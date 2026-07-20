@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { UserPlus, Home, Menu, X } from "lucide-react";
 
@@ -12,6 +12,7 @@ interface NavbarProps {
 
 export default function Navbar({ currentTab, setCurrentTab }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>("home");
 
   const navItems = [
     { label: "Beranda", id: "home", href: "#hero" },
@@ -21,7 +22,37 @@ export default function Navbar({ currentTab, setCurrentTab }: NavbarProps) {
     { label: "Kontak", id: "kontak", href: "#footer" },
   ];
 
+  // Dynamic Scroll spy for active section tracking
+  useEffect(() => {
+    if (currentTab !== "home") return;
+
+    const sectionIds = ["hero", "program", "galeri", "testimoni", "footer"];
+    
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 200;
+
+      for (let i = sectionIds.length - 1; i >= 0; i--) {
+        const sectionId = sectionIds[i];
+        const element = document.getElementById(sectionId);
+        if (element) {
+          const top = element.offsetTop;
+          if (scrollPosition >= top) {
+            const mappedId = sectionId === "hero" ? "home" : sectionId === "footer" ? "kontak" : sectionId;
+            setActiveSection(mappedId);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll(); // Initial check
+
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [currentTab]);
+
   const handleNavClick = (id: string, href: string) => {
+    setActiveSection(id);
     setIsMobileMenuOpen(false);
     if (currentTab !== "home") {
       setCurrentTab("home");
@@ -41,6 +72,7 @@ export default function Navbar({ currentTab, setCurrentTab }: NavbarProps) {
         {/* Left Logo */}
         <button
           onClick={() => {
+            setActiveSection("home");
             setIsMobileMenuOpen(false);
             setCurrentTab("home");
           }}
@@ -66,22 +98,22 @@ export default function Navbar({ currentTab, setCurrentTab }: NavbarProps) {
         </button>
 
         {/* Center Nav Links (Desktop) */}
-        <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+        <nav className="hidden md:flex items-center space-x-2 lg:space-x-4">
           {navItems.map((item) => {
-            const isActive = currentTab === "home" && item.id === "home";
+            const isActive = currentTab === "home" && activeSection === item.id;
             return (
               <button
                 key={item.label}
                 onClick={() => handleNavClick(item.id, item.href)}
-                className={`relative px-4 py-2 text-sm font-semibold transition-colors rounded-full ${
+                className={`relative px-4 py-2 text-sm transition-all duration-200 ${
                   isActive
-                    ? "text-emerald-700 font-bold"
-                    : "text-slate-600 hover:text-emerald-600 hover:bg-emerald-50/50"
+                    ? "text-[#057a44] font-extrabold"
+                    : "text-slate-600 hover:text-emerald-700 font-semibold"
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
                 {isActive && (
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-emerald-600 rounded-full animate-pulse" />
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#057a44] rounded-full transition-all" />
                 )}
               </button>
             );
@@ -140,16 +172,28 @@ export default function Navbar({ currentTab, setCurrentTab }: NavbarProps) {
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white/98 border-b border-emerald-100 px-4 pt-3 pb-6 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col space-y-1">
-            {navItems.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => handleNavClick(item.id, item.href)}
-                className="w-full text-left px-4 py-3 rounded-2xl text-sm font-bold text-slate-700 hover:text-emerald-800 hover:bg-emerald-50 transition-all flex items-center justify-between"
-              >
-                <span>{item.label}</span>
-                <span className="text-xs text-slate-400">→</span>
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const isActive = currentTab === "home" && activeSection === item.id;
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => handleNavClick(item.id, item.href)}
+                  className={`w-full text-left px-4 py-3 rounded-2xl text-sm font-bold transition-all flex items-center justify-between ${
+                    isActive
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      : "text-slate-700 hover:text-emerald-800 hover:bg-emerald-50/50"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    {item.label}
+                    {isActive && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                    )}
+                  </span>
+                  <span className="text-xs text-slate-400">→</span>
+                </button>
+              );
+            })}
           </div>
 
           <div className="pt-3 border-t border-slate-100">
@@ -182,4 +226,5 @@ export default function Navbar({ currentTab, setCurrentTab }: NavbarProps) {
     </header>
   );
 }
+
 
