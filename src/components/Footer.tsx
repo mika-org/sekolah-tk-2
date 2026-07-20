@@ -10,12 +10,12 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center pb-8 border-b border-blue-400/30">
           {/* Brand Info (Left) */}
           <div className="md:col-span-6 flex flex-col sm:flex-row items-start gap-4">
-            <div className="relative w-16 h-16 shrink-0 bg-white rounded-full p-1 shadow-md">
+            <div className="relative w-20 h-20 shrink-0 flex items-center justify-center">
               <Image
                 src="/images/smart_kids_logo.png"
                 alt="Smart Kids Logo"
-                width={64}
-                height={64}
+                width={80}
+                height={80}
                 className="object-contain"
               />
             </div>
@@ -68,12 +68,12 @@ export default function Footer() {
 
           {/* YAPCHI Emblem (Far Right) */}
           <div className="md:col-span-2 flex justify-start md:justify-end items-center">
-            <div className="relative w-20 h-20 bg-white/95 rounded-full p-2 shadow-lg border border-amber-300 transform hover:scale-105 transition-transform">
+            <div className="relative w-24 h-24 shrink-0 transform hover:scale-105 transition-transform flex items-center justify-center">
               <Image
                 src="/images/yapchi_logo.png"
                 alt="YAPCHI Emblem"
-                width={80}
-                height={80}
+                width={96}
+                height={96}
                 className="object-contain"
               />
             </div>
