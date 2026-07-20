@@ -60,6 +60,7 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
   );
   const [copied, setCopied] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [regId, setRegId] = useState<string>("PPDB-2026-8821");
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -81,6 +82,7 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
   };
 
   const handleFinish = () => {
+    setRegId(`PPDB-2026-${Math.floor(1000 + Math.random() * 9000)}`);
     // Trigger confetti
     confetti({
       particleCount: 120,
@@ -114,14 +116,15 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
             </p>
           </div>
 
-          <div className="md:col-span-4 flex justify-end">
-            <div className="relative w-28 h-28 sm:w-32 sm:h-32 shrink-0">
+          <div className="md:col-span-4 flex justify-center md:justify-end items-center">
+            <div className="relative w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 shrink-0 md:-my-4">
               <Image
-                src="/images/owl_mascot.png"
-                alt="Smart Kids Owl Mascot"
+                src="/images/owl_mascot_ppdb-removebg-preview.png"
+                alt="Smart Kids Owl Mascot PPDB"
                 fill
-                sizes="(max-width: 640px) 112px, 128px"
-                className="object-contain drop-shadow-md"
+                sizes="(max-width: 640px) 144px, (max-width: 768px) 176px, 208px"
+                priority
+                className="object-contain drop-shadow-xl hover:scale-105 transition-transform duration-300"
               />
             </div>
           </div>
@@ -880,7 +883,7 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
 
             <div className="bg-slate-50 rounded-2xl p-4 text-xs text-slate-600 border border-slate-100 text-left space-y-1">
               <p>
-                <strong>No. Registrasi:</strong> PPDB-2026-{Math.floor(1000 + Math.random() * 9000)}
+                <strong>No. Registrasi:</strong> {regId}
               </p>
               <p>
                 <strong>Program:</strong> {formData.program}

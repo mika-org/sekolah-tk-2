@@ -20,8 +20,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="id" className={`${plusJakarta.variable} scroll-smooth`}>
-      <body className="font-sans antialiased bg-slate-50 text-slate-800 min-h-screen flex flex-col selection:bg-emerald-200 selection:text-emerald-900">
+    <html
+      lang="id"
+      className={`${plusJakarta.variable} scroll-smooth`}
+      suppressHydrationWarning
+    >
+      <body
+        className="font-sans antialiased bg-slate-50 text-slate-800 min-h-screen flex flex-col selection:bg-emerald-200 selection:text-emerald-900"
+        suppressHydrationWarning
+      >
         {children}
       </body>
     </html>

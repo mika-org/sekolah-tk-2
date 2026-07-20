@@ -141,8 +141,14 @@ export default function LandingPage({ onStartRegistration }: LandingPageProps) {
           {/* Card 1: Playground */}
           <div className="bg-[#f0f7f4] rounded-3xl p-6 border border-emerald-100 flex flex-col justify-between hover:shadow-xl transition-all group">
             <div>
-              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4 text-3xl font-extrabold text-amber-500 group-hover:scale-110 transition-transform">
-                🔤
+              <div className="relative w-24 h-24 mb-4 group-hover:scale-110 transition-transform">
+                <Image
+                  src="/images/program_playground.png"
+                  alt="Icon Program Playground"
+                  fill
+                  sizes="96px"
+                  className="object-contain"
+                />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-1">Playground</h3>
               <span className="inline-block text-xs font-semibold text-emerald-700 bg-emerald-100/70 px-3 py-1 rounded-full mb-4">
@@ -181,8 +187,14 @@ export default function LandingPage({ onStartRegistration }: LandingPageProps) {
           {/* Card 2: Kindergarten */}
           <div className="bg-[#f0f7f4] rounded-3xl p-6 border border-emerald-100 flex flex-col justify-between hover:shadow-xl transition-all group">
             <div>
-              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4 text-3xl font-extrabold text-emerald-500 group-hover:scale-110 transition-transform">
-                🧩
+              <div className="relative w-24 h-24 mb-4 group-hover:scale-110 transition-transform">
+                <Image
+                  src="/images/program_kindergarten.png"
+                  alt="Icon Program Kindergarten"
+                  fill
+                  sizes="96px"
+                  className="object-contain"
+                />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-1">Kindergarten</h3>
               <span className="inline-block text-xs font-semibold text-emerald-700 bg-emerald-100/70 px-3 py-1 rounded-full mb-4">
@@ -221,8 +233,14 @@ export default function LandingPage({ onStartRegistration }: LandingPageProps) {
           {/* Card 3: Pre Kindergarten */}
           <div className="bg-[#f0f7f4] rounded-3xl p-6 border border-emerald-100 flex flex-col justify-between hover:shadow-xl transition-all group">
             <div>
-              <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-4 text-3xl font-extrabold text-blue-500 group-hover:scale-110 transition-transform">
-                🎓
+              <div className="relative w-24 h-24 mb-4 group-hover:scale-110 transition-transform">
+                <Image
+                  src="/images/program_pre_kindergarten.png"
+                  alt="Icon Program Pre Kindergarten"
+                  fill
+                  sizes="96px"
+                  className="object-contain"
+                />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-1">Pre Kindergarten</h3>
               <span className="inline-block text-xs font-semibold text-emerald-700 bg-emerald-100/70 px-3 py-1 rounded-full mb-4">
