@@ -44,6 +44,10 @@ model School {
   galleryItems      GalleryItem[]
   testimonials      Testimonial[]
   ppdbRegistrations PpdbRegistration[]
+  teachers          Teacher[]
+  students          Student[]
+  schedules         Schedule[]
+  announcements     Announcement[]
 
   @@map("schools")
 }
@@ -165,3 +169,121 @@ model UploadLog {
 
   @@map("upload_logs")
 }
+
+model Teacher {
+  id         String   @id @default(cuid())
+  schoolId   String
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name       String
+  role       String   // e.g. "Kepala Sekolah", "Wali Kelas Kindergarten", "Guru Pendamping"
+  photoUrl   String   @default("/images/teacher_default.png")
+  bio        String?  // e.g. "Mendidik dengan kasih sayang"
+  education  String?  // e.g. "S1 Pendidikan PAUD"
+  orderIndex Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("teachers")
+}
+
+model Student {
+  id              String   @id @default(cuid())
+  schoolId        String
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name            String
+  nisn            String   @unique
+  className       String   // e.g. "Kelas TK A"
+  gender          String   @default("L") // L / P
+  avatarUrl       String   @default("https://i.pravatar.cc/150")
+  birthPlaceDate  String
+  parentName      String
+  parentPhone     String
+  address         String
+  attendanceRate  Float    @default(95.0)
+  averageGrade    Float    @default(88.5)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  attendances     Attendance[]
+  sppRecords      SppRecord[]
+
+  @@map("students")
+}
+
+model Schedule {
+  id          String   @id @default(cuid())
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  timeRange   String   // e.g. "08.00 - 09.30"
+  className   String   // e.g. "Kelas TK A"
+  room        String   // e.g. "Ruang Melati"
+  subject     String   // e.g. "Mengenal huruf vokal"
+  activities  String   // e.g. "Bernyanyi, menebalkan huruf"
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("schedules")
+}
+
+model Attendance {
+  id          String   @id @default(cuid())
+  studentId   String
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentName String
+  className   String
+  status      String   @default("hadir") // hadir, sakit, izin, alfa
+  time        String?  // e.g. "07:30"
+  reason      String?
+  date        String   // e.g. "2026-07-23"
+  createdAt   DateTime @default(now())
+
+  @@map("attendances")
+}
+
+model LeaveRequest {
+  id          String   @id @default(cuid())
+  teacherName String
+  type        String   @default("izin") // izin, cuti
+  startDate   String
+  endDate     String
+  reason      String
+  attachment  String?
+  status      String   @default("pending") // pending, disetujui, ditolak
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("leave_requests")
+}
+
+model Announcement {
+  id         String   @id @default(cuid())
+  schoolId   String
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  title      String
+  content    String
+  date       String
+  targetRole String   @default("Semua") // Semua, Guru, Siswa
+  sender     String   @default("Pengelola Sekolah")
+  createdAt  DateTime @default(now())
+
+  @@map("announcements")
+}
+
+model SppRecord {
+  id          String   @id @default(cuid())
+  studentId   String?
+  student     Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  studentName String
+  nisn        String
+  className   String
+  month       String
+  amount      Float    @default(350000)
+  status      String   @default("lunas") // lunas, belumLunas, proses
+  paymentDate String?
+  createdAt   DateTime @default(now())
+
+  @@map("spp_records")
+}
+
+

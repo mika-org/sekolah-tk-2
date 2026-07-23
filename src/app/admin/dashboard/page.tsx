@@ -31,13 +31,31 @@ import {
   Filter,
   ArrowUpRight,
   Clock,
+  GraduationCap,
+  Bell,
+  CreditCard,
+  FileCheck,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [admin, setAdmin] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "schools" | "users" | "ppdb" | "programs" | "gallery" | "testimonials" | "profile"
+    | "overview"
+    | "schools"
+    | "users"
+    | "ppdb"
+    | "programs"
+    | "teachers"
+    | "students"
+    | "attendance"
+    | "spp"
+    | "announcements"
+    | "leave-requests"
+    | "schedules"
+    | "gallery"
+    | "testimonials"
+    | "profile"
   >("overview");
 
   const [loading, setLoading] = useState(true);
@@ -62,6 +80,26 @@ export default function AdminDashboardPage() {
 
   const [programsList, setProgramsList] = useState<any[]>([]);
   const [editingProgram, setEditingProgram] = useState<any | null>(null);
+
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [editingTeacher, setEditingTeacher] = useState<any | null>(null);
+
+  const [studentsList, setStudentsList] = useState<any[]>([]);
+  const [editingStudent, setEditingStudent] = useState<any | null>(null);
+
+  const [attendanceList, setAttendanceList] = useState<any[]>([]);
+  const [editingAttendance, setEditingAttendance] = useState<any | null>(null);
+
+  const [sppList, setSppList] = useState<any[]>([]);
+  const [editingSpp, setEditingSpp] = useState<any | null>(null);
+
+  const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<any | null>(null);
+
+  const [leaveRequestsList, setLeaveRequestsList] = useState<any[]>([]);
+
+  const [schedulesList, setSchedulesList] = useState<any[]>([]);
+  const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
 
   const [galleryList, setGalleryList] = useState<any[]>([]);
   const [newGalleryTitle, setNewGalleryTitle] = useState("");
@@ -196,19 +234,33 @@ export default function AdminDashboardPage() {
     try {
       const queryParam = selectedSchoolId && selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : "";
 
-      const [resPpdb, resProg, resGal, resTest, resProf] = await Promise.all([
+      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp] = await Promise.all([
         fetch(`/api/ppdb${queryParam}`).then((r) => r.json()),
         fetch(`/api/programs${queryParam}`).then((r) => r.json()),
+        fetch(`/api/teachers${queryParam}`).then((r) => r.json()),
         fetch(`/api/gallery${queryParam}`).then((r) => r.json()),
         fetch(`/api/testimonials${queryParam}`).then((r) => r.json()),
         fetch(`/api/site-profile${queryParam}`).then((r) => r.json()),
+        fetch(`/api/students${queryParam}`).then((r) => r.json()),
+        fetch(`/api/schedules${queryParam}`).then((r) => r.json()),
+        fetch(`/api/attendance`).then((r) => r.json()),
+        fetch(`/api/leave-requests`).then((r) => r.json()),
+        fetch(`/api/announcements${queryParam}`).then((r) => r.json()),
+        fetch(`/api/spp`).then((r) => r.json()),
       ]);
 
       if (resPpdb.success) setPpdbList(resPpdb.data || []);
       if (resProg.success) setProgramsList(resProg.data || []);
+      if (resTeach.success) setTeachersList(resTeach.data || []);
       if (resGal.success) setGalleryList(resGal.data || []);
       if (resTest.success) setTestimonialsList(resTest.data || []);
       if (resProf.success && resProf.data) setSiteProfile(resProf.data);
+      if (resStud.success) setStudentsList(resStud.data || []);
+      if (resSched.success) setSchedulesList(resSched.data || []);
+      if (resAtt.success) setAttendanceList(resAtt.data || []);
+      if (resLeave.success) setLeaveRequestsList(resLeave.data || []);
+      if (resAnn.success) setAnnouncementsList(resAnn.data || []);
+      if (resSpp.success) setSppList(resSpp.data || []);
     } catch (err: any) {
       showMessage("Gagal memuat data", "error");
     } finally {
@@ -363,6 +415,265 @@ export default function AdminDashboardPage() {
 
       showMessage("Program dihapus", "success");
       setProgramsList((prev) => prev.filter((p) => p.id !== id));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Teacher Handlers
+  const handleSaveTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const isEdit = !!editingTeacher?.id;
+      const url = isEdit ? `/api/teachers/${editingTeacher.id}` : "/api/teachers";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingTeacher,
+          schoolId: editingTeacher.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(isEdit ? "Data guru diperbarui" : "Guru baru ditambahkan", "success");
+      setEditingTeacher(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTeacher = async (id: string) => {
+    if (!confirm("Hapus data guru ini?")) return;
+    try {
+      const res = await fetch(`/api/teachers/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Data guru dihapus", "success");
+      setTeachersList((prev) => prev.filter((t) => t.id !== id));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Student Handlers
+  const handleSaveStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const isEdit = !!editingStudent?.id;
+      const url = isEdit ? `/api/students/${editingStudent.id}` : "/api/students";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingStudent,
+          schoolId: editingStudent.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(isEdit ? "Data siswa diperbarui" : "Siswa baru ditambahkan", "success");
+      setEditingStudent(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteStudent = async (id: string) => {
+    if (!confirm("Hapus data siswa ini?")) return;
+    try {
+      const res = await fetch(`/api/students/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Data siswa dihapus", "success");
+      setStudentsList((prev) => prev.filter((s) => s.id !== id));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Schedule Handlers
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const isEdit = !!editingSchedule?.id;
+      const url = isEdit ? `/api/schedules/${editingSchedule.id}` : "/api/schedules";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingSchedule,
+          schoolId: editingSchedule.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(isEdit ? "Jadwal diperbarui" : "Jadwal baru ditambahkan", "success");
+      setEditingSchedule(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    if (!confirm("Hapus jadwal ini?")) return;
+    try {
+      const res = await fetch(`/api/schedules/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Jadwal dihapus", "success");
+      setSchedulesList((prev) => prev.filter((s) => s.id !== id));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Announcement Handlers
+  const handleSaveAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/announcements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingAnnouncement,
+          schoolId: editingAnnouncement.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Pengumuman berhasil diterbitkan", "success");
+      setEditingAnnouncement(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm("Hapus pengumuman ini?")) return;
+    try {
+      const res = await fetch(`/api/announcements/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Pengumuman dihapus", "success");
+      setAnnouncementsList((prev) => prev.filter((a) => a.id !== id));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Leave Request Handlers
+  const handleUpdateLeaveStatus = async (id: string, status: string) => {
+    try {
+      const res = await fetch(`/api/leave-requests/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(`Status izin diubah menjadi ${status}`, "success");
+      setLeaveRequestsList((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  const handleDeleteLeaveRequest = async (id: string) => {
+    if (!confirm("Hapus pengajuan izin ini?")) return;
+    try {
+      const res = await fetch(`/api/leave-requests/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Pengajuan izin dihapus", "success");
+      setLeaveRequestsList((prev) => prev.filter((l) => l.id !== id));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // SPP Handlers
+  const handleSaveSpp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/spp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingSpp),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Catatan SPP berhasil ditambahkan", "success");
+      setEditingSpp(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateSppStatus = async (id: string, status: string) => {
+    try {
+      const res = await fetch(`/api/spp/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(`Status SPP diperbarui menjadi ${status}`, "success");
+      setSppList((prev) => prev.map((s) => (s.id === id ? { ...s, status } : s)));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  const handleDeleteSpp = async (id: string) => {
+    if (!confirm("Hapus data SPP ini?")) return;
+    try {
+      const res = await fetch(`/api/spp/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Data SPP dihapus", "success");
+      setSppList((prev) => prev.filter((s) => s.id !== id));
     } catch (err: any) {
       showMessage(err.message, "error");
     }
@@ -703,6 +1014,125 @@ export default function AdminDashboardPage() {
               </div>
               <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
                 {programsList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("teachers")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "teachers"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Award className="w-4 h-4 text-emerald-400" />
+                <span>Kelola Guru & Pengajar</span>
+              </div>
+              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                {teachersList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("students")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "students"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <GraduationCap className="w-4 h-4 text-blue-400" />
+                <span>Kelola Data Siswa</span>
+              </div>
+              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                {studentsList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("attendance")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "attendance"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                <span>Presensi Siswa</span>
+              </div>
+              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                {attendanceList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("spp")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "spp"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-4 h-4 text-amber-400" />
+                <span>SPP & Keuangan</span>
+              </div>
+              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                {sppList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("announcements")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "announcements"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Bell className="w-4 h-4 text-purple-400" />
+                <span>Pengumuman</span>
+              </div>
+              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                {announcementsList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("leave-requests")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "leave-requests"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileCheck className="w-4 h-4 text-rose-400" />
+                <span>Izin & Cuti Guru</span>
+              </div>
+              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                {leaveRequestsList.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("schedules")}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                activeTab === "schedules"
+                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Clock className="w-4 h-4 text-cyan-400" />
+                <span>Jadwal KBM</span>
+              </div>
+              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                {schedulesList.length}
               </span>
             </button>
 
@@ -1696,6 +2126,652 @@ export default function AdminDashboardPage() {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: GURU & PENGAJAR */}
+          {activeTab === "teachers" && (
+            <div className="space-y-6 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">
+                    Kelola Guru & Tenaga Pendidik
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Tambah, perbarui profil, foto, serta informasi guru per cabang sekolah.
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setEditingTeacher({
+                      name: "",
+                      role: "",
+                      photoUrl: "/images/teacher1.png",
+                      education: "S1 Pendidikan PAUD",
+                      bio: "",
+                      orderIndex: teachersList.length + 1,
+                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                    })
+                  }
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Guru</span>
+                </button>
+              </div>
+
+              {editingTeacher && (
+                <form
+                  onSubmit={handleSaveTeacher}
+                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
+                >
+                  <h3 className="font-bold text-white text-base">
+                    {editingTeacher.id ? "Edit Data Guru" : "Tambah Guru Baru"}
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Pilih Cabang Sekolah
+                      </label>
+                      <select
+                        value={editingTeacher.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id)}
+                        onChange={(e) =>
+                          setEditingTeacher({ ...editingTeacher, schoolId: e.target.value })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      >
+                        {schoolsList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Nama Lengkap & Gelar
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingTeacher.name}
+                        onChange={(e) =>
+                          setEditingTeacher({ ...editingTeacher, name: e.target.value })
+                        }
+                        placeholder="Bunda Siti Rahma, S.Pd."
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Jabatan / Peran
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingTeacher.role}
+                        onChange={(e) =>
+                          setEditingTeacher({ ...editingTeacher, role: e.target.value })
+                        }
+                        placeholder="Kepala Sekolah / Wali Kelas Kindergarten"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Pendidikan Terakhir
+                      </label>
+                      <input
+                        type="text"
+                        value={editingTeacher.education || ""}
+                        onChange={(e) =>
+                          setEditingTeacher({ ...editingTeacher, education: e.target.value })
+                        }
+                        placeholder="S1 Pendidikan PAUD"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        URL Foto Profil Guru (atau upload)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editingTeacher.photoUrl || ""}
+                          onChange={(e) =>
+                            setEditingTeacher({ ...editingTeacher, photoUrl: e.target.value })
+                          }
+                          placeholder="/images/teacher1.png"
+                          className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                        />
+                        <label className="px-3 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold cursor-pointer shrink-0 border border-slate-700 flex items-center gap-1">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                try {
+                                  const url = await uploadFile(file, "profile");
+                                  setEditingTeacher({ ...editingTeacher, photoUrl: url });
+                                  showMessage("Foto guru diunggah!", "success");
+                                } catch (err: any) {
+                                  showMessage(err.message, "error");
+                                }
+                              }
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Urutan Tampilan
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTeacher.orderIndex || 0}
+                        onChange={(e) =>
+                          setEditingTeacher({ ...editingTeacher, orderIndex: e.target.value })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">
+                      Kutipan / Deskripsi Singkat
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={editingTeacher.bio || ""}
+                      onChange={(e) =>
+                        setEditingTeacher({ ...editingTeacher, bio: e.target.value })
+                      }
+                      placeholder="Mendidik dengan penuh rasa kasih sayang..."
+                      className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingTeacher(null)}
+                      className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                    >
+                      Simpan Data Guru
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {teachersList.length === 0 ? (
+                <div className="text-center py-12 bg-slate-900/50 rounded-3xl border border-dashed border-slate-800">
+                  <p className="text-sm text-slate-400">Belum ada data guru untuk cabang sekolah ini.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
+                  {teachersList.map((teacher) => (
+                    <div
+                      key={teacher.id}
+                      className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 flex flex-col justify-between transition-all shadow-xl group"
+                    >
+                      <div className="space-y-3 flex flex-col items-center text-center">
+                        <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-emerald-500/30 bg-slate-950 flex items-center justify-center">
+                          {teacher.photoUrl ? (
+                            <Image
+                              src={teacher.photoUrl}
+                              alt={teacher.name}
+                              fill
+                              sizes="96px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <Users className="w-10 h-10 text-emerald-400" />
+                          )}
+                        </div>
+
+                        <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                          {teacher.school?.name}
+                        </span>
+
+                        <div>
+                          <h3 className="font-extrabold text-base text-white group-hover:text-emerald-400 transition-colors">
+                            {teacher.name}
+                          </h3>
+                          <p className="text-xs text-emerald-300 font-semibold mt-0.5">{teacher.role}</p>
+                          {teacher.education && (
+                            <p className="text-[11px] text-slate-400 mt-1">{teacher.education}</p>
+                          )}
+                        </div>
+
+                        {teacher.bio && (
+                          <p className="text-xs text-slate-300 italic bg-slate-950/80 p-3 rounded-2xl border border-slate-800 w-full">
+                            &quot;{teacher.bio}&quot;
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-800/80 text-xs">
+                        <span className="text-slate-500 text-[11px]">Urutan: #{teacher.orderIndex}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingTeacher(teacher)}
+                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl"
+                            title="Edit Data Guru"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTeacher(teacher.id)}
+                            className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl"
+                            title="Hapus Guru"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: DATA SISWA */}
+          {activeTab === "students" && (
+            <div className="space-y-6 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Kelola Data Siswa / Murid</h2>
+                  <p className="text-xs text-slate-400">Daftar seluruh siswa terdaftar per cabang sekolah.</p>
+                </div>
+                <button
+                  onClick={() =>
+                    setEditingStudent({
+                      name: "",
+                      nisn: `2122${Math.floor(1000 + Math.random() * 9000)}`,
+                      className: "Kelas TK A",
+                      gender: "L",
+                      avatarUrl: "https://i.pravatar.cc/150",
+                      birthPlaceDate: "Karawang, 01 Jan 2021",
+                      parentName: "",
+                      parentPhone: "",
+                      address: "",
+                      attendanceRate: 95.0,
+                      averageGrade: 88.5,
+                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                    })
+                  }
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Siswa</span>
+                </button>
+              </div>
+
+              {editingStudent && (
+                <form onSubmit={handleSaveStudent} className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
+                  <h3 className="font-bold text-white text-base">{editingStudent.id ? "Edit Data Siswa" : "Tambah Siswa Baru"}</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Nama Siswa</label>
+                      <input type="text" required value={editingStudent.name} onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">NISN / No Induk</label>
+                      <input type="text" required value={editingStudent.nisn} onChange={(e) => setEditingStudent({ ...editingStudent, nisn: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Kelas</label>
+                      <input type="text" required value={editingStudent.className} onChange={(e) => setEditingStudent({ ...editingStudent, className: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Nama Orang Tua</label>
+                      <input type="text" value={editingStudent.parentName} onChange={(e) => setEditingStudent({ ...editingStudent, parentName: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">No WhatsApp Ortu</label>
+                      <input type="text" value={editingStudent.parentPhone} onChange={(e) => setEditingStudent({ ...editingStudent, parentPhone: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Jenis Kelamin</label>
+                      <select value={editingStudent.gender} onChange={(e) => setEditingStudent({ ...editingStudent, gender: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                        <option value="L">Laki-laki (L)</option>
+                        <option value="P">Perempuan (P)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setEditingStudent(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30">Simpan Siswa</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {studentsList.map((s) => (
+                  <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm">
+                        {s.name.charAt(0)}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                        <p className="text-xs text-slate-400">{s.nisn} • <span className="text-emerald-400 font-semibold">{s.className}</span></p>
+                        <p className="text-[11px] text-slate-500">Ortu: {s.parentName} ({s.parentPhone})</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditingStudent(s)} className="p-2 bg-slate-800 text-slate-300 rounded-xl"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => handleDeleteStudent(s.id)} className="p-2 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PRESENSI SISWA */}
+          {activeTab === "attendance" && (
+            <div className="space-y-6 w-full">
+              <div className="border-b border-slate-800/80 pb-4">
+                <h2 className="text-2xl font-black text-white tracking-tight">Presensi Siswa Harian</h2>
+                <p className="text-xs text-slate-400">Catatan kehadiran murid (Hadir, Sakit, Izin, Alfa).</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {attendanceList.map((att) => (
+                  <div key={att.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-2 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{att.studentName}</h4>
+                      <p className="text-xs text-slate-400">{att.className} • Tanggal: {att.date}</p>
+                      {att.reason && <p className="text-[11px] text-amber-400 italic">Keterangan: {att.reason}</p>}
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${att.status === "hadir" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : att.status === "sakit" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
+                      {att.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: SPP & KEUANGAN */}
+          {activeTab === "spp" && (
+            <div className="space-y-6 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">SPP & Catatan Keuangan</h2>
+                  <p className="text-xs text-slate-400">Kelola status pembayaran SPP bulanan siswa.</p>
+                </div>
+                <button
+                  onClick={() =>
+                    setEditingSpp({
+                      studentName: studentsList[0]?.name || "Siswa Smart Kids",
+                      nisn: studentsList[0]?.nisn || "123456789",
+                      className: studentsList[0]?.className || "TK A",
+                      month: "Juli 2026",
+                      amount: 350000,
+                      status: "lunas",
+                      paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                    })
+                  }
+                  className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Catatan SPP</span>
+                </button>
+              </div>
+
+              {editingSpp && (
+                <form onSubmit={handleSaveSpp} className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
+                  <h3 className="font-bold text-white text-base">Tambah Pembayaran SPP</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Nama Siswa</label>
+                      <input type="text" required value={editingSpp.studentName} onChange={(e) => setEditingSpp({ ...editingSpp, studentName: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Bulan SPP</label>
+                      <input type="text" required value={editingSpp.month} onChange={(e) => setEditingSpp({ ...editingSpp, month: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Nominal (Rp)</label>
+                      <input type="number" required value={editingSpp.amount} onChange={(e) => setEditingSpp({ ...editingSpp, amount: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setEditingSpp(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30">Simpan SPP</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {sppList.map((spp) => (
+                  <div key={spp.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-white text-sm">{spp.studentName}</h4>
+                      <p className="text-xs text-slate-400">{spp.month} • Rp {Number(spp.amount).toLocaleString("id-ID")}</p>
+                      {spp.paymentDate && <p className="text-[11px] text-emerald-400">Bayar: {spp.paymentDate}</p>}
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${spp.status === "lunas" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
+                        {spp.status}
+                      </span>
+                      <button onClick={() => handleDeleteSpp(spp.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PENGUMUMAN */}
+          {activeTab === "announcements" && (
+            <div className="space-y-6 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Pengumuman Sekolah</h2>
+                  <p className="text-xs text-slate-400">Terbitkan pengumuman resmi ke aplikasi mobile guru dan wali murid.</p>
+                </div>
+                <button
+                  onClick={() =>
+                    setEditingAnnouncement({
+                      title: "",
+                      content: "",
+                      targetRole: "Semua",
+                      sender: "Pengelola Sekolah",
+                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                    })
+                  }
+                  className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Buat Pengumuman</span>
+                </button>
+              </div>
+
+              {editingAnnouncement && (
+                <form onSubmit={handleSaveAnnouncement} className="bg-slate-900/90 border border-purple-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
+                  <h3 className="font-bold text-white text-base">Terbitkan Pengumuman Baru</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Judul Pengumuman</label>
+                      <input type="text" required value={editingAnnouncement.title} onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, title: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Target Penerima</label>
+                      <select value={editingAnnouncement.targetRole} onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, targetRole: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                        <option value="Semua">Semua (Guru & Ortu)</option>
+                        <option value="Guru">Khusus Guru</option>
+                        <option value="Siswa">Khusus Ortu/Siswa</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Isi Pengumuman</label>
+                    <textarea rows={3} required value={editingAnnouncement.content} onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, content: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setEditingAnnouncement(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/30">Terbitkan</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                {announcementsList.map((ann) => (
+                  <div key={ann.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-purple-400 bg-purple-500/10 px-2.5 py-1 rounded-full border border-purple-500/20">{ann.targetRole}</span>
+                        <span className="text-xs text-slate-500">{ann.date}</span>
+                      </div>
+                      <h4 className="font-extrabold text-white text-base">{ann.title}</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed">{ann.content}</p>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs text-slate-500">
+                      <span>Pengirim: {ann.sender}</span>
+                      <button onClick={() => handleDeleteAnnouncement(ann.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: IZIN & CUTI GURU */}
+          {activeTab === "leave-requests" && (
+            <div className="space-y-6 w-full">
+              <div className="border-b border-slate-800/80 pb-4">
+                <h2 className="text-2xl font-black text-white tracking-tight">Pengajuan Izin & Cuti Guru</h2>
+                <p className="text-xs text-slate-400">Verifikasi dan beri persetujuan atas pengajuan izin/cuti dari guru.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                {leaveRequestsList.map((leave) => (
+                  <div key={leave.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-white text-base">{leave.teacherName}</h4>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${leave.status === "disetujui" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : leave.status === "ditolak" ? "bg-red-500/20 text-red-300 border border-red-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"}`}>
+                        {leave.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300">Tipe: <span className="font-bold text-emerald-400 uppercase">{leave.type}</span> ({leave.startDate} - {leave.endDate})</p>
+                    <p className="text-xs text-slate-400 italic bg-slate-950 p-3 rounded-2xl border border-slate-800">&quot;{leave.reason}&quot;</p>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                      <button onClick={() => handleUpdateLeaveStatus(leave.id, "disetujui")} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /><span>Setujui</span></button>
+                      <button onClick={() => handleUpdateLeaveStatus(leave.id, "ditolak")} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><XCircle className="w-3.5 h-3.5" /><span>Tolak</span></button>
+                      <button onClick={() => handleDeleteLeaveRequest(leave.id)} className="p-2 bg-slate-800 text-slate-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: JADWAL KBM */}
+          {activeTab === "schedules" && (
+            <div className="space-y-6 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Jadwal Kegiatan Belajar (KBM)</h2>
+                  <p className="text-xs text-slate-400">Atur alokasi waktu dan materi pelajaran harian.</p>
+                </div>
+                <button
+                  onClick={() =>
+                    setEditingSchedule({
+                      timeRange: "08.00 - 09.30",
+                      className: "Kelas TK A",
+                      room: "Ruang Melati",
+                      subject: "",
+                      activities: "",
+                      isCompleted: false,
+                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                    })
+                  }
+                  className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/30"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Jadwal</span>
+                </button>
+              </div>
+
+              {editingSchedule && (
+                <form onSubmit={handleSaveSchedule} className="bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
+                  <h3 className="font-bold text-white text-base">Tambah Jadwal Pelajaran</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Waktu (Jam)</label>
+                      <input type="text" required value={editingSchedule.timeRange} onChange={(e) => setEditingSchedule({ ...editingSchedule, timeRange: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Kelas</label>
+                      <input type="text" required value={editingSchedule.className} onChange={(e) => setEditingSchedule({ ...editingSchedule, className: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Ruangan</label>
+                      <input type="text" required value={editingSchedule.room} onChange={(e) => setEditingSchedule({ ...editingSchedule, room: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Materi / Subjek</label>
+                      <input type="text" required value={editingSchedule.subject} onChange={(e) => setEditingSchedule({ ...editingSchedule, subject: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Aktivitas Belajar</label>
+                      <input type="text" required value={editingSchedule.activities} onChange={(e) => setEditingSchedule({ ...editingSchedule, activities: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setEditingSchedule(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-cyan-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-600/30">Simpan Jadwal</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {schedulesList.map((sch) => (
+                  <div key={sch.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">{sch.timeRange}</span>
+                        <span className="text-xs text-slate-400">{sch.className} • {sch.room}</span>
+                      </div>
+                      <h4 className="font-bold text-white text-base">{sch.subject}</h4>
+                      <p className="text-xs text-slate-400">{sch.activities}</p>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                      <button onClick={() => handleDeleteSchedule(sch.id)} className="p-2 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 ))}

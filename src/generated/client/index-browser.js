@@ -241,6 +241,99 @@ exports.Prisma.UploadLogScalarFieldEnum = {
   createdAt: 'createdAt'
 };
 
+exports.Prisma.TeacherScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  name: 'name',
+  role: 'role',
+  photoUrl: 'photoUrl',
+  bio: 'bio',
+  education: 'education',
+  orderIndex: 'orderIndex',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.StudentScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  name: 'name',
+  nisn: 'nisn',
+  className: 'className',
+  gender: 'gender',
+  avatarUrl: 'avatarUrl',
+  birthPlaceDate: 'birthPlaceDate',
+  parentName: 'parentName',
+  parentPhone: 'parentPhone',
+  address: 'address',
+  attendanceRate: 'attendanceRate',
+  averageGrade: 'averageGrade',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ScheduleScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  timeRange: 'timeRange',
+  className: 'className',
+  room: 'room',
+  subject: 'subject',
+  activities: 'activities',
+  isCompleted: 'isCompleted',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AttendanceScalarFieldEnum = {
+  id: 'id',
+  studentId: 'studentId',
+  studentName: 'studentName',
+  className: 'className',
+  status: 'status',
+  time: 'time',
+  reason: 'reason',
+  date: 'date',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.LeaveRequestScalarFieldEnum = {
+  id: 'id',
+  teacherName: 'teacherName',
+  type: 'type',
+  startDate: 'startDate',
+  endDate: 'endDate',
+  reason: 'reason',
+  attachment: 'attachment',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.AnnouncementScalarFieldEnum = {
+  id: 'id',
+  schoolId: 'schoolId',
+  title: 'title',
+  content: 'content',
+  date: 'date',
+  targetRole: 'targetRole',
+  sender: 'sender',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.SppRecordScalarFieldEnum = {
+  id: 'id',
+  studentId: 'studentId',
+  studentName: 'studentName',
+  nisn: 'nisn',
+  className: 'className',
+  month: 'month',
+  amount: 'amount',
+  status: 'status',
+  paymentDate: 'paymentDate',
+  createdAt: 'createdAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -266,7 +359,14 @@ exports.Prisma.ModelName = {
   GalleryItem: 'GalleryItem',
   Testimonial: 'Testimonial',
   PpdbRegistration: 'PpdbRegistration',
-  UploadLog: 'UploadLog'
+  UploadLog: 'UploadLog',
+  Teacher: 'Teacher',
+  Student: 'Student',
+  Schedule: 'Schedule',
+  Attendance: 'Attendance',
+  LeaveRequest: 'LeaveRequest',
+  Announcement: 'Announcement',
+  SppRecord: 'SppRecord'
 };
 
 /**

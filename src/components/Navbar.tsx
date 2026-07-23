@@ -27,6 +27,7 @@ export default function Navbar({
   const navItems = [
     { label: "Beranda", id: "home", href: "#hero" },
     { label: "Program", id: "program", href: "#program" },
+    { label: "Pengajar", id: "guru", href: "#guru" },
     { label: "Galeri", id: "galeri", href: "#galeri" },
     { label: "Testimoni", id: "testimoni", href: "#testimoni" },
     { label: "Kontak", id: "kontak", href: "#footer" },
@@ -34,7 +35,7 @@ export default function Navbar({
 
   useEffect(() => {
     if (currentTab !== "home") return;
-    const sectionIds = ["hero", "program", "galeri", "testimoni", "footer"];
+    const sectionIds = ["hero", "program", "guru", "galeri", "testimoni", "footer"];
 
     const handleScroll = () => {
       const scrollPosition = window.scrollY + 200;

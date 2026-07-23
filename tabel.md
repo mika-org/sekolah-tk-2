@@ -206,16 +206,33 @@ Setiap Sekolah memiliki 1 profil tampilan halaman website tersendiri.
 
 ---
 
-### E. Relasi `Program`, `GalleryItem`, `Testimonial`, & `PpdbRegistration`
+### E. Tabel `Teacher` (`teachers`)
+| Nama Kolom | Tipe Data | Atribut | Keterangan |
+| :--- | :--- | :--- | :--- |
+| `id` | VARCHAR(191) | Primary Key, CUID | ID Guru |
+| `schoolId` | VARCHAR(191) | Foreign Key -> School | ID Sekolah Tempat Mengajar |
+| `name` | VARCHAR(191) | Not Null | Nama Lengkap & Gelar |
+| `role` | VARCHAR(191) | Not Null | Jabatan / Peran Pengajar |
+| `photoUrl` | TEXT | Default: '/images/teacher_default.png' | URL Foto Guru |
+| `bio` | TEXT | Nullable | Deskripsi / Kutipan Singkat |
+| `education` | VARCHAR(191) | Nullable | Pendidikan Terakhir |
+| `orderIndex` | INT | Default: 0 | Urutan Tampilan |
+| `createdAt` | TIMESTAMP | Default: NOW() | Tanggal Dibuat |
+| `updatedAt` | TIMESTAMP | Auto Update | Tanggal Pembaruan |
+
+---
+
+### F. Relasi `Program`, `Teacher`, `GalleryItem`, `Testimonial`, & `PpdbRegistration`
 Setiap entitas memuat kolom `schoolId` (Foreign Key ke `School`):
 - `Program.schoolId`: Memisahkan program belajar antar sekolah.
+- `Teacher.schoolId`: Memisahkan data guru & tenaga pendidik antar sekolah.
 - `GalleryItem.schoolId`: Memisahkan foto galeri antar sekolah.
 - `Testimonial.schoolId`: Memisahkan testimoni orang tua antar sekolah.
 - `PpdbRegistration.schoolId`: Memisahkan data pendaftaran siswa baru antar sekolah.
 
 ---
 
-## 3. Endpoints API Pengaturan User Admin
+## 3. Endpoints API Pengaturan User Admin & Guru
 
 | Method | Endpoint | Access Role | Keterangan |
 | :--- | :--- | :--- | :--- |
@@ -223,4 +240,31 @@ Setiap entitas memuat kolom `schoolId` (Foreign Key ke `School`):
 | `POST` | `/api/admin-users` | `SUPER_ADMIN` | Menambahkan pengguna admin baru (dengan hashing bcrypt) |
 | `PUT` | `/api/admin-users/[id]` | `SUPER_ADMIN` | Memperbarui data pengguna admin, role, dan password |
 | `DELETE` | `/api/admin-users/[id]` | `SUPER_ADMIN` | Menghapus pengguna admin (dengan proteksi self-delete) |
+| `GET` | `/api/teachers` | `PUBLIC / ALL` | Mengambil daftar guru (filter param `schoolId` / `schoolCode`) |
+| `POST` | `/api/teachers` | `ALL_ADMIN` | Menambahkan data guru baru |
+| `PUT` | `/api/teachers/[id]` | `ALL_ADMIN` | Memperbarui data guru |
+| `DELETE` | `/api/teachers/[id]` | `ALL_ADMIN` | Menghapus data guru |
+| `GET` | `/api/students` | `PUBLIC / ALL` | Mengambil daftar siswa/murid (filter param `schoolId` / `schoolCode`) |
+| `POST` | `/api/students` | `ALL_ADMIN` | Menambahkan data siswa baru |
+| `PUT` | `/api/students/[id]` | `ALL_ADMIN` | Memperbarui data siswa |
+| `DELETE` | `/api/students/[id]` | `ALL_ADMIN` | Menghapus data siswa |
+| `GET` | `/api/schedules` | `PUBLIC / ALL` | Mengambil jadwal KBM (filter param `schoolId` / `schoolCode`) |
+| `POST` | `/api/schedules` | `ALL_ADMIN` | Menambahkan jadwal KBM |
+| `PUT` | `/api/schedules/[id]` | `ALL_ADMIN` | Memperbarui jadwal KBM |
+| `DELETE` | `/api/schedules/[id]` | `ALL_ADMIN` | Menghapus jadwal KBM |
+| `GET` | `/api/announcements` | `PUBLIC / ALL` | Mengambil pengumuman (filter param `schoolId` / `schoolCode`) |
+| `POST` | `/api/announcements` | `ALL_ADMIN` | Menerbitkan pengumuman baru |
+| `DELETE` | `/api/announcements/[id]` | `ALL_ADMIN` | Menghapus pengumuman |
+| `GET` | `/api/attendance` | `ALL_ADMIN / GURU` | Mengambil data presensi siswa |
+| `POST` | `/api/attendance` | `ALL_ADMIN / GURU` | Mencatat presensi siswa baru |
+| `DELETE` | `/api/attendance/[id]` | `ALL_ADMIN` | Menghapus record presensi |
+| `GET` | `/api/leave-requests` | `ALL_ADMIN / GURU` | Mengambil data pengajuan izin/cuti guru |
+| `POST` | `/api/leave-requests` | `GURU / ALL` | Mengajukan izin/cuti baru |
+| `PATCH` | `/api/leave-requests/[id]` | `ALL_ADMIN` | Memperbarui status persetujuan izin/cuti |
+| `DELETE` | `/api/leave-requests/[id]` | `ALL_ADMIN` | Menghapus pengajuan izin/cuti |
+| `GET` | `/api/spp` | `ALL_ADMIN / ORTU` | Mengambil data pembayaran SPP |
+| `POST` | `/api/spp` | `ALL_ADMIN` | Menambahkan catatan SPP baru |
+| `PATCH` | `/api/spp/[id]` | `ALL_ADMIN` | Memperbarui status pembayaran SPP |
+| `DELETE` | `/api/spp/[id]` | `ALL_ADMIN` | Menghapus catatan SPP |
+
 

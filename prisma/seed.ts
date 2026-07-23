@@ -123,7 +123,8 @@ async function main() {
 
   console.log("Site Profiles seeded for both school branches.");
 
-  // 5. Seed Programs for DeKeraton
+  // 5. Seed Programs for DeKeraton & Cikarang
+  await prisma.program.deleteMany({});
   await prisma.program.createMany({
     data: [
       {
@@ -201,6 +202,7 @@ async function main() {
   console.log("Programs seeded for both schools.");
 
   // 6. Seed Gallery
+  await prisma.galleryItem.deleteMany({});
   await prisma.galleryItem.createMany({
     data: [
       {
@@ -235,6 +237,7 @@ async function main() {
   });
 
   // 7. Seed Testimonials
+  await prisma.testimonial.deleteMany({});
   await prisma.testimonial.createMany({
     data: [
       {
@@ -272,9 +275,63 @@ async function main() {
     ],
   });
 
-  // 8. Seed Initial PPDB Registration
-  await prisma.ppdbRegistration.create({
-    data: {
+  // 8. Seed Teachers
+  await prisma.teacher.deleteMany({});
+  await prisma.teacher.createMany({
+    data: [
+      {
+        schoolId: schoolDeKeraton.id,
+        name: "Bunda Siti Rahma, S.Pd.",
+        role: "Kepala Sekolah & Guru Utama",
+        photoUrl: "/images/teacher1.png",
+        bio: "Berpengalaman lebih dari 8 tahun mendidik anak usia dini dengan kasih sayang.",
+        education: "S1 Pendidikan Anak Usia Dini (PAUD)",
+        orderIndex: 1,
+      },
+      {
+        schoolId: schoolDeKeraton.id,
+        name: "Bunda Anisa Fitri, S.Psi.",
+        role: "Wali Kelas Kindergarten",
+        photoUrl: "/images/teacher2.png",
+        bio: "Fokus pada pengembangan kognitif dan pembentukan karakter anak.",
+        education: "S1 Psikologi Pendidikan",
+        orderIndex: 2,
+      },
+      {
+        schoolId: schoolDeKeraton.id,
+        name: "Bunda Dewi Lestari, A.Md.",
+        role: "Guru Pendamping Playground",
+        photoUrl: "/images/teacher3.png",
+        bio: "Penyabar dan terampil merancang aktivitas motorik serta seni yang seru.",
+        education: "D3 Pendidikan Seni & Kreativitas",
+        orderIndex: 3,
+      },
+      {
+        schoolId: schoolCikarang.id,
+        name: "Bunda Ratna Sari, S.Pd.",
+        role: "Kepala Sekolah Cabang Cikarang",
+        photoUrl: "/images/teacher1.png",
+        bio: "Berkomitmen mencetak generasi cilik yang cerdas dan mandiri.",
+        education: "S1 Pendidikan Dasar",
+        orderIndex: 1,
+      },
+      {
+        schoolId: schoolCikarang.id,
+        name: "Bunda Maya Indah, S.Pd.",
+        role: "Guru TK A & B",
+        photoUrl: "/images/teacher2.png",
+        bio: "Spesialis metode belajar interaktif dan pengenalan calistung yang menyenangkan.",
+        education: "S1 Pendidikan PAUD",
+        orderIndex: 2,
+      },
+    ],
+  });
+
+  // 9. Seed Initial PPDB Registration
+  await prisma.ppdbRegistration.upsert({
+    where: { registrationNo: "PPDB-2026-8821" },
+    update: {},
+    create: {
       schoolId: schoolDeKeraton.id,
       registrationNo: "PPDB-2026-8821",
       namaAnak: "Eti Sulastri",
@@ -296,6 +353,141 @@ async function main() {
       paymentMethod: "bank",
       status: "APPROVED",
     },
+  });
+
+  // 10. Seed Students
+  await prisma.student.deleteMany({});
+  const student1 = await prisma.student.create({
+    data: {
+      schoolId: schoolDeKeraton.id,
+      name: "Muhammad Rizky Al-Fayyid",
+      nisn: "212201001",
+      className: "Kelas TK A",
+      gender: "L",
+      avatarUrl: "https://i.pravatar.cc/150?img=60",
+      birthPlaceDate: "Karawang, 12 Mei 2021",
+      parentName: "Ahmad Rizky",
+      parentPhone: "0812-3344-5566",
+      address: "Perum DeKeraton Blok B5 No. 12",
+      attendanceRate: 96.5,
+      averageGrade: 92.0,
+    },
+  });
+
+  const student2 = await prisma.student.create({
+    data: {
+      schoolId: schoolDeKeraton.id,
+      name: "Aisha Nabila Putri",
+      nisn: "212201002",
+      className: "Kelas TK A",
+      gender: "P",
+      avatarUrl: "https://i.pravatar.cc/150?img=61",
+      birthPlaceDate: "Karawang, 24 Agustus 2021",
+      parentName: "Bunda Ratna",
+      parentPhone: "0812-9988-7766",
+      address: "Perum DeKeraton Blok C2 No. 8",
+      attendanceRate: 98.0,
+      averageGrade: 95.0,
+    },
+  });
+
+  // 11. Seed Schedules
+  await prisma.schedule.deleteMany({});
+  await prisma.schedule.createMany({
+    data: [
+      {
+        schoolId: schoolDeKeraton.id,
+        timeRange: "08.00 - 09.30",
+        className: "Kelas TK A",
+        room: "Ruang Melati",
+        subject: "Mengenal huruf vokal",
+        activities: "Bernyanyi, menebalkan huruf, bermain permainan edukatif",
+        isCompleted: true,
+      },
+      {
+        schoolId: schoolDeKeraton.id,
+        timeRange: "09.30 - 10.30",
+        className: "Kelas TK B",
+        room: "Ruang Mawar",
+        subject: "Mengenal angka 1-10",
+        activities: "Menghitung benda, menyusun angka, permainan edukatif",
+        isCompleted: false,
+      },
+    ],
+  });
+
+  // 12. Seed Announcements
+  await prisma.announcement.deleteMany({});
+  await prisma.announcement.createMany({
+    data: [
+      {
+        schoolId: schoolDeKeraton.id,
+        title: "Kegiatan Outbound & Field Trip Ke Taman Mini",
+        content: "Diberitahukan kepada seluruh orang tua siswa TK A & TK B bahwa kegiatan Outbound akan dilaksanakan bulan depan.",
+        date: "24 Juli 2026",
+        targetRole: "Semua",
+        sender: "Panitia Sekolah",
+      },
+      {
+        schoolId: schoolDeKeraton.id,
+        title: "Rapat Koordinasi Pengajar Awal Semester",
+        content: "Rapat persiapan kurikulum dan pembelajaran semester ganjil bagi seluruh bapak/ibu guru.",
+        date: "22 Juli 2026",
+        targetRole: "Guru",
+        sender: "Kepala Sekolah",
+      },
+    ],
+  });
+
+  // 13. Seed Attendance
+  await prisma.attendance.deleteMany({});
+  await prisma.attendance.createMany({
+    data: [
+      {
+        studentId: student1.id,
+        studentName: student1.name,
+        className: student1.className,
+        status: "sakit",
+        time: "06.30",
+        reason: "Demam dan flu",
+        date: "2026-07-23",
+      },
+      {
+        studentId: student2.id,
+        studentName: student2.name,
+        className: student2.className,
+        status: "hadir",
+        time: "07.15",
+        date: "2026-07-23",
+      },
+    ],
+  });
+
+  // 14. Seed SPP Records
+  await prisma.sppRecord.deleteMany({});
+  await prisma.sppRecord.createMany({
+    data: [
+      {
+        studentId: student1.id,
+        studentName: student1.name,
+        nisn: student1.nisn,
+        className: student1.className,
+        month: "Juli 2026",
+        amount: 350000,
+        status: "lunas",
+        paymentDate: "05 Juli 2026",
+      },
+      {
+        studentId: student2.id,
+        studentName: student2.name,
+        nisn: student2.nisn,
+        className: student2.className,
+        month: "Juli 2026",
+        amount: 350000,
+        status: "lunas",
+        paymentDate: "10 Juli 2026",
+      },
+    ],
   });
 
   console.log("Database Multi-School Yayasan seeded successfully!");

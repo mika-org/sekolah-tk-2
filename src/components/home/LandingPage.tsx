@@ -24,6 +24,7 @@ export default function LandingPage({
 }: LandingPageProps) {
   const [siteProfile, setSiteProfile] = useState<any>(null);
   const [programs, setPrograms] = useState<any[]>([]);
+  const [teachers, setTeachers] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>([]);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,15 +34,17 @@ export default function LandingPage({
       setLoading(true);
       try {
         const query = `?schoolCode=${selectedSchoolCode}`;
-        const [resProf, resProg, resGal, resTest] = await Promise.all([
+        const [resProf, resProg, resTeach, resGal, resTest] = await Promise.all([
           fetch(`/api/site-profile${query}`).then((r) => r.json()),
           fetch(`/api/programs${query}`).then((r) => r.json()),
+          fetch(`/api/teachers${query}`).then((r) => r.json()),
           fetch(`/api/gallery${query}`).then((r) => r.json()),
           fetch(`/api/testimonials${query}`).then((r) => r.json()),
         ]);
 
         if (resProf.success && resProf.data) setSiteProfile(resProf.data);
         if (resProg.success && resProg.data) setPrograms(resProg.data);
+        if (resTeach.success && resTeach.data) setTeachers(resTeach.data);
         if (resGal.success && resGal.data) setGallery(resGal.data);
         if (resTest.success && resTest.data) setTestimonials(resTest.data);
       } catch (err) {
@@ -267,6 +270,72 @@ export default function LandingPage({
             <span className="text-[11px] text-slate-500 hidden sm:block">Dengan perkembangan anak mereka</span>
           </div>
         </div>
+      </section>
+
+      {/* 3. GURU & TENAGA PENDIDIK SECTION */}
+      <section id="guru" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="text-center space-y-2 mb-10">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+            <GraduationCap className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Tim Pengajar Profesional</span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+            Guru & Tenaga Pendidik {schoolName}
+          </h2>
+          <p className="text-xs font-semibold text-slate-500 max-w-xl mx-auto">
+            Didukung oleh pendidik penyayang, berpengalaman, dan berdedikasi tinggi dalam membimbing tumbuh kembang si kecil.
+          </p>
+        </div>
+
+        {teachers.length === 0 ? (
+          <div className="text-center py-10 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+            <p className="text-sm text-slate-500">Belum ada data pengajar yang ditambahkan.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {teachers.map((teacher: any) => (
+              <div
+                key={teacher.id}
+                className="bg-white rounded-3xl p-6 border border-emerald-100/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col items-center text-center group hover:-translate-y-1"
+              >
+                <div className="relative w-28 h-28 sm:w-32 sm:h-32 mb-4 rounded-full overflow-hidden border-4 border-emerald-50 shadow-md group-hover:border-emerald-200 transition-colors bg-emerald-100/50 flex items-center justify-center">
+                  {teacher.photoUrl ? (
+                    <Image
+                      src={teacher.photoUrl}
+                      alt={teacher.name}
+                      fill
+                      sizes="128px"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <Users className="w-12 h-12 text-emerald-600" />
+                  )}
+                </div>
+
+                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100/70 px-3 py-1 rounded-full mb-2">
+                  {teacher.role}
+                </span>
+
+                <h3 className="text-lg font-extrabold text-slate-900 mb-1">
+                  {teacher.name}
+                </h3>
+
+                {teacher.education && (
+                  <p className="text-xs text-slate-500 font-medium mb-3 flex items-center gap-1">
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-600 inline" />
+                    <span>{teacher.education}</span>
+                  </p>
+                )}
+
+                {teacher.bio && (
+                  <p className="text-xs text-slate-600 italic bg-slate-50 p-3 rounded-2xl w-full border border-slate-100 leading-relaxed mt-auto">
+                    &quot;{teacher.bio}&quot;
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 4. GALERI & TESTIMONI SECTION */}
