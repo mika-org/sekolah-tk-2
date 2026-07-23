@@ -14,7 +14,7 @@ export async function GET(
     const candidatePaths = [
       path.join(process.env.STORAGE_PATH || "/var/www/storage-sekolah", relativeFilePath),
       path.join("/var/www/storage", relativeFilePath),
-      path.join(process.cwd(), "public", "storage", relativeFilePath),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "storage", relativeFilePath),
     ];
 
     let foundPath: string | null = null;

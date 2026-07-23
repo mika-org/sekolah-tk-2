@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       process.env.STORAGE_PATH,
       "/var/www/storage-sekolah",
       "/var/www/storage",
-      path.join(process.cwd(), "public", "storage"),
+      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "storage"),
     ].filter(Boolean) as string[];
 
     let writtenPath: string | null = null;
@@ -77,16 +77,20 @@ export async function POST(req: Request) {
       ? `${storageBaseUrl.replace(/\/$/, "")}/${folder}/${uniqueFileName}`
       : relativePath;
 
-    // Record upload log in PostgreSQL
-    await prisma.uploadLog.create({
-      data: {
-        fileName: uniqueFileName,
-        fileFolder: folder,
-        fileUrl: fileUrl,
-        fileSize: file.size,
-        mimeType: file.type || "application/octet-stream",
-      },
-    });
+    // Record upload log in PostgreSQL (non-blocking log attempt)
+    try {
+      await prisma.uploadLog.create({
+        data: {
+          fileName: uniqueFileName,
+          fileFolder: folder,
+          fileUrl: fileUrl,
+          fileSize: file.size,
+          mimeType: file.type || "application/octet-stream",
+        },
+      });
+    } catch (logErr: any) {
+      console.warn("Upload DB log warning (non-fatal):", logErr?.message || logErr);
+    }
 
     return NextResponse.json({
       success: true,
