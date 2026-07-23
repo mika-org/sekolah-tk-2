@@ -25,7 +25,7 @@ async function main() {
   });
   console.log("Foundation created:", foundation.name);
 
-  // 2. Create School Branches
+  // 2. Create School Branches under Foundation
   const schoolDeKeraton = await prisma.school.upsert({
     where: { code: "dekeraton" },
     update: {
@@ -62,23 +62,168 @@ async function main() {
 
   console.log("School branches created:", schoolDeKeraton.name, "and", schoolCikarang.name);
 
-  // 3. Create Super Admin User
-  const passwordHash = await bcrypt.hash("admin", 10);
-  const admin = await prisma.adminUser.upsert({
+  // 3. Create Multi-Role Accounts (ADMIN_PUSAT, ADMIN_SEKOLAH, GURU, ORTU)
+  const passwordDefault = await bcrypt.hash("admin123", 10);
+  const passwordGuru = await bcrypt.hash("guru123", 10);
+  const passwordOrtu = await bcrypt.hash("ortu123", 10);
+
+  // A. ADMIN_PUSAT (Super Admin Yayasan - Full Access across all schools)
+  await prisma.adminUser.upsert({
     where: { username: "admin" },
     update: {
-      passwordHash,
+      passwordHash: passwordDefault,
       name: "Super Admin Yayasan YAPCHI",
-      role: "SUPER_ADMIN",
+      role: "ADMIN_PUSAT",
+      schoolId: null,
     },
     create: {
       username: "admin",
-      passwordHash,
+      passwordHash: passwordDefault,
       name: "Super Admin Yayasan YAPCHI",
-      role: "SUPER_ADMIN",
+      role: "ADMIN_PUSAT",
+      schoolId: null,
     },
   });
-  console.log("Super Admin seeded:", admin.username);
+
+  await prisma.adminUser.upsert({
+    where: { username: "admin_pusat" },
+    update: {
+      passwordHash: passwordDefault,
+      name: "Admin Pusat Yayasan",
+      role: "ADMIN_PUSAT",
+      schoolId: null,
+    },
+    create: {
+      username: "admin_pusat",
+      passwordHash: passwordDefault,
+      name: "Admin Pusat Yayasan",
+      role: "ADMIN_PUSAT",
+      schoolId: null,
+    },
+  });
+
+  // B. ADMIN_SEKOLAH (School Admin for specific branch)
+  await prisma.adminUser.upsert({
+    where: { username: "admin_dekeraton" },
+    update: {
+      passwordHash: passwordDefault,
+      name: "Admin Cabang DeKeraton",
+      role: "ADMIN_SEKOLAH",
+      schoolId: schoolDeKeraton.id,
+    },
+    create: {
+      username: "admin_dekeraton",
+      passwordHash: passwordDefault,
+      name: "Admin Cabang DeKeraton",
+      role: "ADMIN_SEKOLAH",
+      schoolId: schoolDeKeraton.id,
+    },
+  });
+
+  await prisma.adminUser.upsert({
+    where: { username: "admin_cikarang" },
+    update: {
+      passwordHash: passwordDefault,
+      name: "Admin Cabang Cikarang",
+      role: "ADMIN_SEKOLAH",
+      schoolId: schoolCikarang.id,
+    },
+    create: {
+      username: "admin_cikarang",
+      passwordHash: passwordDefault,
+      name: "Admin Cabang Cikarang",
+      role: "ADMIN_SEKOLAH",
+      schoolId: schoolCikarang.id,
+    },
+  });
+
+  // C. GURU (Teacher accounts for each branch)
+  await prisma.adminUser.upsert({
+    where: { username: "guru_dekeraton" },
+    update: {
+      passwordHash: passwordGuru,
+      name: "Bunda Siti Rahma, S.Pd.",
+      role: "GURU",
+      schoolId: schoolDeKeraton.id,
+      phone: "0812-3456-7890",
+      email: "guru.dekeraton@smartkids.sch.id",
+    },
+    create: {
+      username: "guru_dekeraton",
+      passwordHash: passwordGuru,
+      name: "Bunda Siti Rahma, S.Pd.",
+      role: "GURU",
+      schoolId: schoolDeKeraton.id,
+      phone: "0812-3456-7890",
+      email: "guru.dekeraton@smartkids.sch.id",
+    },
+  });
+
+  await prisma.adminUser.upsert({
+    where: { username: "guru_cikarang" },
+    update: {
+      passwordHash: passwordGuru,
+      name: "Bunda Ratna Sari, S.Pd.",
+      role: "GURU",
+      schoolId: schoolCikarang.id,
+      phone: "0813-9876-5432",
+      email: "guru.cikarang@smartkids.sch.id",
+    },
+    create: {
+      username: "guru_cikarang",
+      passwordHash: passwordGuru,
+      name: "Bunda Ratna Sari, S.Pd.",
+      role: "GURU",
+      schoolId: schoolCikarang.id,
+      phone: "0813-9876-5432",
+      email: "guru.cikarang@smartkids.sch.id",
+    },
+  });
+
+  // D. ORTU (Parent accounts linked to specific branch)
+  await prisma.adminUser.upsert({
+    where: { username: "ortu_rizky" },
+    update: {
+      passwordHash: passwordOrtu,
+      name: "Ahmad Rizky (Ortu Rizky)",
+      role: "ORTU",
+      schoolId: schoolDeKeraton.id,
+      phone: "0812-3344-5566",
+      email: "ahmad.rizky@gmail.com",
+    },
+    create: {
+      username: "ortu_rizky",
+      passwordHash: passwordOrtu,
+      name: "Ahmad Rizky (Ortu Rizky)",
+      role: "ORTU",
+      schoolId: schoolDeKeraton.id,
+      phone: "0812-3344-5566",
+      email: "ahmad.rizky@gmail.com",
+    },
+  });
+
+  await prisma.adminUser.upsert({
+    where: { username: "ortu_cikarang" },
+    update: {
+      passwordHash: passwordOrtu,
+      name: "Ayah Rian (Ortu Siswa Cikarang)",
+      role: "ORTU",
+      schoolId: schoolCikarang.id,
+      phone: "0812-7788-9900",
+      email: "ayah.rian@gmail.com",
+    },
+    create: {
+      username: "ortu_cikarang",
+      passwordHash: passwordOrtu,
+      name: "Ayah Rian (Ortu Siswa Cikarang)",
+      role: "ORTU",
+      schoolId: schoolCikarang.id,
+      phone: "0812-7788-9900",
+      email: "ayah.rian@gmail.com",
+    },
+  });
+
+  console.log("Multi-role users seeded: ADMIN_PUSAT, ADMIN_SEKOLAH, GURU, ORTU.");
 
   // 4. Create Site Profiles
   await prisma.siteProfile.upsert({
@@ -166,12 +311,6 @@ async function main() {
         ]),
         orderIndex: 3,
       },
-    ],
-  });
-
-  // Seed Programs for Cikarang
-  await prisma.program.createMany({
-    data: [
       {
         schoolId: schoolCikarang.id,
         title: "Toddler & Playgroup",
@@ -413,6 +552,15 @@ async function main() {
         activities: "Menghitung benda, menyusun angka, permainan edukatif",
         isCompleted: false,
       },
+      {
+        schoolId: schoolCikarang.id,
+        timeRange: "08.30 - 10.00",
+        className: "TK A Cikarang",
+        room: "Ruang Ceria",
+        subject: "Sensory & Crafting",
+        activities: "Mewarnai media pasir, membuat kerajinan tangan sederhana",
+        isCompleted: false,
+      },
     ],
   });
 
@@ -423,23 +571,56 @@ async function main() {
       {
         schoolId: schoolDeKeraton.id,
         title: "Kegiatan Outbound & Field Trip Ke Taman Mini",
-        content: "Diberitahukan kepada seluruh orang tua siswa TK A & TK B bahwa kegiatan Outbound akan dilaksanakan bulan depan.",
+        content: "Diberitahukan kepada seluruh orang tua siswa TK A & TK B DeKeraton bahwa kegiatan Outbound akan dilaksanakan bulan depan.",
         date: "24 Juli 2026",
         targetRole: "Semua",
-        sender: "Panitia Sekolah",
+        sender: "Panitia Sekolah DeKeraton",
       },
       {
         schoolId: schoolDeKeraton.id,
         title: "Rapat Koordinasi Pengajar Awal Semester",
-        content: "Rapat persiapan kurikulum dan pembelajaran semester ganjil bagi seluruh bapak/ibu guru.",
+        content: "Rapat persiapan kurikulum dan pembelajaran semester ganjil bagi seluruh bapak/ibu guru DeKeraton.",
         date: "22 Juli 2026",
         targetRole: "Guru",
-        sender: "Kepala Sekolah",
+        sender: "Kepala Sekolah DeKeraton",
+      },
+      {
+        schoolId: schoolCikarang.id,
+        title: "Pemeriksaan Kesehatan Anak Berkala Cabang Cikarang",
+        content: "Pemeriksaan gigi dan mata rutin bekerja sama dengan Puskesmas Cikarang.",
+        date: "28 Juli 2026",
+        targetRole: "Semua",
+        sender: "Panitia Cikarang",
       },
     ],
   });
 
-  // 13. Seed Attendance
+  // 13. Seed Leave Requests
+  await prisma.leaveRequest.deleteMany({});
+  await prisma.leaveRequest.createMany({
+    data: [
+      {
+        schoolId: schoolDeKeraton.id,
+        teacherName: "Bunda Anisa Fitri, S.Psi.",
+        type: "izin",
+        startDate: "25 Juli 2026",
+        endDate: "25 Juli 2026",
+        reason: "Mengikuti Workshop Pelatihan PAUD Nasional",
+        status: "disetujui",
+      },
+      {
+        schoolId: schoolCikarang.id,
+        teacherName: "Bunda Maya Indah, S.Pd.",
+        type: "cuti",
+        startDate: "01 Agustus 2026",
+        endDate: "03 Agustus 2026",
+        reason: "Acara keluarga di luar kota",
+        status: "pending",
+      },
+    ],
+  });
+
+  // 14. Seed Attendance
   await prisma.attendance.deleteMany({});
   await prisma.attendance.createMany({
     data: [
@@ -463,7 +644,7 @@ async function main() {
     ],
   });
 
-  // 14. Seed SPP Records
+  // 15. Seed SPP Records
   await prisma.sppRecord.deleteMany({});
   await prisma.sppRecord.createMany({
     data: [
@@ -490,7 +671,7 @@ async function main() {
     ],
   });
 
-  console.log("Database Multi-School Yayasan seeded successfully!");
+  console.log("Database Multi-School Yayasan seeded successfully with 4 core roles!");
 }
 
 main()

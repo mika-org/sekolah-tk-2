@@ -945,7 +945,7 @@ export default function AdminDashboardPage() {
               <span>Ringkasan & Stats</span>
             </button>
 
-            {admin?.role === "SUPER_ADMIN" && (
+            {(admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN") && (
               <button
                 onClick={() => setActiveTab("schools")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
@@ -964,7 +964,7 @@ export default function AdminDashboardPage() {
               </button>
             )}
 
-            {admin?.role === "SUPER_ADMIN" && (
+            {(admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN") && (
               <button
                 onClick={() => setActiveTab("users")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${

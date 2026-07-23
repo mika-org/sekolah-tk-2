@@ -47,18 +47,21 @@ model School {
   students          Student[]
   schedules         Schedule[]
   announcements     Announcement[]
+  leaveRequests     LeaveRequest[]
 
   @@map("schools")
 }
 
 model AdminUser {
   id           String   @id @default(cuid())
-  schoolId     String?  // Null means SUPER_ADMIN for Foundation
+  schoolId     String?  // Null means ADMIN_PUSAT for Foundation
   school       School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
   username     String   @unique
   passwordHash String
   name         String
-  role         String   @default("SUPER_ADMIN") // SUPER_ADMIN, SCHOOL_ADMIN
+  role         String   @default("ADMIN_PUSAT") // ADMIN_PUSAT, ADMIN_SEKOLAH, GURU, ORTU
+  phone        String?
+  email        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -191,12 +194,15 @@ model Student {
   school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   name            String
   nisn            String   @unique
+  username        String?  @unique
+  passwordHash    String?
   className       String   // e.g. "Kelas TK A"
   gender          String   @default("L") // L / P
   avatarUrl       String   @default("https://i.pravatar.cc/150")
   birthPlaceDate  String
   parentName      String
   parentPhone     String
+  parentEmail     String?
   address         String
   attendanceRate  Float    @default(95.0)
   averageGrade    Float    @default(88.5)
@@ -242,6 +248,8 @@ model Attendance {
 
 model LeaveRequest {
   id          String   @id @default(cuid())
+  schoolId    String?
+  school      School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   teacherName String
   type        String   @default("izin") // izin, cuti
   startDate   String

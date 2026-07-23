@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { createStudentAccountAndSendEmail } from "@/lib/email";
 
 export async function PATCH(
   req: Request,
@@ -30,7 +31,16 @@ export async function PATCH(
       data: { status },
     });
 
-    return NextResponse.json({ success: true, data: updated });
+    let accountInfo = null;
+    if (status === "APPROVED") {
+      accountInfo = await createStudentAccountAndSendEmail(updated);
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: updated,
+      accountInfo,
+    });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message },

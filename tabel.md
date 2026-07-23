@@ -172,14 +172,18 @@ Menyimpan daftar sekolah-sekolah di bawah naungan Yayasan.
 ---
 
 ### C. Tabel `AdminUser` (`admin_users`)
+Tabel kredensial dan hak akses pengguna multi-role dalam 1 Yayasan.
+
 | Nama Kolom | Tipe Data | Atribut | Keterangan |
 | :--- | :--- | :--- | :--- |
-| `id` | VARCHAR(191) | Primary Key, CUID | ID Admin |
-| `schoolId` | VARCHAR(191) | Foreign Key, Nullable | ID Sekolah (Null = SUPER_ADMIN Yayasan) |
+| `id` | VARCHAR(191) | Primary Key, CUID | ID Pengguna |
+| `schoolId` | VARCHAR(191) | Foreign Key, Nullable | ID Sekolah (Null = `ADMIN_PUSAT` Yayasan) |
 | `username` | VARCHAR(191) | Unique, Not Null | Username Login |
-| `passwordHash` | TEXT | Not Null | Hash Kata Sandi |
-| `name` | VARCHAR(191) | Not Null | Nama Pengelola |
-| `role` | VARCHAR(50) | Default: 'SUPER_ADMIN' | Role (`SUPER_ADMIN` / `SCHOOL_ADMIN`) |
+| `passwordHash` | TEXT | Not Null | Hash Kata Sandi (Bcrypt) |
+| `name` | VARCHAR(191) | Not Null | Nama Lengkap Pengguna |
+| `role` | VARCHAR(50) | Default: 'ADMIN_PUSAT' | Role (`ADMIN_PUSAT`, `ADMIN_SEKOLAH`, `GURU`, `ORTU`) |
+| `phone` | VARCHAR(50) | Nullable | Nomor Telepon / WA |
+| `email` | VARCHAR(191) | Nullable | Alamat Email |
 | `createdAt` | TIMESTAMP | Default: NOW() | Waktu Dibuat |
 | `updatedAt` | TIMESTAMP | Auto Update | Tanggal Diperbarui |
 
