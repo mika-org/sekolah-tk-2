@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma@6.4.0 generate && next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "npx prisma@6.4.0 db push",
-    "db:seed": "npx prisma@6.4.0 db seed",
-    "db:generate": "npx prisma@6.4.0 generate"
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed",
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",
