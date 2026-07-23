@@ -1,4 +1,4 @@
-import { PrismaClient } from "@/generated/client";
+import { PrismaClient } from "@prisma/client";
 
 // Force reset globalThis cache to purge pre-migration Prisma instances
 if ((globalThis as any).prisma && !(globalThis as any).prisma.school) {
