@@ -23,9 +23,15 @@ import confetti from "canvas-confetti";
 
 interface PpdbFormProps {
   onBackToHome: () => void;
+  selectedSchoolCode?: string;
+  schools?: any[];
 }
 
-export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
+export default function PpdbForm({
+  onBackToHome,
+  selectedSchoolCode = "dekeraton",
+  schools = [],
+}: PpdbFormProps) {
   const [step, setStep] = useState<number>(1);
 
   // Form State prefilled with realistic data matching image 3 reference
@@ -45,7 +51,7 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
     agreedTerms: true,
   });
 
-  // Uploaded files simulation state
+  // Uploaded files state
   const [documents, setDocuments] = useState<{ [key: string]: string | null }>({
     kk: "kk_eti_sulastri.pdf",
     akta: "akta_kelahiran.pdf",
@@ -61,6 +67,7 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
   const [copied, setCopied] = useState<boolean>(false);
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [regId, setRegId] = useState<string>("PPDB-2026-8821");
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -71,8 +78,25 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFileUpload = (docKey: string, fileName: string) => {
-    setDocuments((prev) => ({ ...prev, [docKey]: fileName }));
+  const handleFileUpload = async (docKey: string, file: File) => {
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", file);
+      formDataUpload.append("folder", "ppdb");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formDataUpload,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDocuments((prev) => ({ ...prev, [docKey]: data.url }));
+      } else {
+        setDocuments((prev) => ({ ...prev, [docKey]: file.name }));
+      }
+    } catch {
+      setDocuments((prev) => ({ ...prev, [docKey]: file.name }));
+    }
   };
 
   const handleCopyAccount = () => {
@@ -81,15 +105,48 @@ export default function PpdbForm({ onBackToHome }: PpdbFormProps) {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const handleFinish = () => {
-    setRegId(`PPDB-2026-${Math.floor(1000 + Math.random() * 9000)}`);
-    // Trigger confetti
-    confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-    setShowSuccessModal(true);
+  const handleFinish = async () => {
+    setSubmitting(true);
+    const newRegNo = `PPDB-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    setRegId(newRegNo);
+
+    try {
+      await fetch("/api/ppdb", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schoolCode: selectedSchoolCode,
+          registrationNo: newRegNo,
+          namaAnak: formData.namaAnak,
+          jenisKelamin: formData.jenisKelamin,
+          agama: formData.agama,
+          tempatLahir: formData.tempatLahir,
+          tanggalLahir: formData.tanggalLahir,
+          usiaAnak: formData.usiaAnak,
+          program: formData.program,
+          namaOrtu: formData.namaOrtu,
+          noWhatsapp: formData.noWhatsapp,
+          email: formData.email,
+          alamatRumah: formData.alamatRumah,
+          docKkUrl: documents.kk,
+          docAktaUrl: documents.akta,
+          docFotoUrl: documents.foto,
+          docKtpUrl: documents.ktp,
+          buktiBayarUrl: documents.buktiBayar,
+          paymentMethod,
+        }),
+      });
+    } catch (err) {
+      console.error("Error submitting PPDB:", err);
+    } finally {
+      setSubmitting(false);
+      confetti({
+        particleCount: 120,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+      setShowSuccessModal(true);
+    }
   };
 
   return (
