@@ -19,12 +19,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // 1. Search in AdminUser by username OR email (case-insensitive)
+    // 1. Search in AdminUser by username OR email
     let admin = await prisma.adminUser.findFirst({
       where: {
         OR: [
+          { username: usernameStr },
+          { email: usernameStr },
           { username: { equals: usernameStr, mode: "insensitive" } },
-          { email: { equals: usernameStr, mode: "insensitive" } },
         ],
       },
     });
@@ -74,8 +75,9 @@ export async function POST(req: Request) {
     const student = await prisma.student.findFirst({
       where: {
         OR: [
+          { username: usernameStr },
+          { nisn: usernameStr },
           { username: { equals: usernameStr, mode: "insensitive" } },
-          { nisn: { equals: usernameStr, mode: "insensitive" } },
         ],
       },
     });
@@ -123,7 +125,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("Login error:", error);
     return NextResponse.json(
-      { success: false, error: "Terjadi kesalahan server saat login" },
+      { success: false, error: error?.message || "Terjadi kesalahan server saat login" },
       { status: 500 }
     );
   }

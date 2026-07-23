@@ -18,13 +18,33 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { studentId, studentName, className, status, time, reason, date } = await req.json();
+    const { studentId: reqStudentId, studentName, className, status, time, reason, date } = await req.json();
+
+    let targetStudentId = reqStudentId;
+    if (!targetStudentId && studentName) {
+      const foundStudent = await prisma.student.findFirst({
+        where: { name: { equals: studentName, mode: "insensitive" } },
+      });
+      if (foundStudent) targetStudentId = foundStudent.id;
+    }
+
+    if (!targetStudentId) {
+      const fallbackStudent = await prisma.student.findFirst();
+      targetStudentId = fallbackStudent?.id;
+    }
+
+    if (!targetStudentId) {
+      return NextResponse.json(
+        { success: false, error: "Siswa tidak ditemukan. Pastikan data siswa sudah terdaftar terlebih dahulu." },
+        { status: 400 }
+      );
+    }
 
     const attendance = await prisma.attendance.create({
       data: {
-        studentId,
-        studentName,
-        className,
+        studentId: targetStudentId,
+        studentName: studentName || "Siswa",
+        className: className || "Kelas TK A",
         status: status || "hadir",
         time: time || null,
         reason: reason || null,

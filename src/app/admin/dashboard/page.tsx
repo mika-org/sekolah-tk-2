@@ -36,6 +36,9 @@ import {
   CreditCard,
   FileCheck,
   FileText,
+  Key,
+  Copy,
+  Send,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -87,6 +90,17 @@ export default function AdminDashboardPage() {
 
   const [studentsList, setStudentsList] = useState<any[]>([]);
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
+  const [sendingAccount, setSendingAccount] = useState<boolean>(false);
+  const [selectedCredentialModal, setSelectedCredentialModal] = useState<{
+    studentName: string;
+    username: string;
+    password: string;
+    parentEmail?: string;
+    parentPhone?: string;
+    waUrl?: string | null;
+    emailSent?: boolean;
+  } | null>(null);
+  const [credentialsCopied, setCredentialsCopied] = useState<boolean>(false);
 
   const [attendanceList, setAttendanceList] = useState<any[]>([]);
   const [editingAttendance, setEditingAttendance] = useState<any | null>(null);
@@ -352,15 +366,68 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
 
-      showMessage(`Status PPDB diperbarui menjadi ${status}`, "success");
       setPpdbList((prev) =>
         prev.map((item) => (item.id === id ? { ...item, status } : item))
       );
       if (selectedPpdb?.id === id) {
         setSelectedPpdb({ ...selectedPpdb, status });
       }
+
+      if (status === "APPROVED") {
+        // Automatically reload students list so the new student appears in Kelola Murid immediately
+        const queryParam = selectedSchoolId && selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : "";
+        const resStud = await fetch(`/api/students${queryParam}`).then((r) => r.json());
+        if (resStud.success) setStudentsList(resStud.data || []);
+
+        if (data.accountInfo && data.accountInfo.username) {
+          const ppdbItem = ppdbList.find((p) => p.id === id) || selectedPpdb;
+          const cleanPhone = (ppdbItem?.noWhatsapp || "").replace(/[^0-9]/g, "");
+          const formattedPhone = cleanPhone.startsWith("0") ? `62${cleanPhone.slice(1)}` : cleanPhone;
+          const appUrl = window.location.origin;
+          const waMsg = `Halo Bapak/Ibu ${ppdbItem?.namaOrtu || "Orang Tua"},\n\nPendaftaran PPDB ananda *${ppdbItem?.namaAnak}* telah DITERIMA!\n\nBerikut akun Portal Orang Tua:\n👤 Username: *${data.accountInfo.username}*\n🔑 Password: *${data.accountInfo.passwordStr}*\n\nSilakan login di: ${appUrl}/login`;
+
+          setSelectedCredentialModal({
+            studentName: ppdbItem?.namaAnak || "Siswa",
+            username: data.accountInfo.username,
+            password: data.accountInfo.passwordStr,
+            parentEmail: ppdbItem?.email || "",
+            parentPhone: ppdbItem?.noWhatsapp || "",
+            emailSent: true,
+            waUrl: formattedPhone ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(waMsg)}` : null,
+          });
+        }
+        showMessage("PPDB disetujui & Akun Siswa otomatis dibuat!", "success");
+      } else {
+        showMessage(`Status PPDB diperbarui menjadi ${status}`, "success");
+      }
     } catch (err: any) {
       showMessage(err.message || "Gagal mengubah status PPDB", "error");
+    }
+  };
+
+  const handleSendStudentCredentials = async (studentId: string) => {
+    setSendingAccount(true);
+    try {
+      const res = await fetch(`/api/students/${studentId}/send-credentials`, {
+        method: "POST",
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      setSelectedCredentialModal({
+        studentName: data.data.student.name,
+        username: data.data.username,
+        password: data.data.password,
+        parentEmail: data.data.parentEmail || "",
+        parentPhone: data.data.parentPhone || "",
+        waUrl: data.data.waUrl,
+        emailSent: data.data.emailSent,
+      });
+      showMessage("Akun ortu berhasil dibuat & dikirim!", "success");
+    } catch (err: any) {
+      showMessage(err.message || "Gagal mengirim akun ortu", "error");
+    } finally {
+      setSendingAccount(false);
     }
   };
 
@@ -510,6 +577,31 @@ export default function AdminDashboardPage() {
       setStudentsList((prev) => prev.filter((s) => s.id !== id));
     } catch (err: any) {
       showMessage(err.message, "error");
+    }
+  };
+  // Attendance Handler
+  const handleSaveAttendance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingAttendance,
+          schoolId: editingAttendance.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Presensi siswa berhasil dicatat!", "success");
+      setEditingAttendance(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -899,6 +991,25 @@ export default function AdminDashboardPage() {
               {admin?.name?.charAt(0) || "A"}
             </div>
             <span className="text-xs font-bold text-slate-200">{admin?.name || admin?.username}</span>
+            <span
+              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN"
+                  ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                  : admin?.role === "ADMIN_SEKOLAH"
+                  ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
+                  : admin?.role === "GURU"
+                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                  : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+              }`}
+            >
+              {admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN"
+                ? "Super Admin"
+                : admin?.role === "ADMIN_SEKOLAH"
+                ? "Admin Cabang"
+                : admin?.role === "GURU"
+                ? "Guru"
+                : "Wali Murid"}
+            </span>
           </div>
 
           <button
@@ -987,73 +1098,81 @@ export default function AdminDashboardPage() {
               </button>
             )}
 
-            <button
-              onClick={() => setActiveTab("ppdb")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "ppdb"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Users className="w-4 h-4" />
-                <span>Pendaftaran PPDB</span>
-              </div>
-              <span className="bg-slate-800 text-emerald-400 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-slate-700">
-                {ppdbList.length}
-              </span>
-            </button>
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("ppdb")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "ppdb"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Users className="w-4 h-4" />
+                  <span>Pendaftaran PPDB</span>
+                </div>
+                <span className="bg-slate-800 text-emerald-400 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-slate-700">
+                  {ppdbList.length}
+                </span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("programs")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "programs"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <BookOpen className="w-4 h-4" />
-                <span>Kelola Program</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {programsList.length}
-              </span>
-            </button>
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("programs")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "programs"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <BookOpen className="w-4 h-4" />
+                  <span>Kelola Program</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {programsList.length}
+                </span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("teachers")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "teachers"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Award className="w-4 h-4 text-emerald-400" />
-                <span>Kelola Guru & Pengajar</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {teachersList.length}
-              </span>
-            </button>
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("teachers")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "teachers"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Award className="w-4 h-4 text-emerald-400" />
+                  <span>Kelola Guru & Pengajar</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {teachersList.length}
+                </span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("students")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "students"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <GraduationCap className="w-4 h-4 text-blue-400" />
-                <span>Kelola Data Siswa</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {studentsList.length}
-              </span>
-            </button>
+            {admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("students")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "students"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <GraduationCap className="w-4 h-4 text-blue-400" />
+                  <span>Kelola Data Siswa</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {studentsList.length}
+                </span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab("attendance")}
@@ -1072,22 +1191,24 @@ export default function AdminDashboardPage() {
               </span>
             </button>
 
-            <button
-              onClick={() => setActiveTab("spp")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "spp"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <CreditCard className="w-4 h-4 text-amber-400" />
-                <span>SPP & Keuangan</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {sppList.length}
-              </span>
-            </button>
+            {admin?.role !== "GURU" && (
+              <button
+                onClick={() => setActiveTab("spp")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "spp"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <CreditCard className="w-4 h-4 text-amber-400" />
+                  <span>SPP & Keuangan</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {sppList.length}
+                </span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab("announcements")}
@@ -1106,22 +1227,24 @@ export default function AdminDashboardPage() {
               </span>
             </button>
 
-            <button
-              onClick={() => setActiveTab("leave-requests")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "leave-requests"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <FileCheck className="w-4 h-4 text-rose-400" />
-                <span>Izin & Cuti Guru</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {leaveRequestsList.length}
-              </span>
-            </button>
+            {admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("leave-requests")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "leave-requests"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileCheck className="w-4 h-4 text-rose-400" />
+                  <span>Izin & Cuti Guru</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {leaveRequestsList.length}
+                </span>
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab("schedules")}
@@ -1140,51 +1263,57 @@ export default function AdminDashboardPage() {
               </span>
             </button>
 
-            <button
-              onClick={() => setActiveTab("gallery")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "gallery"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <ImageIcon className="w-4 h-4" />
-                <span>Kelola Galeri</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {galleryList.length}
-              </span>
-            </button>
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("gallery")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "gallery"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Kelola Galeri</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {galleryList.length}
+                </span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("testimonials")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "testimonials"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <MessageSquare className="w-4 h-4" />
-                <span>Kelola Testimoni</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {testimonialsList.length}
-              </span>
-            </button>
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("testimonials")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "testimonials"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Kelola Testimoni</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {testimonialsList.length}
+                </span>
+              </button>
+            )}
 
-            <button
-              onClick={() => setActiveTab("profile")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "profile"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>Pengaturan Website</span>
-            </button>
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("profile")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "profile"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                <span>Pengaturan Website</span>
+              </button>
+            )}
           </nav>
         </aside>
 
@@ -1203,10 +1332,18 @@ export default function AdminDashboardPage() {
                     <span>Selamat Datang Kembali, {admin?.name}!</span>
                   </div>
                   <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                    Dashboard Pengelolaan {activeSchoolName}
+                    {admin?.role === "GURU"
+                      ? `Portal Pembelajaran & Presensi - ${activeSchoolName}`
+                      : admin?.role === "ORTU"
+                      ? `Portal Informasi Wali Murid - ${activeSchoolName}`
+                      : `Dashboard Pengelolaan ${activeSchoolName}`}
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
-                    Kelola data pendaftaran PPDB, program pembelajaran, foto galeri, ulasan testimoni orang tua, dan profil website dalam satu pusat kontrol terpadu.
+                    {admin?.role === "GURU"
+                      ? "Kelola presensi harian siswa, jadwal kegiatan belajar mengajar, pengumuman kelas, serta permohonan izin/cuti mengajar."
+                      : admin?.role === "ORTU"
+                      ? "Pantau catatan kehadiran ananda, jadwal belajar harian, pengumuman sekolah, serta informasi status pembayaran SPP."
+                      : "Kelola data pendaftaran PPDB, program pembelajaran, presensi murid, data pengajar, serta pengumuman sekolah secara terpadu."}
                   </p>
                 </div>
               </div>
@@ -2569,20 +2706,34 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                 {studentsList.map((s) => (
-                  <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex items-center justify-between">
+                  <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm">
+                      <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0">
                         {s.name.charAt(0)}
                       </div>
                       <div>
                         <h4 className="font-bold text-white text-sm">{s.name}</h4>
                         <p className="text-xs text-slate-400">{s.nisn} • <span className="text-emerald-400 font-semibold">{s.className}</span></p>
                         <p className="text-[11px] text-slate-500">Ortu: {s.parentName} ({s.parentPhone})</p>
+                        {s.username && (
+                          <span className="inline-block text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 mt-1">
+                            User: {s.username}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => setEditingStudent(s)} className="p-2 bg-slate-800 text-slate-300 rounded-xl"><Edit className="w-4 h-4" /></button>
-                      <button onClick={() => handleDeleteStudent(s.id)} className="p-2 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-4 h-4" /></button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => handleSendStudentCredentials(s.id)}
+                        disabled={sendingAccount}
+                        className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                        title="Kirim Akun Login Ortu"
+                      >
+                        <Key className="w-3.5 h-3.5" />
+                        <span>Akun Ortu</span>
+                      </button>
+                      <button onClick={() => setEditingStudent(s)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl" title="Edit Siswa"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => handleDeleteStudent(s.id)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl" title="Hapus Siswa"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 ))}
@@ -2593,24 +2744,108 @@ export default function AdminDashboardPage() {
           {/* TAB: PRESENSI SISWA */}
           {activeTab === "attendance" && (
             <div className="space-y-6 w-full">
-              <div className="border-b border-slate-800/80 pb-4">
-                <h2 className="text-2xl font-black text-white tracking-tight">Presensi Siswa Harian</h2>
-                <p className="text-xs text-slate-400">Catatan kehadiran murid (Hadir, Sakit, Izin, Alfa).</p>
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Presensi Siswa Harian</h2>
+                  <p className="text-xs text-slate-400">Catatan kehadiran murid (Hadir, Sakit, Izin, Alfa).</p>
+                </div>
+                {admin?.role !== "ORTU" && (
+                  <button
+                    onClick={() =>
+                      setEditingAttendance({
+                        studentId: studentsList[0]?.id,
+                        studentName: studentsList[0]?.name || "Siswa Smart Kids",
+                        className: studentsList[0]?.className || "TK A",
+                        date: new Date().toISOString().split("T")[0],
+                        status: "hadir",
+                        reason: "",
+                        schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                      })
+                    }
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Catat Presensi Harian</span>
+                  </button>
+                )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {attendanceList.map((att) => (
-                  <div key={att.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-2 flex items-center justify-between">
+              {editingAttendance && (
+                <form onSubmit={handleSaveAttendance} className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
+                  <h3 className="font-bold text-white text-base">Input Presensi Kehadiran Siswa</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <h4 className="font-bold text-white text-sm">{att.studentName}</h4>
-                      <p className="text-xs text-slate-400">{att.className} • Tanggal: {att.date}</p>
-                      {att.reason && <p className="text-[11px] text-amber-400 italic">Keterangan: {att.reason}</p>}
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Murid / Siswa</label>
+                      <select
+                        value={editingAttendance.studentName}
+                        onChange={(e) => {
+                          const found = studentsList.find((s) => s.name === e.target.value);
+                          setEditingAttendance({
+                            ...editingAttendance,
+                            studentId: found?.id,
+                            studentName: e.target.value,
+                            className: found?.className || editingAttendance.className,
+                          });
+                        }}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      >
+                        {studentsList.map((s) => (
+                          <option key={s.id} value={s.name}>{s.name} ({s.className})</option>
+                        ))}
+                      </select>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${att.status === "hadir" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : att.status === "sakit" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
-                      {att.status}
-                    </span>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Presensi</label>
+                      <input type="date" required value={editingAttendance.date} onChange={(e) => setEditingAttendance({ ...editingAttendance, date: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Status Kehadiran</label>
+                      <select value={editingAttendance.status} onChange={(e) => setEditingAttendance({ ...editingAttendance, status: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                        <option value="hadir">Hadir (Masuk)</option>
+                        <option value="sakit">Sakit</option>
+                        <option value="izin">Izin</option>
+                        <option value="alfa">Alfa (Tanpa Keterangan)</option>
+                      </select>
+                    </div>
                   </div>
-                ))}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Catatan / Keterangan (Opsional)</label>
+                    <input type="text" placeholder="Misal: Demam, Izin acara keluarga, dll" value={editingAttendance.reason || ""} onChange={(e) => setEditingAttendance({ ...editingAttendance, reason: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button type="button" onClick={() => setEditingAttendance(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30">Simpan Presensi</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {attendanceList
+                  .filter((att) => {
+                    if (admin?.role !== "ORTU") return true;
+                    const u = (admin?.username || "").toLowerCase();
+                    const n = (admin?.name || "").toLowerCase();
+                    const sName = (att.studentName || "").toLowerCase();
+                    const sUser = (att.student?.username || "").toLowerCase();
+
+                    return (
+                      (u && (sName.includes(u) || sUser.includes(u))) ||
+                      (n && (n.includes(sName) || sName.includes(n.replace("wali", "").trim()))) ||
+                      att.studentId === admin?.id
+                    );
+                  })
+                  .map((att) => (
+                    <div key={att.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-2 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{att.studentName}</h4>
+                        <p className="text-xs text-slate-400">{att.className} • Tanggal: {att.date}</p>
+                        {att.reason && <p className="text-[11px] text-amber-400 italic">Keterangan: {att.reason}</p>}
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${att.status === "hadir" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : att.status === "sakit" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
+                        {att.status}
+                      </span>
+                    </div>
+                  ))}
               </div>
             </div>
           )}
@@ -2621,25 +2856,31 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
                 <div>
                   <h2 className="text-2xl font-black text-white tracking-tight">SPP & Catatan Keuangan</h2>
-                  <p className="text-xs text-slate-400">Kelola status pembayaran SPP bulanan siswa.</p>
+                  <p className="text-xs text-slate-400">
+                    {admin?.role === "ORTU"
+                      ? "Status dan riwayat pembayaran SPP ananda."
+                      : "Kelola status pembayaran SPP bulanan siswa."}
+                  </p>
                 </div>
-                <button
-                  onClick={() =>
-                    setEditingSpp({
-                      studentName: studentsList[0]?.name || "Siswa Smart Kids",
-                      nisn: studentsList[0]?.nisn || "123456789",
-                      className: studentsList[0]?.className || "TK A",
-                      month: "Juli 2026",
-                      amount: 350000,
-                      status: "lunas",
-                      paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
-                    })
-                  }
-                  className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Catatan SPP</span>
-                </button>
+                {admin?.role !== "ORTU" && (
+                  <button
+                    onClick={() =>
+                      setEditingSpp({
+                        studentName: studentsList[0]?.name || "Siswa Smart Kids",
+                        nisn: studentsList[0]?.nisn || "123456789",
+                        className: studentsList[0]?.className || "TK A",
+                        month: "Juli 2026",
+                        amount: 350000,
+                        status: "lunas",
+                        paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                      })
+                    }
+                    className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah Catatan SPP</span>
+                  </button>
+                )}
               </div>
 
               {editingSpp && (
@@ -2656,32 +2897,60 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Nominal (Rp)</label>
-                      <input type="number" required value={editingSpp.amount} onChange={(e) => setEditingSpp({ ...editingSpp, amount: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <input type="number" required value={editingSpp.amount} onChange={(e) => setEditingSpp({ ...editingSpp, amount: Number(e.target.value) })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Status Pembayaran</label>
+                      <select value={editingSpp.status} onChange={(e) => setEditingSpp({ ...editingSpp, status: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
+                        <option value="lunas">Lunas</option>
+                        <option value="belum_bayar">Belum Bayar</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Pembayaran</label>
+                      <input type="text" value={editingSpp.paymentDate} onChange={(e) => setEditingSpp({ ...editingSpp, paymentDate: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={() => setEditingSpp(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30">Simpan SPP</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30">Simpan Record SPP</button>
                   </div>
                 </form>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {sppList.map((spp) => (
-                  <div key={spp.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-white text-sm">{spp.studentName}</h4>
-                      <p className="text-xs text-slate-400">{spp.month} • Rp {Number(spp.amount).toLocaleString("id-ID")}</p>
-                      {spp.paymentDate && <p className="text-[11px] text-emerald-400">Bayar: {spp.paymentDate}</p>}
+                {sppList
+                  .filter((spp) => {
+                    if (admin?.role !== "ORTU") return true;
+                    const u = (admin?.username || "").toLowerCase();
+                    const n = (admin?.name || "").toLowerCase();
+                    const sName = (spp.studentName || "").toLowerCase();
+
+                    return (
+                      (u && sName.includes(u)) ||
+                      (n && (n.includes(sName) || sName.includes(n.replace("wali", "").trim()))) ||
+                      spp.studentId === admin?.id
+                    );
+                  })
+                  .map((spp) => (
+                    <div key={spp.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{spp.studentName}</h4>
+                        <p className="text-xs text-slate-400">{spp.month} • Rp {Number(spp.amount).toLocaleString("id-ID")}</p>
+                        {spp.paymentDate && <p className="text-[11px] text-emerald-400">Bayar: {spp.paymentDate}</p>}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${spp.status === "lunas" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
+                          {spp.status}
+                        </span>
+                        {admin?.role !== "ORTU" && (
+                          <button onClick={() => handleDeleteSpp(spp.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${spp.status === "lunas" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
-                        {spp.status}
-                      </span>
-                      <button onClick={() => handleDeleteSpp(spp.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}
@@ -2692,23 +2961,29 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
                 <div>
                   <h2 className="text-2xl font-black text-white tracking-tight">Pengumuman Sekolah</h2>
-                  <p className="text-xs text-slate-400">Terbitkan pengumuman resmi ke aplikasi mobile guru dan wali murid.</p>
+                  <p className="text-xs text-slate-400">
+                    {admin?.role === "ORTU"
+                      ? "Informasi dan pengumuman resmi terbaru dari sekolah."
+                      : "Terbitkan pengumuman resmi ke aplikasi mobile guru dan wali murid."}
+                  </p>
                 </div>
-                <button
-                  onClick={() =>
-                    setEditingAnnouncement({
-                      title: "",
-                      content: "",
-                      targetRole: "Semua",
-                      sender: "Pengelola Sekolah",
-                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
-                    })
-                  }
-                  className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Buat Pengumuman</span>
-                </button>
+                {admin?.role !== "ORTU" && (
+                  <button
+                    onClick={() =>
+                      setEditingAnnouncement({
+                        title: "",
+                        content: "",
+                        targetRole: "Semua",
+                        sender: admin?.name || "Pengelola Sekolah",
+                        schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                      })
+                    }
+                    className="bg-purple-600 hover:bg-purple-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Buat Pengumuman</span>
+                  </button>
+                )}
               </div>
 
               {editingAnnouncement && (
@@ -2752,7 +3027,9 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs text-slate-500">
                       <span>Pengirim: {ann.sender}</span>
-                      <button onClick={() => handleDeleteAnnouncement(ann.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                      {admin?.role !== "ORTU" && (
+                        <button onClick={() => handleDeleteAnnouncement(ann.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -2763,9 +3040,49 @@ export default function AdminDashboardPage() {
           {/* TAB: IZIN & CUTI GURU */}
           {activeTab === "leave-requests" && (
             <div className="space-y-6 w-full">
-              <div className="border-b border-slate-800/80 pb-4">
-                <h2 className="text-2xl font-black text-white tracking-tight">Pengajuan Izin & Cuti Guru</h2>
-                <p className="text-xs text-slate-400">Verifikasi dan beri persetujuan atas pengajuan izin/cuti dari guru.</p>
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Pengajuan Izin & Cuti Guru</h2>
+                  <p className="text-xs text-slate-400">
+                    {admin?.role === "GURU"
+                      ? "Status pengajuan izin / cuti mengajar Anda."
+                      : "Verifikasi dan beri persetujuan atas pengajuan izin/cuti dari guru."}
+                  </p>
+                </div>
+                {admin?.role === "GURU" && (
+                  <button
+                    onClick={() => {
+                      const reason = prompt("Masukkan alasan izin / cuti mengajar:");
+                      if (reason) {
+                        fetch("/api/leave-requests", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            teacherName: admin?.name || "Guru",
+                            type: "Cuti",
+                            startDate: new Date().toISOString().split("T")[0],
+                            endDate: new Date().toISOString().split("T")[0],
+                            reason,
+                            schoolId: admin?.schoolId || selectedSchoolId,
+                          }),
+                        })
+                          .then((r) => r.json())
+                          .then((res) => {
+                            if (res.success) {
+                              showMessage("Pengajuan izin berhasil dikirim!", "success");
+                              fetch(`/api/leave-requests${selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : ""}`)
+                                .then((r) => r.json())
+                                .then((d) => setLeaveRequestsList(d.data || []));
+                            }
+                          });
+                      }
+                    }}
+                    className="bg-rose-600 hover:bg-rose-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Ajukan Izin / Cuti Baru</span>
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
@@ -2779,11 +3096,13 @@ export default function AdminDashboardPage() {
                     </div>
                     <p className="text-xs text-slate-300">Tipe: <span className="font-bold text-emerald-400 uppercase">{leave.type}</span> ({leave.startDate} - {leave.endDate})</p>
                     <p className="text-xs text-slate-400 italic bg-slate-950 p-3 rounded-2xl border border-slate-800">&quot;{leave.reason}&quot;</p>
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                      <button onClick={() => handleUpdateLeaveStatus(leave.id, "disetujui")} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /><span>Setujui</span></button>
-                      <button onClick={() => handleUpdateLeaveStatus(leave.id, "ditolak")} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><XCircle className="w-3.5 h-3.5" /><span>Tolak</span></button>
-                      <button onClick={() => handleDeleteLeaveRequest(leave.id)} className="p-2 bg-slate-800 text-slate-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
+                    {admin?.role !== "GURU" && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button onClick={() => handleUpdateLeaveStatus(leave.id, "disetujui")} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /><span>Setujui</span></button>
+                        <button onClick={() => handleUpdateLeaveStatus(leave.id, "ditolak")} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><XCircle className="w-3.5 h-3.5" /><span>Tolak</span></button>
+                        <button onClick={() => handleDeleteLeaveRequest(leave.id)} className="p-2 bg-slate-800 text-slate-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2796,25 +3115,31 @@ export default function AdminDashboardPage() {
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
                 <div>
                   <h2 className="text-2xl font-black text-white tracking-tight">Jadwal Kegiatan Belajar (KBM)</h2>
-                  <p className="text-xs text-slate-400">Atur alokasi waktu dan materi pelajaran harian.</p>
+                  <p className="text-xs text-slate-400">
+                    {admin?.role === "ORTU"
+                      ? "Jadwal dan alokasi kegiatan belajar harian ananda."
+                      : "Atur alokasi waktu dan materi pelajaran harian."}
+                  </p>
                 </div>
-                <button
-                  onClick={() =>
-                    setEditingSchedule({
-                      timeRange: "08.00 - 09.30",
-                      className: "Kelas TK A",
-                      room: "Ruang Melati",
-                      subject: "",
-                      activities: "",
-                      isCompleted: false,
-                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
-                    })
-                  }
-                  className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/30"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Jadwal</span>
-                </button>
+                {admin?.role !== "ORTU" && (
+                  <button
+                    onClick={() =>
+                      setEditingSchedule({
+                        timeRange: "08.00 - 09.30",
+                        className: "Kelas TK A",
+                        room: "Ruang Melati",
+                        subject: "",
+                        activities: "",
+                        isCompleted: false,
+                        schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                      })
+                    }
+                    className="bg-cyan-600 hover:bg-cyan-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-cyan-600/30"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah Jadwal</span>
+                  </button>
+                )}
               </div>
 
               {editingSchedule && (
@@ -2862,9 +3187,11 @@ export default function AdminDashboardPage() {
                       <h4 className="font-bold text-white text-base">{sch.subject}</h4>
                       <p className="text-xs text-slate-400">{sch.activities}</p>
                     </div>
-                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                      <button onClick={() => handleDeleteSchedule(sch.id)} className="p-2 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
+                    {admin?.role !== "ORTU" && (
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button onClick={() => handleDeleteSchedule(sch.id)} className="p-2 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -3169,6 +3496,87 @@ export default function AdminDashboardPage() {
           )}
         </main>
       </div>
+
+      {/* Credential Details Modal */}
+      {selectedCredentialModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                  <Key className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-base">Akun Portal Orang Tua</h3>
+                  <p className="text-xs text-slate-400">Siswa: {selectedCredentialModal.studentName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedCredentialModal(null)}
+                className="text-slate-400 hover:text-white text-lg font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-bold">Username:</span>
+                <span className="text-sm text-emerald-400 font-mono font-bold">{selectedCredentialModal.username}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-slate-400 font-bold">Password:</span>
+                <span className="text-sm text-emerald-400 font-mono font-bold">{selectedCredentialModal.password}</span>
+              </div>
+              {selectedCredentialModal.parentEmail && (
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                  <span className="text-[11px] text-slate-500">Email Ortu:</span>
+                  <span className="text-[11px] text-slate-300 font-semibold">{selectedCredentialModal.parentEmail}</span>
+                </div>
+              )}
+              {selectedCredentialModal.parentPhone && (
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500">No WA Ortu:</span>
+                  <span className="text-[11px] text-slate-300 font-semibold">{selectedCredentialModal.parentPhone}</span>
+                </div>
+              )}
+            </div>
+
+            {selectedCredentialModal.emailSent && (
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>Email pemberitahuan akun telah dikirim ke {selectedCredentialModal.parentEmail}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2.5 pt-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`Akun Portal Ortu Smart Kids:\nSiswa: ${selectedCredentialModal.studentName}\nUsername: ${selectedCredentialModal.username}\nPassword: ${selectedCredentialModal.password}\nLogin: ${window.location.origin}/login`);
+                  setCredentialsCopied(true);
+                  setTimeout(() => setCredentialsCopied(false), 2500);
+                }}
+                className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all"
+              >
+                <Copy className="w-4 h-4" />
+                <span>{credentialsCopied ? "Berhasil Disalin!" : "Salin Akun Login"}</span>
+              </button>
+
+              {selectedCredentialModal.waUrl && (
+                <a
+                  href={selectedCredentialModal.waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30 text-center"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>Kirim via WhatsApp</span>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

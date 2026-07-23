@@ -123,17 +123,24 @@ export async function createStudentAccountAndSendEmail(ppdb: {
         ? `${ppdb.tempatLahir}, ${ppdb.tanggalLahir}`
         : "Karawang, 2021";
 
+    let targetSchoolId = ppdb.schoolId;
+    if (!targetSchoolId) {
+      const defaultSchool = await prisma.school.findFirst({ orderBy: { orderIndex: "asc" } });
+      targetSchoolId = defaultSchool?.id || "default";
+    }
+
     // 3. Upsert Student bound to PPDB registration
     const student = await prisma.student.upsert({
       where: { nisn: ppdb.registrationNo },
       update: {
+        schoolId: targetSchoolId,
         username,
         passwordHash,
         parentEmail: ppdb.email,
         parentPhone: ppdb.noWhatsapp,
       },
       create: {
-        schoolId: ppdb.schoolId,
+        schoolId: targetSchoolId,
         name: ppdb.namaAnak,
         nisn: ppdb.registrationNo,
         username,
@@ -148,7 +155,29 @@ export async function createStudentAccountAndSendEmail(ppdb: {
       },
     });
 
-    // 4. Send credential email to parent
+    // 4. Upsert AdminUser account table (role = ORTU) for portal login
+    await prisma.adminUser.upsert({
+      where: { username },
+      update: {
+        schoolId: targetSchoolId,
+        passwordHash,
+        name: `Wali ${ppdb.namaAnak}`,
+        phone: ppdb.noWhatsapp,
+        email: ppdb.email,
+        role: "ORTU",
+      },
+      create: {
+        schoolId: targetSchoolId,
+        username,
+        passwordHash,
+        name: `Wali ${ppdb.namaAnak}`,
+        phone: ppdb.noWhatsapp,
+        email: ppdb.email,
+        role: "ORTU",
+      },
+    });
+
+    // 5. Send credential email to parent
     if (ppdb.email) {
       await sendCredentialEmail(ppdb.email, ppdb.namaAnak, username, passwordStr);
     }
