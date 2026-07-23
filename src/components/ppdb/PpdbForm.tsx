@@ -34,29 +34,30 @@ export default function PpdbForm({
 }: PpdbFormProps) {
   const [step, setStep] = useState<number>(1);
 
-  // Form State prefilled with realistic data matching image 3 reference
+  // Form State initialized as empty
   const [formData, setFormData] = useState({
-    namaAnak: "Eti Sulastri",
-    jenisKelamin: "Perempuan",
-    agama: "Islam",
-    tempatLahir: "Jombang",
-    tanggalLahir: "17 Agustus 2021",
-    usiaAnak: "5 Tahun",
-    program: "Kindergarten",
-    namaOrtu: "Agus Mulyana",
-    noWhatsapp: "0812 3456 7890",
-    email: "agusmulyana1945@gmail.com",
-    alamatRumah:
-      "Jl. Turangga No. 25E RT 03 RW 09, Kelurahan Lingkar Selatan, Kecamatan Lengkong, Kota Bandung, Jawa Barat 40263",
-    agreedTerms: true,
+    namaAnak: "",
+    jenisKelamin: "",
+    agama: "",
+    tempatLahir: "",
+    tanggalLahir: "",
+    usiaAnak: "",
+    program: "",
+    namaOrtu: "",
+    noWhatsapp: "",
+    email: "",
+    alamatRumah: "",
+    agreedTerms: false,
   });
 
-  // Uploaded files state
-  const [documents, setDocuments] = useState<{ [key: string]: string | null }>({
-    kk: "kk_eti_sulastri.pdf",
-    akta: "akta_kelahiran.pdf",
-    foto: "foto_anak_eti.jpg",
-    ktp: "ktp_agus_mulyana.jpg",
+  // Selected file objects stored in local state (deferred batch upload)
+  const [selectedFileObjects, setSelectedFileObjects] = useState<{
+    [key: string]: File | null;
+  }>({
+    kk: null,
+    akta: null,
+    foto: null,
+    ktp: null,
     buktiBayar: null,
   });
 
@@ -78,25 +79,8 @@ export default function PpdbForm({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleFileUpload = async (docKey: string, file: File) => {
-    try {
-      const formDataUpload = new FormData();
-      formDataUpload.append("file", file);
-      formDataUpload.append("folder", "ppdb");
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formDataUpload,
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDocuments((prev) => ({ ...prev, [docKey]: data.url }));
-      } else {
-        setDocuments((prev) => ({ ...prev, [docKey]: file.name }));
-      }
-    } catch {
-      setDocuments((prev) => ({ ...prev, [docKey]: file.name }));
-    }
+  const handleFileSelect = (docKey: string, file: File) => {
+    setSelectedFileObjects((prev) => ({ ...prev, [docKey]: file }));
   };
 
   const handleCopyAccount = () => {
@@ -110,6 +94,41 @@ export default function PpdbForm({
     const newRegNo = `PPDB-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     setRegId(newRegNo);
 
+    // 1. Batch Upload all selected files at once
+    const uploadedUrls: { [key: string]: string | null } = {
+      kk: null,
+      akta: null,
+      foto: null,
+      ktp: null,
+      buktiBayar: null,
+    };
+
+    for (const docKey of Object.keys(selectedFileObjects)) {
+      const fileObj = selectedFileObjects[docKey];
+      if (fileObj) {
+        try {
+          const formDataUpload = new FormData();
+          formDataUpload.append("file", fileObj);
+          formDataUpload.append("folder", "ppdb");
+
+          const res = await fetch("/api/upload", {
+            method: "POST",
+            body: formDataUpload,
+          });
+          const data = await res.json();
+          if (data.success && data.url) {
+            uploadedUrls[docKey] = data.url;
+          } else if (data.error) {
+            alert(`Gagal mengunggah ${docKey}: ${data.error}`);
+          }
+        } catch (uploadErr: any) {
+          console.error(`Error uploading ${docKey}:`, uploadErr);
+          alert(`Gagal mengunggah berkas ${docKey}: ${uploadErr.message}`);
+        }
+      }
+    }
+
+    // 2. Submit complete PPDB form data with uploaded file URLs
     try {
       await fetch("/api/ppdb", {
         method: "POST",
@@ -128,11 +147,11 @@ export default function PpdbForm({
           noWhatsapp: formData.noWhatsapp,
           email: formData.email,
           alamatRumah: formData.alamatRumah,
-          docKkUrl: documents.kk,
-          docAktaUrl: documents.akta,
-          docFotoUrl: documents.foto,
-          docKtpUrl: documents.ktp,
-          buktiBayarUrl: documents.buktiBayar,
+          docKkUrl: uploadedUrls.kk,
+          docAktaUrl: uploadedUrls.akta,
+          docFotoUrl: uploadedUrls.foto,
+          docKtpUrl: uploadedUrls.ktp,
+          buktiBayarUrl: uploadedUrls.buktiBayar,
           paymentMethod,
         }),
       });
@@ -464,7 +483,15 @@ export default function PpdbForm({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Dropzone 1: Kartu Keluarga */}
-                  <div className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) handleFileSelect("kk", e.target.files[0]);
+                      }}
+                    />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
                       <Upload className="w-5 h-5" />
                     </div>
@@ -472,18 +499,26 @@ export default function PpdbForm({
                       Kartu Keluarga
                     </span>
                     <span className="text-[10px] text-slate-500 block mt-0.5">
-                      {documents.kk ? (
+                      {selectedFileObjects.kk ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {documents.kk}
+                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.kk.name}
                         </span>
                       ) : (
-                        "Unggah kartu keluarga"
+                        "Unggah Kartu Keluarga (PDF / Gambar)"
                       )}
                     </span>
-                  </div>
+                  </label>
 
                   {/* Dropzone 2: Akta Kelahiran */}
-                  <div className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) handleFileSelect("akta", e.target.files[0]);
+                      }}
+                    />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
                       <Upload className="w-5 h-5" />
                     </div>
@@ -491,18 +526,26 @@ export default function PpdbForm({
                       Akta Kelahiran
                     </span>
                     <span className="text-[10px] text-slate-500 block mt-0.5">
-                      {documents.akta ? (
+                      {selectedFileObjects.akta ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {documents.akta}
+                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.akta.name}
                         </span>
                       ) : (
-                        "Unggah akta kelahiran"
+                        "Unggah Akta Kelahiran (PDF / Gambar)"
                       )}
                     </span>
-                  </div>
+                  </label>
 
                   {/* Dropzone 3: Foto Anak */}
-                  <div className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) handleFileSelect("foto", e.target.files[0]);
+                      }}
+                    />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
                       <Upload className="w-5 h-5" />
                     </div>
@@ -510,18 +553,26 @@ export default function PpdbForm({
                       Foto Anak
                     </span>
                     <span className="text-[10px] text-slate-500 block mt-0.5">
-                      {documents.foto ? (
+                      {selectedFileObjects.foto ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {documents.foto}
+                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.foto.name}
                         </span>
                       ) : (
-                        "Unggah foto anak"
+                        "Unggah Foto Anak (Gambar / PDF)"
                       )}
                     </span>
-                  </div>
+                  </label>
 
                   {/* Dropzone 4: KTP Orang Tua/Wali */}
-                  <div className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) handleFileSelect("ktp", e.target.files[0]);
+                      }}
+                    />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
                       <Upload className="w-5 h-5" />
                     </div>
@@ -529,15 +580,15 @@ export default function PpdbForm({
                       KTP Orang Tua/Wali
                     </span>
                     <span className="text-[10px] text-slate-500 block mt-0.5">
-                      {documents.ktp ? (
+                      {selectedFileObjects.ktp ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {documents.ktp}
+                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.ktp.name}
                         </span>
                       ) : (
-                        "Unggah KTP orang tua/wali"
+                        "Unggah KTP (PDF / Gambar)"
                       )}
                     </span>
-                  </div>
+                  </label>
                 </div>
               </div>
 
@@ -691,13 +742,30 @@ export default function PpdbForm({
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-12 gap-2">
+                  <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
                       Alamat Lengkap
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
                     <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900 leading-relaxed">
                       {formData.alamatRumah}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-12 gap-2">
+                    <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
+                      Berkas Diterapkan
+                    </span>
+                    <span className="col-span-1 text-slate-400 text-center">:</span>
+                    <span className="col-span-6 sm:col-span-7 font-semibold text-emerald-800">
+                      {[
+                        selectedFileObjects.kk && `KK: ${selectedFileObjects.kk.name}`,
+                        selectedFileObjects.akta && `Akta: ${selectedFileObjects.akta.name}`,
+                        selectedFileObjects.foto && `Foto: ${selectedFileObjects.foto.name}`,
+                        selectedFileObjects.ktp && `KTP: ${selectedFileObjects.ktp.name}`,
+                      ]
+                        .filter(Boolean)
+                        .join(", ") || "Belum ada berkas terlampir"}
                     </span>
                   </div>
                 </div>
@@ -853,7 +921,15 @@ export default function PpdbForm({
                   </div>
 
                   {/* Right Upload Bukti Dropzone */}
-                  <div className="md:col-span-5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center">
+                  <label className="md:col-span-5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) handleFileSelect("buktiBayar", e.target.files[0]);
+                      }}
+                    />
                     <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-1.5">
                       <Upload className="w-4 h-4" />
                     </div>
@@ -861,15 +937,15 @@ export default function PpdbForm({
                       Bukti Pembayaran / KTP
                     </span>
                     <span className="text-[10px] text-slate-500 block">
-                      {documents.buktiBayar ? (
+                      {selectedFileObjects.buktiBayar ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1 mt-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> {documents.buktiBayar}
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {selectedFileObjects.buktiBayar.name}
                         </span>
                       ) : (
-                        "Unggah bukti pembayaran"
+                        "Unggah Bukti (PDF / Gambar)"
                       )}
                     </span>
-                  </div>
+                  </label>
                 </div>
 
                 {/* Perhatian Transfer Note */}
@@ -891,16 +967,25 @@ export default function PpdbForm({
                 <div className="flex items-center justify-between gap-4 pt-2">
                   <button
                     onClick={() => setStep(2)}
-                    className="px-8 py-3 rounded-full border border-emerald-600 text-emerald-700 font-bold text-xs sm:text-sm hover:bg-emerald-50 transition-colors"
+                    disabled={submitting}
+                    className="px-8 py-3 rounded-full border border-emerald-600 text-emerald-700 font-bold text-xs sm:text-sm hover:bg-emerald-50 transition-colors disabled:opacity-40"
                   >
                     Kembali
                   </button>
 
                   <button
                     onClick={handleFinish}
-                    className="px-10 py-3 rounded-full bg-[#057a44] hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all"
+                    disabled={submitting}
+                    className="px-10 py-3 rounded-full bg-[#057a44] hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
                   >
-                    Selesai
+                    {submitting ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Mengunggah Berkas & Memproses...</span>
+                      </>
+                    ) : (
+                      <span>Selesai & Kirim Pendaftaran</span>
+                    )}
                   </button>
                 </div>
               </div>

@@ -30,17 +30,52 @@ export async function POST(req: Request) {
     const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
     const uniqueFileName = `${Date.now()}_${sanitizedName}`;
 
-    // Target storage path in public/storage/{folder}/
-    const uploadDir = path.join(process.cwd(), "public", "storage", folder);
-    await mkdir(uploadDir, { recursive: true });
+    // Candidate directories to write
+    const candidateDirs = [
+      process.env.STORAGE_PATH,
+      "/var/www/storage-sekolah",
+      "/var/www/storage",
+      path.join(process.cwd(), "public", "storage"),
+    ].filter(Boolean) as string[];
 
-    const filePath = path.join(uploadDir, uniqueFileName);
-    await writeFile(filePath, buffer);
+    let writtenPath: string | null = null;
+    let usedBaseDir: string | null = null;
+    let lastError: any = null;
 
-    // Storage base URL
-    const storageBaseUrl =
-      process.env.NEXT_PUBLIC_STORAGE_URL || "https://elevore.web.id/storage";
-    const fileUrl = `${storageBaseUrl}/${folder}/${uniqueFileName}`;
+    for (const baseDir of candidateDirs) {
+      try {
+        const targetFolder = path.join(baseDir, folder);
+        await mkdir(targetFolder, { recursive: true, mode: 0o777 });
+        const targetFilePath = path.join(targetFolder, uniqueFileName);
+        await writeFile(targetFilePath, buffer, { mode: 0o666 });
+
+        writtenPath = targetFilePath;
+        usedBaseDir = baseDir;
+        break;
+      } catch (err: any) {
+        console.warn(`Write attempt failed for ${baseDir}:`, err?.message || err);
+        lastError = err;
+      }
+    }
+
+    if (!writtenPath) {
+      const errMsg = lastError?.message || "Tidak ada direktori yang dapat ditulis oleh server (Permission Denied)";
+      console.error("All upload storage directories failed:", errMsg);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Gagal menulis berkas ke server: ${errMsg}. Jalankan 'sudo chmod -R 777 /var/www/storage-sekolah' di VPS.`,
+        },
+        { status: 500 }
+      );
+    }
+
+    // Storage URL resolution
+    const relativePath = `/storage/${folder}/${uniqueFileName}`;
+    const storageBaseUrl = process.env.NEXT_PUBLIC_STORAGE_URL;
+    const fileUrl = storageBaseUrl
+      ? `${storageBaseUrl.replace(/\/$/, "")}/${folder}/${uniqueFileName}`
+      : relativePath;
 
     // Record upload log in PostgreSQL
     await prisma.uploadLog.create({
@@ -58,7 +93,8 @@ export async function POST(req: Request) {
       fileName: uniqueFileName,
       folder: folder,
       url: fileUrl,
-      localUrl: `/storage/${folder}/${uniqueFileName}`,
+      fileUrl: fileUrl,
+      localUrl: relativePath,
     });
   } catch (error: any) {
     console.error("Upload error:", error);
@@ -68,3 +104,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

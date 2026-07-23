@@ -150,6 +150,9 @@ export default function AdminDashboardPage() {
           router.push("/admin/login");
         } else {
           setAdmin(data.admin);
+          if (data.admin?.schoolId) {
+            setSelectedSchoolId(data.admin.schoolId);
+          }
           loadSchools();
           loadAdminUsers();
         }
@@ -1955,6 +1958,94 @@ export default function AdminDashboardPage() {
                         <p className="text-sm font-bold text-white">{selectedPpdb.namaOrtu}</p>
                         <p>WhatsApp: {selectedPpdb.noWhatsapp}</p>
                         <p>Email: {selectedPpdb.email}</p>
+                      </div>
+                    </div>
+
+                    {/* Dokumen Terunggah */}
+                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
+                      <p className="font-bold text-amber-400 uppercase text-[10px] tracking-wider">
+                        Dokumen & Berkas Terunggah
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {selectedPpdb.docKkUrl ? (
+                          <a
+                            href={selectedPpdb.docKkUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span className="truncate">Kartu Keluarga</span>
+                          </a>
+                        ) : (
+                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                            KK: Belum ada
+                          </span>
+                        )}
+
+                        {selectedPpdb.docAktaUrl ? (
+                          <a
+                            href={selectedPpdb.docAktaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span className="truncate">Akta Kelahiran</span>
+                          </a>
+                        ) : (
+                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                            Akta: Belum ada
+                          </span>
+                        )}
+
+                        {selectedPpdb.docFotoUrl ? (
+                          <a
+                            href={selectedPpdb.docFotoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          >
+                            <ImageIcon className="w-3.5 h-3.5" />
+                            <span className="truncate">Foto Anak</span>
+                          </a>
+                        ) : (
+                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                            Foto: Belum ada
+                          </span>
+                        )}
+
+                        {selectedPpdb.docKtpUrl ? (
+                          <a
+                            href={selectedPpdb.docKtpUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            <span className="truncate">KTP Ortu</span>
+                          </a>
+                        ) : (
+                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                            KTP: Belum ada
+                          </span>
+                        )}
+
+                        {selectedPpdb.buktiBayarUrl ? (
+                          <a
+                            href={selectedPpdb.buktiBayarUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                            <span className="truncate">Bukti Bayar</span>
+                          </a>
+                        ) : (
+                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                            Bukti Bayar: Belum ada
+                          </span>
+                        )}
                       </div>
                     </div>
 
