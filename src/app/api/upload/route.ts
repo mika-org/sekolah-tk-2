@@ -30,44 +30,20 @@ export async function POST(req: Request) {
     const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
     const uniqueFileName = `${Date.now()}_${sanitizedName}`;
 
-    // Candidate directories to write
-    const candidateDirs = [
-      process.env.STORAGE_PATH,
-      "/var/www/storage-sekolah",
-      "/var/www/storage",
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "storage"),
-    ].filter(Boolean) as string[];
+    // Target base storage directory (Static resolution)
+    const baseStorageDir = process.env.STORAGE_PATH || "/var/www/storage-sekolah";
+    let uploadDir = path.resolve(baseStorageDir, folder);
+    let targetFilePath = path.resolve(uploadDir, uniqueFileName);
 
-    let writtenPath: string | null = null;
-    let usedBaseDir: string | null = null;
-    let lastError: any = null;
-
-    for (const baseDir of candidateDirs) {
-      try {
-        const targetFolder = path.join(baseDir, folder);
-        await mkdir(targetFolder, { recursive: true, mode: 0o777 });
-        const targetFilePath = path.join(targetFolder, uniqueFileName);
-        await writeFile(targetFilePath, buffer, { mode: 0o666 });
-
-        writtenPath = targetFilePath;
-        usedBaseDir = baseDir;
-        break;
-      } catch (err: any) {
-        console.warn(`Write attempt failed for ${baseDir}:`, err?.message || err);
-        lastError = err;
-      }
-    }
-
-    if (!writtenPath) {
-      const errMsg = lastError?.message || "Tidak ada direktori yang dapat ditulis oleh server (Permission Denied)";
-      console.error("All upload storage directories failed:", errMsg);
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Gagal menulis berkas ke server: ${errMsg}. Jalankan 'sudo chmod -R 777 /var/www/storage-sekolah' di VPS.`,
-        },
-        { status: 500 }
-      );
+    try {
+      await mkdir(uploadDir, { recursive: true, mode: 0o777 });
+      await writeFile(targetFilePath, buffer, { mode: 0o666 });
+    } catch {
+      // Fallback for local dev environments where /var/www/storage-sekolah is unavailable
+      uploadDir = path.resolve(process.cwd(), "public", "storage", folder);
+      await mkdir(uploadDir, { recursive: true, mode: 0o777 });
+      targetFilePath = path.resolve(uploadDir, uniqueFileName);
+      await writeFile(targetFilePath, buffer, { mode: 0o666 });
     }
 
     // Storage URL resolution

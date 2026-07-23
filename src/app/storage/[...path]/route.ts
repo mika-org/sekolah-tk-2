@@ -10,35 +10,21 @@ export async function GET(
     const { path: pathSegments } = await params;
     const relativeFilePath = pathSegments.join("/");
 
-    // Candidate locations
-    const candidatePaths = [
-      path.join(process.env.STORAGE_PATH || "/var/www/storage-sekolah", relativeFilePath),
-      path.join("/var/www/storage", relativeFilePath),
-      path.join(/*turbopackIgnore: true*/ process.cwd(), "public", "storage", relativeFilePath),
-    ];
+    // Static target paths
+    const storagePath = process.env.STORAGE_PATH || "/var/www/storage-sekolah";
+    const primaryFile = path.resolve(storagePath, relativeFilePath);
+    const fallbackFile = path.resolve("/var/www/storage", relativeFilePath);
 
-    let foundPath: string | null = null;
-    for (const cand of candidatePaths) {
-      try {
-        const fileStat = await stat(cand);
-        if (fileStat.isFile()) {
-          foundPath = cand;
-          break;
-        }
-      } catch {
-        // file not found in this candidate path
-      }
+    let targetFile = primaryFile;
+    try {
+      const fileStat = await stat(primaryFile);
+      if (!fileStat.isFile()) targetFile = fallbackFile;
+    } catch {
+      targetFile = fallbackFile;
     }
 
-    if (!foundPath) {
-      return NextResponse.json(
-        { success: false, error: "File tidak ditemukan" },
-        { status: 404 }
-      );
-    }
-
-    const fileBuffer = await readFile(foundPath);
-    const ext = path.extname(foundPath).toLowerCase();
+    const fileBuffer = await readFile(targetFile);
+    const ext = path.extname(targetFile).toLowerCase();
 
     let contentType = "application/octet-stream";
     if (ext === ".pdf") contentType = "application/pdf";
@@ -56,8 +42,8 @@ export async function GET(
     });
   } catch (error: any) {
     return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
+      { success: false, error: error.message || "File tidak ditemukan" },
+      { status: 404 }
     );
   }
 }
