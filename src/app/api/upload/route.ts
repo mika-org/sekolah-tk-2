@@ -32,18 +32,18 @@ export async function POST(req: Request) {
 
     // Target base storage directory (Static resolution)
     const baseStorageDir = process.env.STORAGE_PATH || "/var/www/storage-sekolah";
-    let uploadDir = path.resolve(baseStorageDir, folder);
-    let targetFilePath = path.resolve(uploadDir, uniqueFileName);
+    let uploadDir = path.resolve(/*turbopackIgnore: true*/ baseStorageDir, folder);
+    let targetFilePath = path.resolve(/*turbopackIgnore: true*/ uploadDir, uniqueFileName);
 
     try {
       await mkdir(uploadDir, { recursive: true, mode: 0o777 });
-      await writeFile(targetFilePath, buffer, { mode: 0o666 });
+      await writeFile(/*turbopackIgnore: true*/ targetFilePath, buffer, { mode: 0o666 });
     } catch {
       // Fallback for local dev environments where /var/www/storage-sekolah is unavailable
-      uploadDir = path.resolve(process.cwd(), "public", "storage", folder);
+      uploadDir = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "public", "storage", folder);
       await mkdir(uploadDir, { recursive: true, mode: 0o777 });
-      targetFilePath = path.resolve(uploadDir, uniqueFileName);
-      await writeFile(targetFilePath, buffer, { mode: 0o666 });
+      targetFilePath = path.resolve(/*turbopackIgnore: true*/ uploadDir, uniqueFileName);
+      await writeFile(/*turbopackIgnore: true*/ targetFilePath, buffer, { mode: 0o666 });
     }
 
     // Storage URL resolution

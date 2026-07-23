@@ -12,18 +12,18 @@ export async function GET(
 
     // Static target paths
     const storagePath = process.env.STORAGE_PATH || "/var/www/storage-sekolah";
-    const primaryFile = path.resolve(storagePath, relativeFilePath);
-    const fallbackFile = path.resolve("/var/www/storage", relativeFilePath);
+    const primaryFile = path.resolve(/*turbopackIgnore: true*/ storagePath, relativeFilePath);
+    const fallbackFile = path.resolve(/*turbopackIgnore: true*/ "/var/www/storage", relativeFilePath);
 
     let targetFile = primaryFile;
     try {
-      const fileStat = await stat(primaryFile);
+      const fileStat = await stat(/*turbopackIgnore: true*/ primaryFile);
       if (!fileStat.isFile()) targetFile = fallbackFile;
     } catch {
       targetFile = fallbackFile;
     }
 
-    const fileBuffer = await readFile(targetFile);
+    const fileBuffer = await readFile(/*turbopackIgnore: true*/ targetFile);
     const ext = path.extname(targetFile).toLowerCase();
 
     let contentType = "application/octet-stream";

@@ -35,6 +35,7 @@ import {
   Bell,
   CreditCard,
   FileCheck,
+  FileText,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
