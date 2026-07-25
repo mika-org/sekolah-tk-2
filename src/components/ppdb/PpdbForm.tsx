@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import ImageModal from "@/components/common/ImageModal";
+import SearchableSelect from "@/components/common/SearchableSelect";
 import Sidebar from "./Sidebar";
 import {
   User,
@@ -69,6 +71,20 @@ export default function PpdbForm({
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [regId, setRegId] = useState<string>("PPDB-2026-8821");
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  // Image Modal State for document previews
+  const [previewModal, setPreviewModal] = useState<{ isOpen: boolean; src: string | null; title: string }>({
+    isOpen: false,
+    src: null,
+    title: "Pratinjau Berkas",
+  });
+
+  const handlePreviewFile = (file: File | null, title: string) => {
+    if (file) {
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewModal({ isOpen: true, src: objectUrl, title });
+    }
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -309,36 +325,36 @@ export default function PpdbForm({
                       <label className="block font-bold text-slate-700 mb-1.5">
                         Jenis Kelamin
                       </label>
-                      <select
-                        name="jenisKelamin"
+                      <SearchableSelect
+                        options={[
+                          { value: "Laki-laki", label: "Laki-laki" },
+                          { value: "Perempuan", label: "Perempuan" },
+                        ]}
                         value={formData.jenisKelamin}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition-all bg-slate-50/50"
-                      >
-                        <option value="">Pilih jenis kelamin</option>
-                        <option value="Laki-laki">Laki-laki</option>
-                        <option value="Perempuan">Perempuan</option>
-                      </select>
+                        onChange={(val) => setFormData((prev) => ({ ...prev, jenisKelamin: val }))}
+                        variant="light"
+                        placeholder="Pilih jenis kelamin..."
+                      />
                     </div>
 
                     <div>
                       <label className="block font-bold text-slate-700 mb-1.5">
                         Agama
                       </label>
-                      <select
-                        name="agama"
+                      <SearchableSelect
+                        options={[
+                          { value: "Islam", label: "Islam" },
+                          { value: "Kristen", label: "Kristen" },
+                          { value: "Katolik", label: "Katolik" },
+                          { value: "Hindu", label: "Hindu" },
+                          { value: "Buddha", label: "Buddha" },
+                          { value: "Khonghucu", label: "Khonghucu" },
+                        ]}
                         value={formData.agama}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition-all bg-slate-50/50"
-                      >
-                        <option value="">Pilih agama</option>
-                        <option value="Islam">Islam</option>
-                        <option value="Kristen">Kristen</option>
-                        <option value="Katolik">Katolik</option>
-                        <option value="Hindu">Hindu</option>
-                        <option value="Buddha">Buddha</option>
-                        <option value="Khonghucu">Khonghucu</option>
-                      </select>
+                        onChange={(val) => setFormData((prev) => ({ ...prev, agama: val }))}
+                        variant="light"
+                        placeholder="Pilih agama..."
+                      />
                     </div>
                   </div>
 
@@ -391,19 +407,19 @@ export default function PpdbForm({
 
                     <div>
                       <label className="block font-bold text-slate-700 mb-1.5">
-                        Program
+                        Program Belajar
                       </label>
-                      <select
-                        name="program"
+                      <SearchableSelect
+                        options={[
+                          { value: "Playground", label: "Playground", sublabel: "Usia 3-4 Tahun" },
+                          { value: "Kindergarten", label: "Kindergarten", sublabel: "Usia 4-5 Tahun" },
+                          { value: "Pre Kindergarten", label: "Pre Kindergarten", sublabel: "Usia 5-6 Tahun" },
+                        ]}
                         value={formData.program}
-                        onChange={handleInputChange}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition-all bg-slate-50/50"
-                      >
-                        <option value="">Pilih program</option>
-                        <option value="Playground">Playground (3-4 Thn)</option>
-                        <option value="Kindergarten">Kindergarten (4-5 Thn)</option>
-                        <option value="Pre Kindergarten">Pre Kindergarten (5-6 Thn)</option>
-                      </select>
+                        onChange={(val) => setFormData((prev) => ({ ...prev, program: val }))}
+                        variant="light"
+                        placeholder="Pilih program belajar..."
+                      />
                     </div>
                   </div>
 
@@ -483,7 +499,7 @@ export default function PpdbForm({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Dropzone 1: Kartu Keluarga */}
-                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
@@ -510,7 +526,7 @@ export default function PpdbForm({
                   </label>
 
                   {/* Dropzone 2: Akta Kelahiran */}
-                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
@@ -537,7 +553,7 @@ export default function PpdbForm({
                   </label>
 
                   {/* Dropzone 3: Foto Anak */}
-                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
@@ -564,7 +580,7 @@ export default function PpdbForm({
                   </label>
 
                   {/* Dropzone 4: KTP Orang Tua/Wali */}
-                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-[120px]">
+                  <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
@@ -1047,6 +1063,14 @@ export default function PpdbForm({
           </div>
         </div>
       )}
+
+      {/* Image & Document Modal Preview */}
+      <ImageModal
+        isOpen={previewModal.isOpen}
+        onClose={() => setPreviewModal({ ...previewModal, isOpen: false })}
+        src={previewModal.src}
+        title={previewModal.title}
+      />
     </div>
   );
 }

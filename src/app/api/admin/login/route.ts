@@ -28,6 +28,9 @@ export async function POST(req: Request) {
           { username: { equals: usernameStr, mode: "insensitive" } },
         ],
       },
+      include: {
+        school: true,
+      },
     });
 
     if (admin) {
@@ -56,6 +59,11 @@ export async function POST(req: Request) {
           name: admin.name,
           role: admin.role,
           schoolId: admin.schoolId,
+          schoolName: admin.school?.name || "TK Smart Kids",
+          schoolCode: admin.school?.code || "dekeraton",
+          assignedClass: admin.assignedClass || null,
+          phone: admin.phone || null,
+          email: admin.email || null,
         },
       });
 
@@ -80,6 +88,9 @@ export async function POST(req: Request) {
           { username: { equals: usernameStr, mode: "insensitive" } },
         ],
       },
+      include: {
+        school: true,
+      },
     });
 
     if (student && student.passwordHash) {
@@ -102,6 +113,11 @@ export async function POST(req: Request) {
             name: student.name,
             role: "SISWA",
             schoolId: student.schoolId,
+            schoolName: student.school?.name || "TK Smart Kids",
+            schoolCode: student.school?.code || "dekeraton",
+            assignedClass: student.className,
+            parentName: student.parentName,
+            parentPhone: student.parentPhone,
           },
         });
 
@@ -130,4 +146,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

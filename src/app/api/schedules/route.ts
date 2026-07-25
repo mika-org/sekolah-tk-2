@@ -7,11 +7,17 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("schoolId");
     const schoolCode = searchParams.get("schoolCode");
+    const className = searchParams.get("className");
 
     const where: any = {};
-    if (schoolId) {
+
+    if (className) {
+      where.className = className;
+    }
+
+    if (schoolId && schoolId !== "ALL") {
       where.schoolId = schoolId;
-    } else if (schoolCode) {
+    } else if (schoolCode && schoolCode !== "ALL") {
       const school = await prisma.school.findUnique({ where: { code: schoolCode } });
       if (school) where.schoolId = school.id;
     }

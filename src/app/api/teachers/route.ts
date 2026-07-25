@@ -9,9 +9,9 @@ export async function GET(req: Request) {
     const schoolCode = searchParams.get("schoolCode");
 
     const where: any = {};
-    if (schoolId) {
+    if (schoolId && schoolId !== "ALL") {
       where.schoolId = schoolId;
-    } else if (schoolCode) {
+    } else if (schoolCode && schoolCode !== "ALL") {
       const school = await prisma.school.findUnique({ where: { code: schoolCode } });
       if (school) where.schoolId = school.id;
     }
@@ -21,7 +21,14 @@ export async function GET(req: Request) {
       orderBy: { orderIndex: "asc" },
       include: { school: true },
     });
-    return NextResponse.json({ success: true, data: teachers });
+
+    // Ensure all teachers have qrCode generated
+    const formatted = teachers.map((t: any) => ({
+      ...t,
+      qrCode: t.qrCode || `TEACHER:${t.id}`,
+    }));
+
+    return NextResponse.json({ success: true, data: formatted });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message },
@@ -40,7 +47,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { schoolId, name, role, photoUrl, bio, education, orderIndex } = await req.json();
+    const { id, schoolId, name, role, assignedClass, photoUrl, bio, education, orderIndex } = await req.json();
 
     let targetSchoolId = schoolId || admin.schoolId;
     if (!targetSchoolId) {
@@ -55,11 +62,38 @@ export async function POST(req: Request) {
       );
     }
 
-    const teacher = await prisma.teacher.create({
+    const db = prisma as any;
+
+    if (id) {
+      // Update existing teacher
+      const updated = await db.teacher.update({
+        where: { id },
+        data: {
+          name,
+          role,
+          assignedClass: assignedClass || null,
+          photoUrl: photoUrl || "/images/teacher_default.png",
+          bio: bio || null,
+          education: education || null,
+          orderIndex: Number(orderIndex) || 0,
+        },
+      });
+
+      // Update linked AdminUser if role GURU
+      await db.adminUser.updateMany({
+        where: { name: name },
+        data: { assignedClass: assignedClass || null },
+      });
+
+      return NextResponse.json({ success: true, data: updated });
+    }
+
+    const teacher = await db.teacher.create({
       data: {
         schoolId: targetSchoolId,
         name,
         role,
+        assignedClass: assignedClass || null,
         photoUrl: photoUrl || "/images/teacher_default.png",
         bio: bio || null,
         education: education || null,
@@ -67,7 +101,13 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, data: teacher });
+    // Auto-update qrCode with created ID
+    const updatedTeacher = await db.teacher.update({
+      where: { id: teacher.id },
+      data: { qrCode: `TEACHER:${teacher.id}` },
+    });
+
+    return NextResponse.json({ success: true, data: updatedTeacher });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message },

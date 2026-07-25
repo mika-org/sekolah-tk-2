@@ -48,6 +48,7 @@ model School {
   schedules         Schedule[]
   announcements     Announcement[]
   leaveRequests     LeaveRequest[]
+  classRooms        ClassRoom[]
 
   @@map("schools")
 }
@@ -60,6 +61,7 @@ model AdminUser {
   passwordHash String
   name         String
   role         String   @default("ADMIN_PUSAT") // ADMIN_PUSAT, ADMIN_SEKOLAH, GURU, ORTU
+  assignedClass String? // e.g. "Kelas TK A"
   phone        String?
   email        String?
   createdAt    DateTime @default(now())
@@ -173,17 +175,19 @@ model UploadLog {
 }
 
 model Teacher {
-  id         String   @id @default(cuid())
-  schoolId   String
-  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  name       String
-  role       String   // e.g. "Kepala Sekolah", "Wali Kelas Kindergarten", "Guru Pendamping"
-  photoUrl   String   @default("/images/teacher_default.png")
-  bio        String?  // e.g. "Mendidik dengan kasih sayang"
-  education  String?  // e.g. "S1 Pendidikan PAUD"
-  orderIndex Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default(cuid())
+  schoolId      String
+  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name          String
+  role          String   // e.g. "Kepala Sekolah", "Wali Kelas Kindergarten", "Guru Pendamping"
+  assignedClass String?  // e.g. "Kelas TK A"
+  qrCode        String?  // e.g. "TEACHER:tech_123"
+  photoUrl      String   @default("/images/teacher_default.png")
+  bio           String?  // e.g. "Mendidik dengan kasih sayang"
+  education     String?  // e.g. "S1 Pendidikan PAUD"
+  orderIndex    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@map("teachers")
 }
@@ -198,6 +202,7 @@ model Student {
   passwordHash    String?
   className       String   // e.g. "Kelas TK A"
   gender          String   @default("L") // L / P
+  qrCode          String?  // e.g. "STUDENT:nisn_123"
   avatarUrl       String   @default("https://i.pravatar.cc/150")
   birthPlaceDate  String
   parentName      String
@@ -240,10 +245,25 @@ model Attendance {
   status      String   @default("hadir") // hadir, sakit, izin, alfa
   time        String?  // e.g. "07:30"
   reason      String?
-  date        String   // e.g. "2026-07-23"
+  date        String   // e.g. "2026-07-26"
   createdAt   DateTime @default(now())
 
   @@map("attendances")
+}
+
+model TeacherAttendance {
+  id          String   @id @default(cuid())
+  teacherId   String
+  teacherName String
+  schoolId    String?
+  className   String?
+  status      String   @default("hadir") // hadir, sakit, izin, alfa
+  time        String?  // e.g. "07:15"
+  reason      String?
+  date        String   // e.g. "2026-07-26"
+  createdAt   DateTime @default(now())
+
+  @@map("teacher_attendances")
 }
 
 model LeaveRequest {
@@ -291,4 +311,20 @@ model SppRecord {
   createdAt   DateTime @default(now())
 
   @@map("spp_records")
+}
+
+model ClassRoom {
+  id                  String   @id @default(cuid())
+  schoolId            String
+  school              School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name                String   // e.g. "Kelas TK A"
+  gradeLevel          String   @default("TK A") // TK A, TK B, KB, PAUD
+  academicYear        String   @default("2026/2027")
+  capacity            Int      @default(20)
+  homeroomTeacherId   String?
+  homeroomTeacherName String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@map("class_rooms")
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import ImageModal from "@/components/common/ImageModal";
 import {
   Users,
   BookOpen,
@@ -11,6 +12,7 @@ import {
   Heart,
   ArrowRight,
   CheckCircle2,
+  Eye,
 } from "lucide-react";
 
 interface LandingPageProps {
@@ -28,6 +30,17 @@ export default function LandingPage({
   const [gallery, setGallery] = useState<any[]>([]);
   const [testimonials, setTestimonials] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Image Modal State
+  const [previewModal, setPreviewModal] = useState<{ isOpen: boolean; src: string | null; title: string }>({
+    isOpen: false,
+    src: null,
+    title: "Pratinjau Foto",
+  });
+
+  const handleOpenPreview = (src: string | null, title: string = "Pratinjau Foto") => {
+    if (src) setPreviewModal({ isOpen: true, src, title });
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -298,7 +311,11 @@ export default function LandingPage({
                 key={teacher.id}
                 className="bg-white rounded-3xl p-6 border border-emerald-100/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col items-center text-center group hover:-translate-y-1"
               >
-                <div className="relative w-28 h-28 sm:w-32 sm:h-32 mb-4 rounded-full overflow-hidden border-4 border-emerald-50 shadow-md group-hover:border-emerald-200 transition-colors bg-emerald-100/50 flex items-center justify-center">
+                <div
+                  className="relative w-28 h-28 sm:w-32 sm:h-32 mb-4 rounded-full overflow-hidden border-4 border-emerald-50 shadow-md group-hover:border-emerald-200 transition-colors bg-emerald-100/50 flex items-center justify-center cursor-pointer"
+                  onClick={() => teacher.photoUrl && handleOpenPreview(teacher.photoUrl, `Tim Pengajar: ${teacher.name}`)}
+                  title="Klik untuk memperbesar foto"
+                >
                   {teacher.photoUrl ? (
                     <Image
                       src={teacher.photoUrl}
@@ -354,15 +371,20 @@ export default function LandingPage({
                 {gallery.slice(0, 3).map((g: any) => (
                   <div
                     key={g.id}
-                    className="relative h-44 sm:h-52 rounded-2xl overflow-hidden shadow-sm bg-amber-200"
+                    className="relative h-44 sm:h-52 rounded-2xl overflow-hidden shadow-sm bg-amber-200 cursor-pointer group/img"
+                    onClick={() => handleOpenPreview(g.imageUrl, `Galeri: ${g.title || 'Dokumentasi Sekolah'}`)}
+                    title="Klik untuk memperbesar foto"
                   >
                     <Image
                       src={g.imageUrl}
                       alt={g.title || "Galeri Foto"}
                       fill
                       sizes="(max-width: 768px) 33vw, 250px"
-                      className="object-cover hover:scale-105 transition-transform duration-300"
+                      className="object-cover group-hover/img:scale-105 transition-transform duration-300"
                     />
+                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                      <Eye className="w-6 h-6 text-white drop-shadow-md" />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -450,6 +472,14 @@ export default function LandingPage({
           </button>
         </div>
       </section>
+
+      {/* Image & Document Modal Preview */}
+      <ImageModal
+        isOpen={previewModal.isOpen}
+        onClose={() => setPreviewModal({ ...previewModal, isOpen: false })}
+        src={previewModal.src}
+        title={previewModal.title}
+      />
     </div>
   );
 }

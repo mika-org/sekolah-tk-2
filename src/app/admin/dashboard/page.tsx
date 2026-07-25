@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import ImageModal from "@/components/common/ImageModal";
+import SearchableSelect from "@/components/common/SearchableSelect";
 import Image from "next/image";
 import {
   Users,
@@ -39,6 +41,10 @@ import {
   Key,
   Copy,
   Send,
+  QrCode,
+  Camera,
+  Check,
+  X,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -47,6 +53,7 @@ export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<
     | "overview"
     | "schools"
+    | "classes"
     | "users"
     | "ppdb"
     | "programs"
@@ -66,10 +73,28 @@ export default function AdminDashboardPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
+  // Image & Document Modal Preview State
+  const [previewModal, setPreviewModal] = useState<{ isOpen: boolean; src: string | null; title: string }>({
+    isOpen: false,
+    src: null,
+    title: "Pratinjau Berkas",
+  });
+
+  const handleOpenPreview = (src: string | null, title: string = "Pratinjau Berkas") => {
+    if (src) {
+      setPreviewModal({ isOpen: true, src, title });
+    }
+  };
+
   // Multi-School & Admin Users States
   const [schoolsList, setSchoolsList] = useState<any[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>("ALL");
   const [editingSchool, setEditingSchool] = useState<any | null>(null);
+
+  // Master Kelas & Class Filter States
+  const [classesList, setClassesList] = useState<any[]>([]);
+  const [editingClassRoom, setEditingClassRoom] = useState<any | null>(null);
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>("ALL");
 
   const [adminUsersList, setAdminUsersList] = useState<any[]>([]);
   const [editingAdminUser, setEditingAdminUser] = useState<any | null>(null);
@@ -112,6 +137,37 @@ export default function AdminDashboardPage() {
   const [editingAnnouncement, setEditingAnnouncement] = useState<any | null>(null);
 
   const [leaveRequestsList, setLeaveRequestsList] = useState<any[]>([]);
+  const [teacherAttendanceList, setTeacherAttendanceList] = useState<any[]>([]);
+
+  // QR Code Presensi Modal State
+  const [qrModal, setQrModal] = useState<{
+    isOpen: boolean;
+    type: "STUDENT" | "TEACHER";
+    inputCode: string;
+    scanning: boolean;
+    result: any | null;
+    error: string | null;
+  }>({
+    isOpen: false,
+    type: "STUDENT",
+    inputCode: "",
+    scanning: false,
+    result: null,
+    error: null,
+  });
+
+  // Plotting Wali Kelas Modal State
+  const [plottingModal, setPlottingModal] = useState<{
+    isOpen: boolean;
+    teacherId: string;
+    teacherName: string;
+    assignedClass: string;
+  }>({
+    isOpen: false,
+    teacherId: "",
+    teacherName: "",
+    assignedClass: "",
+  });
 
   const [schedulesList, setSchedulesList] = useState<any[]>([]);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
@@ -252,7 +308,7 @@ export default function AdminDashboardPage() {
     try {
       const queryParam = selectedSchoolId && selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : "";
 
-      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp] = await Promise.all([
+      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp, resTeachAtt, resClasses] = await Promise.all([
         fetch(`/api/ppdb${queryParam}`).then((r) => r.json()),
         fetch(`/api/programs${queryParam}`).then((r) => r.json()),
         fetch(`/api/teachers${queryParam}`).then((r) => r.json()),
@@ -261,10 +317,12 @@ export default function AdminDashboardPage() {
         fetch(`/api/site-profile${queryParam}`).then((r) => r.json()),
         fetch(`/api/students${queryParam}`).then((r) => r.json()),
         fetch(`/api/schedules${queryParam}`).then((r) => r.json()),
-        fetch(`/api/attendance`).then((r) => r.json()),
-        fetch(`/api/leave-requests`).then((r) => r.json()),
+        fetch(`/api/attendance${queryParam}`).then((r) => r.json()),
+        fetch(`/api/leave-requests${queryParam}`).then((r) => r.json()),
         fetch(`/api/announcements${queryParam}`).then((r) => r.json()),
-        fetch(`/api/spp`).then((r) => r.json()),
+        fetch(`/api/spp${queryParam}`).then((r) => r.json()),
+        fetch(`/api/teacher-attendance${queryParam}`).then((r) => r.json()),
+        fetch(`/api/classes${queryParam}`).then((r) => r.json()),
       ]);
 
       if (resPpdb.success) setPpdbList(resPpdb.data || []);
@@ -279,10 +337,157 @@ export default function AdminDashboardPage() {
       if (resLeave.success) setLeaveRequestsList(resLeave.data || []);
       if (resAnn.success) setAnnouncementsList(resAnn.data || []);
       if (resSpp.success) setSppList(resSpp.data || []);
+      if (resTeachAtt.success) setTeacherAttendanceList(resTeachAtt.data || []);
+      if (resClasses.success) setClassesList(resClasses.data || []);
     } catch (err: any) {
       showMessage("Gagal memuat data", "error");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveClassRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const isEdit = !!editingClassRoom?.id;
+      const url = isEdit ? `/api/classes/${editingClassRoom.id}` : "/api/classes";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingClassRoom),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(isEdit ? "Master kelas diperbarui" : "Master kelas baru ditambahkan", "success");
+      setEditingClassRoom(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClassRoom = async (id: string) => {
+    if (!confirm("Hapus master kelas ini?")) return;
+    try {
+      const res = await fetch(`/api/classes/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Master kelas dihapus", "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // QR Code Presensi Scanner Handlers
+  const handleScanQr = async (qrText: string, type: "STUDENT" | "TEACHER") => {
+    if (!qrText) return;
+    setQrModal((prev) => ({ ...prev, scanning: true, error: null, result: null }));
+    try {
+      const endpoint = type === "STUDENT" ? "/api/attendance/scan-qr" : "/api/teacher-attendance/scan-qr";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ qrData: qrText, adminRole: admin?.role }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      setQrModal((prev) => ({
+        ...prev,
+        scanning: false,
+        result: data,
+        inputCode: "",
+      }));
+
+      showMessage(data.message, "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      setQrModal((prev) => ({
+        ...prev,
+        scanning: false,
+        error: err.message,
+      }));
+    }
+  };
+
+  // Batch Attendance for Wali Kelas
+  const handleBatchAttendanceWaliKelas = async (targetClassName: string) => {
+    const classStudents = studentsList.filter(
+      (s) => s.className?.toLowerCase() === targetClassName?.toLowerCase()
+    );
+    if (classStudents.length === 0) {
+      showMessage(`Tidak ada siswa terdaftar pada ${targetClassName}`, "error");
+      return;
+    }
+
+    if (!confirm(`Tandai HADIR seluruh ${classStudents.length} murid di ${targetClassName}?`)) return;
+
+    try {
+      const batchData = classStudents.map((s) => ({
+        studentId: s.id,
+        studentName: s.name,
+        className: s.className,
+        status: "hadir",
+        time: new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        date: new Date().toISOString().split("T")[0],
+      }));
+
+      const res = await fetch("/api/attendance/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ attendance: batchData }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(`Absensi Wali Kelas Berhasil! ${classStudents.length} murid ${targetClassName} dicatat HADIR.`, "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Save Teacher Plotting (Wali Kelas)
+  const handleSaveTeacherPlotting = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const teacher = teachersList.find((t) => t.id === plottingModal.teacherId);
+      if (!teacher) throw new Error("Guru tidak ditemukan");
+
+      const res = await fetch("/api/teachers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: teacher.id,
+          name: teacher.name,
+          role: teacher.role,
+          assignedClass: plottingModal.assignedClass,
+          photoUrl: teacher.photoUrl,
+          bio: teacher.bio,
+          education: teacher.education,
+          orderIndex: teacher.orderIndex,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(`Berhasil plotting ${teacher.name} sebagai Wali Kelas ${plottingModal.assignedClass}`, "success");
+      setPlottingModal({ isOpen: false, teacherId: "", teacherName: "", assignedClass: "" });
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -931,7 +1136,7 @@ export default function AdminDashboardPage() {
       <header className="bg-slate-900/80 border-b border-slate-800/80 sticky top-0 z-30 backdrop-blur-xl px-6 py-3.5 flex flex-col lg:flex-row items-center justify-between gap-4 w-full shadow-2xl">
         {/* BRAND TITLE & BADGES */}
         <div className="flex items-center gap-3.5 w-full lg:w-auto">
-          <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 p-0.5 shadow-lg shadow-emerald-500/20 shrink-0">
+          <div className="relative w-11 h-11 rounded-2xl bg-linear-to-br from-emerald-500 to-teal-700 p-0.5 shadow-lg shadow-emerald-500/20 shrink-0">
             <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center font-black text-emerald-400 text-sm">
               YAP
             </div>
@@ -941,7 +1146,7 @@ export default function AdminDashboardPage() {
               <h1 className="font-black text-lg text-white tracking-tight">
                 YAPCHI CMS
               </h1>
-              <span className="inline-flex items-center gap-1 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              <span className="inline-flex items-center gap-1 bg-linear-to-r from-emerald-500/20 to-teal-500/20 text-emerald-300 text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                 <Sparkles className="w-3 h-3 text-emerald-400" />
                 Multi-Sekolah
               </span>
@@ -951,23 +1156,24 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* CENTER: SCHOOL BRANCH SWITCHER PILL */}
-        <div className="flex items-center gap-3 bg-slate-950/80 border border-slate-800 hover:border-emerald-500/50 px-4 py-2 rounded-2xl w-full lg:w-auto shadow-inner transition-all">
-          <Building className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
-          <span className="text-xs font-bold text-slate-400 shrink-0">Sekolah:</span>
-          <select
-            value={selectedSchoolId}
-            onChange={(e) => setSelectedSchoolId(e.target.value)}
-            className="bg-transparent text-xs font-extrabold text-emerald-300 focus:outline-none cursor-pointer flex-1 lg:w-64"
-          >
-            <option value="ALL" className="bg-slate-900 text-white font-bold">
-              🏢 Semua Sekolah (Yayasan Level)
-            </option>
-            {schoolsList.map((sch) => (
-              <option key={sch.id} value={sch.id} className="bg-slate-900 text-white">
-                🏫 {sch.name} ({sch.code})
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-2xl px-3 py-1.5 w-full lg:w-72 shadow-inner">
+          <Building className="w-4 h-4 text-emerald-400 shrink-0" />
+          <div className="flex-1">
+            <SearchableSelect
+              options={[
+                { value: "ALL", label: "🏢 Semua Sekolah (Yayasan Level)" },
+                ...schoolsList.map((sch) => ({
+                  value: sch.id,
+                  label: `🏫 ${sch.name}`,
+                  sublabel: `Kode: ${sch.code}`,
+                })),
+              ]}
+              value={selectedSchoolId}
+              onChange={(val) => setSelectedSchoolId(val)}
+              placeholder="Pilih cabang..."
+              searchPlaceholder="Cari sekolah..."
+            />
+          </div>
         </div>
 
         {/* RIGHT CONTROL ACTIONS */}
@@ -1052,7 +1258,7 @@ export default function AdminDashboardPage() {
               onClick={() => setActiveTab("overview")}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                 activeTab === "overview"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                   : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
               }`}
             >
@@ -1065,7 +1271,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("schools")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "schools"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1079,12 +1285,31 @@ export default function AdminDashboardPage() {
               </button>
             )}
 
+            {admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("classes")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "classes"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Layers className="w-4 h-4 text-emerald-400" />
+                  <span>Master Kelas & Plotting</span>
+                </div>
+                <span className="bg-emerald-500/20 text-emerald-300 text-[11px] px-2 py-0.5 rounded-full font-black border border-emerald-500/30">
+                  {classesList.length}
+                </span>
+              </button>
+            )}
+
             {(admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN") && (
               <button
                 onClick={() => setActiveTab("users")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "users"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1103,7 +1328,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("ppdb")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "ppdb"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1122,7 +1347,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("programs")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "programs"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1141,7 +1366,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("teachers")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "teachers"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1160,7 +1385,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("students")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "students"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1178,7 +1403,7 @@ export default function AdminDashboardPage() {
               onClick={() => setActiveTab("attendance")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                 activeTab === "attendance"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                   : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
               }`}
             >
@@ -1196,7 +1421,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("spp")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "spp"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1214,7 +1439,7 @@ export default function AdminDashboardPage() {
               onClick={() => setActiveTab("announcements")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                 activeTab === "announcements"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                   : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
               }`}
             >
@@ -1232,7 +1457,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("leave-requests")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "leave-requests"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1250,7 +1475,7 @@ export default function AdminDashboardPage() {
               onClick={() => setActiveTab("schedules")}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                 activeTab === "schedules"
-                  ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                   : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
               }`}
             >
@@ -1268,7 +1493,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("gallery")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "gallery"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1287,7 +1512,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("testimonials")}
                 className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "testimonials"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1306,7 +1531,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setActiveTab("profile")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
                   activeTab === "profile"
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
                     : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
                 }`}
               >
@@ -1471,6 +1696,217 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
+          {/* TAB: KELOLA MASTER KELAS & PLOTTING */}
+          {activeTab === "classes" && (
+            <div className="space-y-6 w-full">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">
+                    Master Kelas & Plotting Wali Kelas
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Kelola data master kelas per cabang sekolah dan atur penugasan Wali Kelas.
+                  </p>
+                </div>
+
+                <button
+                  onClick={() =>
+                    setEditingClassRoom({
+                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                      name: "",
+                      gradeLevel: "TK A",
+                      academicYear: "2026/2027",
+                      capacity: 20,
+                      homeroomTeacherId: "",
+                      homeroomTeacherName: "",
+                    })
+                  }
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Master Kelas</span>
+                </button>
+              </div>
+
+              {/* FORM TAMBAH / EDIT MASTER KELAS */}
+              {editingClassRoom && (
+                <form
+                  onSubmit={handleSaveClassRoom}
+                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
+                >
+                  <h3 className="font-bold text-white text-base">
+                    {editingClassRoom.id ? "Edit Master Kelas" : "Tambah Master Kelas Baru"}
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Pilih Cabang Sekolah
+                      </label>
+                      <SearchableSelect
+                        options={schoolsList.map((s) => ({
+                          value: s.id,
+                          label: s.name,
+                        }))}
+                        value={editingClassRoom.schoolId || schoolsList[0]?.id || ""}
+                        onChange={(val) => setEditingClassRoom({ ...editingClassRoom, schoolId: val })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Nama Kelas
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingClassRoom.name}
+                        onChange={(e) => setEditingClassRoom({ ...editingClassRoom, name: e.target.value })}
+                        placeholder="Contoh: Kelas TK A - Melati"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Tingkat / Jenjang
+                      </label>
+                      <SearchableSelect
+                        options={[
+                          { value: "TK A", label: "TK A (Usia 4-5 Thn)" },
+                          { value: "TK B", label: "TK B (Usia 5-6 Thn)" },
+                          { value: "Playground", label: "Playground (Usia 3-4 Thn)" },
+                          { value: "Kindergarten", label: "Kindergarten" },
+                          { value: "Pre Kindergarten", label: "Pre Kindergarten" },
+                        ]}
+                        value={editingClassRoom.gradeLevel || "TK A"}
+                        onChange={(val) => setEditingClassRoom({ ...editingClassRoom, gradeLevel: val })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Tahun Ajaran
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingClassRoom.academicYear || "2026/2027"}
+                        onChange={(e) => setEditingClassRoom({ ...editingClassRoom, academicYear: e.target.value })}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Kapasitas Siswa
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={editingClassRoom.capacity || 20}
+                        onChange={(e) => setEditingClassRoom({ ...editingClassRoom, capacity: e.target.value })}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">
+                        Plotting Wali Kelas
+                      </label>
+                      <SearchableSelect
+                        options={[
+                          { value: "", label: "-- Belum Ditentukan --" },
+                          ...teachersList.map((t) => ({
+                            value: t.id,
+                            label: t.name,
+                            sublabel: t.role,
+                          })),
+                        ]}
+                        value={editingClassRoom.homeroomTeacherId || ""}
+                        onChange={(teacherId) => {
+                          const t = teachersList.find((item) => item.id === teacherId);
+                          setEditingClassRoom({
+                            ...editingClassRoom,
+                            homeroomTeacherId: teacherId,
+                            homeroomTeacherName: t ? t.name : "",
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingClassRoom(null)}
+                      className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                    >
+                      Simpan Master Kelas
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* LIST OF MASTER CLASSES */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
+                {classesList.map((cls) => {
+                  const studentCount = studentsList.filter((s) => s.className?.toLowerCase() === cls.name?.toLowerCase()).length;
+                  return (
+                    <div key={cls.id} className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 shadow-xl transition-all">
+                      <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                            {cls.gradeLevel}
+                          </span>
+                          <h3 className="text-lg font-black text-white mt-1">{cls.name}</h3>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setEditingClassRoom(cls)}
+                            className="p-2 bg-slate-800 text-slate-300 hover:text-white rounded-xl"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClassRoom(cls.id)}
+                            className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between text-slate-300">
+                          <span className="text-slate-400 font-medium">Wali Kelas:</span>
+                          <span className="font-bold text-emerald-300">{cls.homeroomTeacherName || "Belum di-plot"}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-300">
+                          <span className="text-slate-400 font-medium">Jumlah Murid:</span>
+                          <span className="font-bold text-white">{studentCount} / {cls.capacity} Siswa</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-300">
+                          <span className="text-slate-400 font-medium">Tahun Ajaran:</span>
+                          <span className="font-bold text-slate-400">{cls.academicYear}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* TAB 2: KELOLA SEKOLAH */}
           {activeTab === "schools" && (
             <div className="space-y-8 w-full">
@@ -1494,7 +1930,7 @@ export default function AdminDashboardPage() {
                       logoUrl: "/images/smart_kids_logo.png",
                     })
                   }
-                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all"
+                  className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Tambah Cabang Sekolah</span>
@@ -1705,7 +2141,7 @@ export default function AdminDashboardPage() {
                       schoolId: schoolsList[0]?.id || "",
                     })
                   }
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 transition-all"
+                  className="bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Tambah User Admin</span>
@@ -1776,37 +2212,32 @@ export default function AdminDashboardPage() {
                       <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
                         Role / Hak Akses
                       </label>
-                      <select
+                      <SearchableSelect
+                        options={[
+                          { value: "SUPER_ADMIN", label: "👑 SUPER_ADMIN (Akses Semua Yayasan)" },
+                          { value: "SCHOOL_ADMIN", label: "🏫 SCHOOL_ADMIN (Khusus Cabang)" },
+                        ]}
                         value={editingAdminUser.role}
-                        onChange={(e) =>
-                          setEditingAdminUser({ ...editingAdminUser, role: e.target.value })
-                        }
-                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-white focus:border-purple-500 focus:outline-none"
-                      >
-                        <option value="SUPER_ADMIN">👑 SUPER_ADMIN (Akses Semua Yayasan)</option>
-                        <option value="SCHOOL_ADMIN">🏫 SCHOOL_ADMIN (Khusus Cabang)</option>
-                      </select>
+                        onChange={(val) => setEditingAdminUser({ ...editingAdminUser, role: val })}
+                      />
                     </div>
 
                     <div>
                       <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
                         Cabang Sekolah (Khusus School Admin)
                       </label>
-                      <select
+                      <SearchableSelect
                         disabled={editingAdminUser.role === "SUPER_ADMIN"}
+                        options={[
+                          { value: "ALL", label: "🏢 Semua Sekolah (Yayasan Level)" },
+                          ...schoolsList.map((sch) => ({
+                            value: sch.id,
+                            label: `🏫 ${sch.name}`,
+                          })),
+                        ]}
                         value={editingAdminUser.role === "SUPER_ADMIN" ? "ALL" : editingAdminUser.schoolId || ""}
-                        onChange={(e) =>
-                          setEditingAdminUser({ ...editingAdminUser, schoolId: e.target.value })
-                        }
-                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-bold text-white focus:border-purple-500 focus:outline-none disabled:opacity-50"
-                      >
-                        <option value="ALL">🏢 Semua Sekolah (Yayasan Level)</option>
-                        {schoolsList.map((sch) => (
-                          <option key={sch.id} value={sch.id}>
-                            🏫 {sch.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setEditingAdminUser({ ...editingAdminUser, schoolId: val })}
+                      />
                     </div>
                   </div>
 
@@ -1913,36 +2344,38 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-30">
                     <span className="text-[11px] text-slate-400 font-bold hidden md:inline">Tampilkan:</span>
-                    <select
-                      value={ppdbItemsPerPage}
-                      onChange={(e) => {
-                        setPpdbItemsPerPage(Number(e.target.value));
+                    <SearchableSelect
+                      options={[
+                        { value: "5", label: "5 / hlm" },
+                        { value: "10", label: "10 / hlm" },
+                        { value: "25", label: "25 / hlm" },
+                        { value: "50", label: "50 / hlm" },
+                      ]}
+                      value={String(ppdbItemsPerPage)}
+                      onChange={(val) => {
+                        setPpdbItemsPerPage(Number(val));
                         setPpdbPage(1);
                       }}
-                      className="bg-slate-900 border border-slate-700 text-xs text-white rounded-2xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 font-bold"
-                    >
-                      <option value={5}>5 / hlm</option>
-                      <option value={10}>10 / hlm</option>
-                      <option value={25}>25 / hlm</option>
-                      <option value={50}>50 / hlm</option>
-                    </select>
+                    />
                   </div>
 
-                  <select
-                    value={ppdbStatusFilter}
-                    onChange={(e) => {
-                      setPpdbStatusFilter(e.target.value);
-                      setPpdbPage(1);
-                    }}
-                    className="bg-slate-900 border border-slate-700 text-xs text-white rounded-2xl px-4 py-2.5 focus:outline-none focus:border-emerald-500 font-bold"
-                  >
-                    <option value="ALL">Semua Status</option>
-                    <option value="PENDING">PENDING</option>
-                    <option value="APPROVED">APPROVED</option>
-                    <option value="REJECTED">REJECTED</option>
-                  </select>
+                  <div className="min-w-37.5">
+                    <SearchableSelect
+                      options={[
+                        { value: "ALL", label: "Semua Status" },
+                        { value: "PENDING", label: "PENDING" },
+                        { value: "APPROVED", label: "APPROVED" },
+                        { value: "REJECTED", label: "REJECTED" },
+                      ]}
+                      value={ppdbStatusFilter}
+                      onChange={(val) => {
+                        setPpdbStatusFilter(val);
+                        setPpdbPage(1);
+                      }}
+                    />
+                  </div>
 
                   <div className="relative flex-1 sm:w-72">
                     <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
@@ -2106,15 +2539,14 @@ export default function AdminDashboardPage() {
                       </p>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {selectedPpdb.docKkUrl ? (
-                          <a
-                            href={selectedPpdb.docKkUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(selectedPpdb.docKkUrl, `Kartu Keluarga - ${selectedPpdb.namaAnak}`)}
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <FileText className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">Kartu Keluarga</span>
-                          </a>
+                          </button>
                         ) : (
                           <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
                             KK: Belum ada
@@ -2122,15 +2554,14 @@ export default function AdminDashboardPage() {
                         )}
 
                         {selectedPpdb.docAktaUrl ? (
-                          <a
-                            href={selectedPpdb.docAktaUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(selectedPpdb.docAktaUrl, `Akta Kelahiran - ${selectedPpdb.namaAnak}`)}
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <FileText className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">Akta Kelahiran</span>
-                          </a>
+                          </button>
                         ) : (
                           <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
                             Akta: Belum ada
@@ -2138,15 +2569,14 @@ export default function AdminDashboardPage() {
                         )}
 
                         {selectedPpdb.docFotoUrl ? (
-                          <a
-                            href={selectedPpdb.docFotoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(selectedPpdb.docFotoUrl, `Foto Anak - ${selectedPpdb.namaAnak}`)}
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
                           >
-                            <ImageIcon className="w-3.5 h-3.5" />
+                            <ImageIcon className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">Foto Anak</span>
-                          </a>
+                          </button>
                         ) : (
                           <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
                             Foto: Belum ada
@@ -2154,15 +2584,14 @@ export default function AdminDashboardPage() {
                         )}
 
                         {selectedPpdb.docKtpUrl ? (
-                          <a
-                            href={selectedPpdb.docKtpUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(selectedPpdb.docKtpUrl, `KTP Ortu - ${selectedPpdb.namaOrtu}`)}
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
                           >
-                            <FileText className="w-3.5 h-3.5" />
+                            <FileText className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">KTP Ortu</span>
-                          </a>
+                          </button>
                         ) : (
                           <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
                             KTP: Belum ada
@@ -2170,15 +2599,14 @@ export default function AdminDashboardPage() {
                         )}
 
                         {selectedPpdb.buktiBayarUrl ? (
-                          <a
-                            href={selectedPpdb.buktiBayarUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px]"
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(selectedPpdb.buktiBayarUrl, `Bukti Bayar - ${selectedPpdb.namaAnak}`)}
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
                           >
-                            <CreditCard className="w-3.5 h-3.5" />
+                            <CreditCard className="w-3.5 h-3.5 shrink-0" />
                             <span className="truncate">Bukti Bayar</span>
-                          </a>
+                          </button>
                         ) : (
                           <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
                             Bukti Bayar: Belum ada
@@ -2691,10 +3119,14 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Jenis Kelamin</label>
-                      <select value={editingStudent.gender} onChange={(e) => setEditingStudent({ ...editingStudent, gender: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
-                        <option value="L">Laki-laki (L)</option>
-                        <option value="P">Perempuan (P)</option>
-                      </select>
+                      <SearchableSelect
+                        options={[
+                          { value: "L", label: "Laki-laki (L)" },
+                          { value: "P", label: "Perempuan (P)" },
+                        ]}
+                        value={editingStudent.gender}
+                        onChange={(val) => setEditingStudent({ ...editingStudent, gender: val })}
+                      />
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 pt-2">
@@ -2708,7 +3140,11 @@ export default function AdminDashboardPage() {
                 {studentsList.map((s) => (
                   <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0">
+                      <div
+                        className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                        onClick={() => handleOpenPreview(s.avatarUrl || "https://i.pravatar.cc/150", `Avatar Siswa: ${s.name}`)}
+                        title="Klik untuk melihat foto avatar"
+                      >
                         {s.name.charAt(0)}
                       </div>
                       <div>
@@ -2749,25 +3185,58 @@ export default function AdminDashboardPage() {
                   <h2 className="text-2xl font-black text-white tracking-tight">Presensi Siswa Harian</h2>
                   <p className="text-xs text-slate-400">Catatan kehadiran murid (Hadir, Sakit, Izin, Alfa).</p>
                 </div>
-                {admin?.role !== "ORTU" && (
+                <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                  {/* Scan QR Murid Button */}
                   <button
-                    onClick={() =>
-                      setEditingAttendance({
-                        studentId: studentsList[0]?.id,
-                        studentName: studentsList[0]?.name || "Siswa Smart Kids",
-                        className: studentsList[0]?.className || "TK A",
-                        date: new Date().toISOString().split("T")[0],
-                        status: "hadir",
-                        reason: "",
-                        schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
-                      })
-                    }
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                    onClick={() => setQrModal({ isOpen: true, type: "STUDENT", inputCode: "", scanning: false, result: null, error: null })}
+                    className="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Catat Presensi Harian</span>
+                    <QrCode className="w-4 h-4 text-emerald-300" />
+                    <span>Scan QR Murid</span>
                   </button>
-                )}
+
+                  {/* Scan QR Guru Button (Khusus Super Admin & Admin Cabang) */}
+                  {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT" || admin?.role === "ADMIN_SEKOLAH") && (
+                    <button
+                      onClick={() => setQrModal({ isOpen: true, type: "TEACHER", inputCode: "", scanning: false, result: null, error: null })}
+                      className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
+                    >
+                      <QrCode className="w-4 h-4 text-purple-300" />
+                      <span>Scan QR Guru</span>
+                    </button>
+                  )}
+
+                  {/* Absensi Kolektif Wali Kelas (Khusus Guru) */}
+                  {admin?.role === "GURU" && admin?.assignedClass && (
+                    <button
+                      onClick={() => handleBatchAttendanceWaliKelas(admin.assignedClass)}
+                      className="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Absensi Kolektif {admin.assignedClass}</span>
+                    </button>
+                  )}
+
+                  {admin?.role !== "ORTU" && (
+                    <button
+                      onClick={() =>
+                        setEditingAttendance({
+                          studentId: studentsList[0]?.id,
+                          studentName: studentsList[0]?.name || "Siswa Smart Kids",
+                          className: studentsList[0]?.className || "TK A",
+                          date: new Date().toISOString().split("T")[0],
+                          status: "hadir",
+                          reason: "",
+                          schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                        })
+                      }
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Input Manual</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {editingAttendance && (
@@ -2776,23 +3245,31 @@ export default function AdminDashboardPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Murid / Siswa</label>
-                      <select
-                        value={editingAttendance.studentName}
-                        onChange={(e) => {
-                          const found = studentsList.find((s) => s.name === e.target.value);
-                          setEditingAttendance({
-                            ...editingAttendance,
-                            studentId: found?.id,
-                            studentName: e.target.value,
-                            className: found?.className || editingAttendance.className,
-                          });
+                      <SearchableSelect
+                        options={studentsList.map((s) => ({
+                          value: s.id,
+                          label: s.name,
+                          sublabel: `NISN: ${s.nisn} • ${s.className}`,
+                        }))}
+                        value={
+                          editingAttendance.studentId ||
+                          studentsList.find((s) => s.name === editingAttendance.studentName)?.id ||
+                          ""
+                        }
+                        onChange={(selectedId) => {
+                          const found = studentsList.find((s) => s.id === selectedId);
+                          if (found) {
+                            setEditingAttendance({
+                              ...editingAttendance,
+                              studentId: found.id,
+                              studentName: found.name,
+                              className: found.className,
+                            });
+                          }
                         }}
-                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
-                      >
-                        {studentsList.map((s) => (
-                          <option key={s.id} value={s.name}>{s.name} ({s.className})</option>
-                        ))}
-                      </select>
+                        placeholder="Pilih atau cari nama siswa..."
+                        searchPlaceholder="Ketik nama siswa..."
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Presensi</label>
@@ -2800,12 +3277,16 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Status Kehadiran</label>
-                      <select value={editingAttendance.status} onChange={(e) => setEditingAttendance({ ...editingAttendance, status: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
-                        <option value="hadir">Hadir (Masuk)</option>
-                        <option value="sakit">Sakit</option>
-                        <option value="izin">Izin</option>
-                        <option value="alfa">Alfa (Tanpa Keterangan)</option>
-                      </select>
+                      <SearchableSelect
+                        options={[
+                          { value: "hadir", label: "Hadir (Masuk)" },
+                          { value: "sakit", label: "Sakit" },
+                          { value: "izin", label: "Izin" },
+                          { value: "alfa", label: "Alfa (Tanpa Keterangan)" },
+                        ]}
+                        value={editingAttendance.status}
+                        onChange={(val) => setEditingAttendance({ ...editingAttendance, status: val })}
+                      />
                     </div>
                   </div>
                   <div>
@@ -2888,8 +3369,33 @@ export default function AdminDashboardPage() {
                   <h3 className="font-bold text-white text-base">Tambah Pembayaran SPP</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Nama Siswa</label>
-                      <input type="text" required value={editingSpp.studentName} onChange={(e) => setEditingSpp({ ...editingSpp, studentName: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Murid / Siswa</label>
+                      <SearchableSelect
+                        options={studentsList.map((s) => ({
+                          value: s.id,
+                          label: s.name,
+                          sublabel: `NISN: ${s.nisn} • ${s.className}`,
+                        }))}
+                        value={
+                          editingSpp.studentId ||
+                          studentsList.find((s) => s.name === editingSpp.studentName)?.id ||
+                          ""
+                        }
+                        onChange={(selectedId) => {
+                          const selectedStudent = studentsList.find((s) => s.id === selectedId);
+                          if (selectedStudent) {
+                            setEditingSpp({
+                              ...editingSpp,
+                              studentId: selectedStudent.id,
+                              studentName: selectedStudent.name,
+                              nisn: selectedStudent.nisn,
+                              className: selectedStudent.className,
+                            });
+                          }
+                        }}
+                        placeholder="Pilih atau cari nama siswa..."
+                        searchPlaceholder="Ketik nama siswa, NISN, atau kelas..."
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Bulan SPP</label>
@@ -2903,10 +3409,14 @@ export default function AdminDashboardPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Status Pembayaran</label>
-                      <select value={editingSpp.status} onChange={(e) => setEditingSpp({ ...editingSpp, status: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
-                        <option value="lunas">Lunas</option>
-                        <option value="belum_bayar">Belum Bayar</option>
-                      </select>
+                      <SearchableSelect
+                        options={[
+                          { value: "lunas", label: "Lunas" },
+                          { value: "belum_bayar", label: "Belum Bayar" },
+                        ]}
+                        value={editingSpp.status}
+                        onChange={(val) => setEditingSpp({ ...editingSpp, status: val })}
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Pembayaran</label>
@@ -2996,11 +3506,15 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Target Penerima</label>
-                      <select value={editingAnnouncement.targetRole} onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, targetRole: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white">
-                        <option value="Semua">Semua (Guru & Ortu)</option>
-                        <option value="Guru">Khusus Guru</option>
-                        <option value="Siswa">Khusus Ortu/Siswa</option>
-                      </select>
+                      <SearchableSelect
+                        options={[
+                          { value: "Semua", label: "Semua (Guru & Ortu)" },
+                          { value: "Guru", label: "Khusus Guru" },
+                          { value: "Siswa", label: "Khusus Ortu/Siswa" },
+                        ]}
+                        value={editingAnnouncement.targetRole}
+                        onChange={(val) => setEditingAnnouncement({ ...editingAnnouncement, targetRole: val })}
+                      />
                     </div>
                   </div>
                   <div>
@@ -3270,13 +3784,20 @@ export default function AdminDashboardPage() {
                     key={item.id}
                     className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group relative shadow-xl"
                   >
-                    <div className="relative h-44 w-full bg-slate-950">
+                    <div
+                      className="relative h-44 w-full bg-slate-950 cursor-pointer group/img"
+                      onClick={() => handleOpenPreview(item.imageUrl, `Galeri Foto: ${item.title}`)}
+                      title="Klik untuk memperbesar gambar"
+                    >
                       <Image
                         src={item.imageUrl}
                         alt={item.title}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="object-cover group-hover/img:scale-105 transition-transform duration-300"
                       />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                        <Eye className="w-6 h-6 text-white drop-shadow-md" />
+                      </div>
                     </div>
                     <div className="p-3 flex items-center justify-between">
                       <span className="text-xs text-slate-300 font-bold truncate">
@@ -3380,19 +3901,17 @@ export default function AdminDashboardPage() {
                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
                       Pilih Cabang Sekolah
                     </label>
-                    <select
+                    <SearchableSelect
+                      options={schoolsList.map((s) => ({
+                        value: s.id,
+                        label: s.name,
+                        sublabel: `Slug: ${s.code}`,
+                      }))}
                       value={siteProfile.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id)}
-                      onChange={(e) =>
-                        setSiteProfile({ ...siteProfile, schoolId: e.target.value })
-                      }
-                      className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white font-bold focus:border-emerald-500 focus:outline-none"
-                    >
-                      {schoolsList.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.code})
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(val) => setSiteProfile({ ...siteProfile, schoolId: val })}
+                      placeholder="Pilih cabang sekolah..."
+                      searchPlaceholder="Cari sekolah..."
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -3486,7 +4005,7 @@ export default function AdminDashboardPage() {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-8 py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-2xl shadow-xl shadow-emerald-600/30 flex items-center gap-2"
+                    className="px-8 py-3.5 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-2xl shadow-xl shadow-emerald-600/30 flex items-center gap-2"
                   >
                     {saving ? "Menyimpan..." : "Simpan Pengaturan Cabang"}
                   </button>
@@ -3577,6 +4096,91 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* QR Code Presensi Scanner Modal Overlay */}
+      {qrModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-bold text-white text-base">
+                  {qrModal.type === "STUDENT" ? "Scan QR Presensi Murid" : "Scan QR Presensi Guru"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setQrModal({ isOpen: false, type: "STUDENT", inputCode: "", scanning: false, result: null, error: null })}
+                className="p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded-xl"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-center">
+              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3 flex flex-col items-center justify-center">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-pulse">
+                  <Camera className="w-8 h-8" />
+                </div>
+                <p className="text-xs text-slate-300">
+                  Arahkan Kode QR ke kamera atau masukkan Kode QR / NISN / ID di bawah ini:
+                </p>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleScanQr(qrModal.inputCode, qrModal.type);
+                }}
+                className="space-y-3"
+              >
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder={qrModal.type === "STUDENT" ? "Ketik NISN atau QR Code Murid (cth: STUDENT:123)..." : "Ketik ID atau QR Code Guru (cth: TEACHER:abc)..."}
+                  value={qrModal.inputCode}
+                  onChange={(e) => setQrModal((prev) => ({ ...prev, inputCode: e.target.value }))}
+                  className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-emerald-500 focus:outline-none font-medium"
+                />
+                <button
+                  type="submit"
+                  disabled={qrModal.scanning || !qrModal.inputCode}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+                >
+                  {qrModal.scanning ? "Memproses Scan..." : "Proses Scan QR Presensi"}
+                </button>
+              </form>
+
+              {qrModal.result && (
+                <div className="p-4 bg-emerald-950/80 border border-emerald-500/40 rounded-2xl text-xs text-emerald-200 space-y-1 text-left">
+                  <p className="font-bold flex items-center gap-1.5 text-emerald-300">
+                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    Presensi Berhasil Dicatat!
+                  </p>
+                  <p>{qrModal.result.message}</p>
+                </div>
+              )}
+
+              {qrModal.error && (
+                <div className="p-4 bg-red-950/80 border border-red-500/40 rounded-2xl text-xs text-red-200 space-y-1 text-left">
+                  <p className="font-bold flex items-center gap-1.5 text-red-300">
+                    <XCircle className="w-4 h-4 text-red-400" />
+                    Scan Gagal!
+                  </p>
+                  <p>{qrModal.error}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image & Document Modal Preview */}
+      <ImageModal
+        isOpen={previewModal.isOpen}
+        onClose={() => setPreviewModal({ ...previewModal, isOpen: false })}
+        src={previewModal.src}
+        title={previewModal.title}
+      />
     </div>
   );
 }

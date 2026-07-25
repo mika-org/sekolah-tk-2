@@ -3,9 +3,53 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const schoolId = searchParams.get("schoolId");
+    const schoolCode = searchParams.get("schoolCode");
+    const date = searchParams.get("date");
+    const className = searchParams.get("className");
+    const studentId = searchParams.get("studentId");
+    const parentPhone = searchParams.get("parentPhone");
+
+    const where: any = {};
+
+    if (date) {
+      where.date = date;
+    }
+
+    if (className) {
+      where.className = className;
+    }
+
+    if (studentId) {
+      where.studentId = studentId;
+    }
+
+    if (parentPhone) {
+      where.student = {
+        parentPhone: { contains: parentPhone },
+      };
+    }
+
+    if (schoolId && schoolId !== "ALL") {
+      where.student = {
+        ...(where.student || {}),
+        schoolId: schoolId,
+      };
+    } else if (schoolCode && schoolCode !== "ALL") {
+      const sch = await prisma.school.findUnique({ where: { code: schoolCode } });
+      if (sch) {
+        where.student = {
+          ...(where.student || {}),
+          schoolId: sch.id,
+        };
+      }
+    }
+
     const attendances = await prisma.attendance.findMany({
+      where,
       orderBy: { createdAt: "desc" },
-      include: { student: true },
+      include: { student: { include: { school: true } } },
     });
     return NextResponse.json({ success: true, data: attendances });
   } catch (error: any) {

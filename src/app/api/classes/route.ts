@@ -7,32 +7,8 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get("schoolId");
     const schoolCode = searchParams.get("schoolCode");
-    const className = searchParams.get("className");
-    const parentPhone = searchParams.get("parentPhone");
-    const nisn = searchParams.get("nisn");
-    const studentId = searchParams.get("studentId");
 
     const where: any = {};
-
-    if (studentId) {
-      where.id = studentId;
-    }
-
-    if (nisn) {
-      where.nisn = nisn;
-    }
-
-    if (className) {
-      where.className = className;
-    }
-
-    if (parentPhone) {
-      where.OR = [
-        { parentPhone: parentPhone },
-        { parentPhone: { contains: parentPhone } },
-      ];
-    }
-
     if (schoolId && schoolId !== "ALL") {
       where.schoolId = schoolId;
     } else if (schoolCode && schoolCode !== "ALL") {
@@ -40,12 +16,14 @@ export async function GET(req: Request) {
       if (school) where.schoolId = school.id;
     }
 
-    const students = await prisma.student.findMany({
+    const db = prisma as any;
+    const classes = await db.classRoom.findMany({
       where,
       orderBy: { name: "asc" },
       include: { school: true },
     });
-    return NextResponse.json({ success: true, data: students });
+
+    return NextResponse.json({ success: true, data: classes });
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error.message },
@@ -61,7 +39,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 401 });
     }
 
-    const { schoolId, name, nisn, className, gender, avatarUrl, birthPlaceDate, parentName, parentPhone, address, attendanceRate, averageGrade } = await req.json();
+    const { schoolId, name, gradeLevel, academicYear, capacity, homeroomTeacherId, homeroomTeacherName } = await req.json();
 
     let targetSchoolId = schoolId || admin.schoolId;
     if (!targetSchoolId) {
@@ -69,28 +47,32 @@ export async function POST(req: Request) {
       targetSchoolId = defaultSchool?.id;
     }
 
-    const studentNisn = nisn || `NISN-${Date.now()}`;
+    if (!targetSchoolId) {
+      return NextResponse.json({ success: false, error: "Sekolah tidak ditemukan" }, { status: 400 });
+    }
 
     const db = prisma as any;
-    const student = await db.student.create({
+    const classRoom = await db.classRoom.create({
       data: {
         schoolId: targetSchoolId,
         name,
-        nisn: studentNisn,
-        qrCode: `STUDENT:${studentNisn}`,
-        className: className || "Kelas TK A",
-        gender: gender || "L",
-        avatarUrl: avatarUrl || "https://i.pravatar.cc/150",
-        birthPlaceDate: birthPlaceDate || "-",
-        parentName: parentName || "-",
-        parentPhone: parentPhone || "-",
-        address: address || "-",
-        attendanceRate: Number(attendanceRate) || 95.0,
-        averageGrade: Number(averageGrade) || 88.5,
+        gradeLevel: gradeLevel || "TK A",
+        academicYear: academicYear || "2026/2027",
+        capacity: Number(capacity) || 20,
+        homeroomTeacherId: homeroomTeacherId || null,
+        homeroomTeacherName: homeroomTeacherName || null,
       },
     });
 
-    return NextResponse.json({ success: true, data: student });
+    // If homeroom teacher assigned, update teacher's assignedClass
+    if (homeroomTeacherId) {
+      await db.teacher.update({
+        where: { id: homeroomTeacherId },
+        data: { assignedClass: name },
+      });
+    }
+
+    return NextResponse.json({ success: true, data: classRoom });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

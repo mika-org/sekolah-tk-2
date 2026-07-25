@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import SearchableSelect from "@/components/common/SearchableSelect";
 import { UserPlus, Home, Menu, X, Building, LogIn, Lock } from "lucide-react";
 
 interface NavbarProps {
@@ -133,19 +134,18 @@ export default function Navbar({
         <div className="flex items-center gap-2.5">
           {/* SCHOOL BRANCH SELECTOR DROPDOWN (FAR RIGHT SEPARATED) */}
           {schools.length > 1 && onSelectSchool && (
-            <div className="hidden lg:flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-200/80 px-3.5 py-2 rounded-full transition-colors">
-              <Building className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-              <select
+            <div className="hidden lg:flex items-center gap-1.5 min-w-52.5">
+              <SearchableSelect
+                options={schools.map((s) => ({
+                  value: s.code,
+                  label: s.name,
+                }))}
                 value={selectedSchoolCode}
-                onChange={(e) => onSelectSchool(e.target.value)}
-                className="bg-transparent text-xs font-extrabold text-emerald-900 focus:outline-none cursor-pointer"
-              >
-                {schools.map((s) => (
-                  <option key={s.id} value={s.code}>
-                    📍 {s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={(code) => onSelectSchool(code)}
+                variant="light"
+                placeholder="Pilih cabang..."
+                searchPlaceholder="Cari sekolah..."
+              />
             </div>
           )}
 
@@ -199,22 +199,22 @@ export default function Navbar({
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white/98 border-b border-emerald-100 px-4 pt-3 pb-6 space-y-3 shadow-xl">
           {schools.length > 1 && onSelectSchool && (
-            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-800">Pilih Cabang Sekolah:</span>
-              <select
+            <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-2xl space-y-1.5">
+              <span className="text-xs font-bold text-emerald-800 block">Pilih Cabang Sekolah:</span>
+              <SearchableSelect
+                options={schools.map((s) => ({
+                  value: s.code,
+                  label: s.name,
+                }))}
                 value={selectedSchoolCode}
-                onChange={(e) => {
-                  onSelectSchool(e.target.value);
+                onChange={(code) => {
+                  onSelectSchool(code);
                   setIsMobileMenuOpen(false);
                 }}
-                className="bg-white border border-emerald-300 text-xs font-bold text-emerald-900 rounded-xl px-2 py-1 focus:outline-none"
-              >
-                {schools.map((s) => (
-                  <option key={s.id} value={s.code}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+                variant="light"
+                placeholder="Pilih cabang..."
+                searchPlaceholder="Cari sekolah..."
+              />
             </div>
           )}
 
