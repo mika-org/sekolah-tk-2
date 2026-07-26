@@ -236,13 +236,32 @@ model Student {
   address         String     @map("alamat")
   attendanceRate  Float      @default(95.0) @map("persentase_kehadiran")
   averageGrade    Float      @default(88.5) @map("rata_rata_nilai")
+  dailyGrade      Float      @default(85.0) @map("nilai_harian")
+  semesterGrade   Float      @default(90.0) @map("nilai_semester")
+  attendanceWeight Float     @default(20.0) @map("bobot_kehadiran")
+  dailyWeight     Float      @default(40.0) @map("bobot_harian")
+  semesterWeight  Float      @default(40.0) @map("bobot_semester")
   createdAt       DateTime   @default(now()) @map("dibuat_pada")
   updatedAt       DateTime   @updatedAt @map("diperbarui_pada")
 
   attendances     Attendance[]
   sppRecords      SppRecord[]
+  dailyGrades     DailyGrade[]
 
   @@map("siswa")
+}
+
+model DailyGrade {
+  id        String   @id @default(uuid())
+  studentId String   @map("id_siswa")
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subject   String   @default("Moral & Agama") @map("mata_pelajaran")
+  score     Float    @default(85.0) @map("nilai")
+  date      String   @map("tanggal")
+  notes     String?  @map("catatan")
+  createdAt DateTime @default(now()) @map("dibuat_pada")
+
+  @@map("catatan_nilai_harian")
 }
 
 model Schedule {
@@ -325,17 +344,20 @@ model Announcement {
 }
 
 model SppRecord {
-  id          String   @id @default(uuid())
-  studentId   String?  @map("id_siswa")
-  student     Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
-  studentName String   @map("nama_siswa")
-  nisn        String   @map("nisn")
-  className   String   @map("nama_kelas")
-  month       String   @map("bulan")
-  amount      Float    @default(350000) @map("jumlah")
-  status      String   @default("lunas") @map("status")
-  paymentDate String?  @map("tanggal_pembayaran")
-  createdAt   DateTime @default(now()) @map("dibuat_pada")
+  id            String   @id @default(uuid())
+  studentId     String?  @map("id_siswa")
+  student       Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  studentName   String   @map("nama_siswa")
+  nisn          String   @map("nisn")
+  className     String   @map("nama_kelas")
+  month         String   @map("bulan")
+  amount        Float    @default(350000) @map("jumlah")
+  status        String   @default("lunas") @map("status")
+  paymentDate   String?  @map("tanggal_pembayaran")
+  proofUrl      String?  @map("url_bukti_bayar")
+  paymentMethod String?  @default("TRANSFER") @map("metode_pembayaran")
+  note          String?  @map("catatan")
+  createdAt     DateTime @default(now()) @map("dibuat_pada")
 
   @@map("catatan_spp")
 }

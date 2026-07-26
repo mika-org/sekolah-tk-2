@@ -68,13 +68,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 401 });
     }
 
-    const { studentId, studentName, nisn, className, month, amount, status, paymentDate } = await req.json();
+    const {
+      studentId,
+      studentName,
+      nisn,
+      className,
+      month,
+      amount,
+      status,
+      paymentDate,
+      proofUrl,
+      paymentMethod,
+      note,
+    } = await req.json();
 
     let targetStudentId = studentId;
     if (!targetStudentId && nisn) {
       const st = await prisma.student.findUnique({ where: { nisn } });
       if (st) targetStudentId = st.id;
     }
+
+    const isParent = admin.role === "ORTU" || admin.role === "ORANG_TUA";
+    const initialStatus = status || (isParent ? "menunggu_konfirmasi" : "lunas");
 
     const spp = await prisma.sppRecord.create({
       data: {
@@ -84,9 +99,12 @@ export async function POST(req: Request) {
         className: className || "TK A",
         month: month || "Juli 2026",
         amount: Number(amount) || 350000,
-        status: status || "lunas",
-        paymentDate: paymentDate || null,
-      },
+        status: initialStatus,
+        paymentDate: paymentDate || (initialStatus === "lunas" ? new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : null),
+        proofUrl: proofUrl || null,
+        paymentMethod: paymentMethod || "TRANSFER",
+        note: note || null,
+      } as any,
     });
 
     return NextResponse.json({ success: true, data: spp });

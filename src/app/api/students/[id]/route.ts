@@ -38,8 +38,12 @@ export async function PUT(
         "alamat" = $11, 
         "persentase_kehadiran" = $12, 
         "rata_rata_nilai" = $13, 
+        "nilai_harian" = $14,
+        "nilai_semester" = $15,
+        "bobot_harian" = $16,
+        "bobot_semester" = $17,
         "diperbarui_pada" = NOW() 
-       WHERE "id" = $14`,
+       WHERE "id" = $18`,
       data.name,
       data.nisn,
       className,
@@ -53,6 +57,10 @@ export async function PUT(
       address,
       Number(data.attendanceRate) || 95.0,
       Number(data.averageGrade) || 88.5,
+      data.dailyGrade !== undefined && data.dailyGrade !== null ? Number(data.dailyGrade) : 85.0,
+      data.semesterGrade !== undefined && data.semesterGrade !== null ? Number(data.semesterGrade) : 90.0,
+      data.dailyWeight !== undefined && data.dailyWeight !== null ? Number(data.dailyWeight) : 40.0,
+      data.semesterWeight !== undefined && data.semesterWeight !== null ? Number(data.semesterWeight) : 60.0,
       id
     );
 

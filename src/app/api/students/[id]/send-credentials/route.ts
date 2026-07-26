@@ -40,12 +40,20 @@ export async function POST(
       }
     }
 
-    // 2. Generate new random password
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
-    const passwordStr = `Sk${randomNum}`;
-    const passwordHash = await bcrypt.hash(passwordStr, 10);
+    // 2. Generate initial password ONLY if passwordHash does not exist yet
+    let passwordStr = "";
+    let passwordHash = student.passwordHash;
+    const isNewPassword = !passwordHash;
 
-    // 3. Update student record with username and new passwordHash
+    if (isNewPassword) {
+      const randomNum = Math.floor(100000 + Math.random() * 900000);
+      passwordStr = `Sk${randomNum}`;
+      passwordHash = await bcrypt.hash(passwordStr, 10);
+    } else {
+      passwordStr = "(Password Anda tidak berubah)";
+    }
+
+    // 3. Update student record with username and passwordHash (only updating hash if it was missing)
     const updatedStudent = await prisma.student.update({
       where: { id },
       data: {
@@ -59,7 +67,7 @@ export async function POST(
       where: { username },
       update: {
         schoolId: student.schoolId,
-        passwordHash,
+        ...(isNewPassword && { passwordHash: passwordHash as string }),
         name: `Wali ${student.name}`,
         phone: student.parentPhone,
         email: student.parentEmail,
@@ -68,7 +76,7 @@ export async function POST(
       create: {
         schoolId: student.schoolId,
         username,
-        passwordHash,
+        passwordHash: passwordHash || (await bcrypt.hash("Sk123456", 10)),
         name: `Wali ${student.name}`,
         phone: student.parentPhone,
         email: student.parentEmail,

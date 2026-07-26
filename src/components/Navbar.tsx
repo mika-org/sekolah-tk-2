@@ -6,9 +6,11 @@ import Link from "next/link";
 import SearchableSelect from "@/components/common/SearchableSelect";
 import { UserPlus, Home, Menu, X, Building, LogIn, Lock } from "lucide-react";
 
+import { usePathname, useRouter } from "next/navigation";
+
 interface NavbarProps {
-  currentTab: "home" | "ppdb";
-  setCurrentTab: (tab: "home" | "ppdb") => void;
+  currentTab?: "home" | "ppdb";
+  setCurrentTab?: (tab: "home" | "ppdb") => void;
   ppdbStep?: number;
   selectedSchoolCode?: string;
   onSelectSchool?: (code: string) => void;
@@ -16,7 +18,7 @@ interface NavbarProps {
 }
 
 export default function Navbar({
-  currentTab,
+  currentTab = "home",
   setCurrentTab,
   selectedSchoolCode = "dekeraton",
   onSelectSchool,
@@ -24,6 +26,8 @@ export default function Navbar({
 }: NavbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string>("home");
+  const pathname = usePathname();
+  const router = useRouter();
 
   const navItems = [
     { label: "Beranda", id: "home", href: "#hero" },
@@ -32,9 +36,13 @@ export default function Navbar({
     { label: "Galeri", id: "galeri", href: "#galeri" },
     { label: "Testimoni", id: "testimoni", href: "#testimoni" },
     { label: "Kontak", id: "kontak", href: "#footer" },
+    { label: "Tentang Kami", id: "tentang-kami", href: "/tentang-kami" },
   ];
 
   useEffect(() => {
+    if (pathname === "/tentang-kami") {
+      return;
+    }
     if (currentTab !== "home") return;
     const sectionIds = ["hero", "program", "guru", "galeri", "testimoni", "footer"];
 
@@ -62,12 +70,23 @@ export default function Navbar({
     window.addEventListener("scroll", handleScroll, { passive: true });
     handleScroll();
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [currentTab]);
+  }, [currentTab, pathname]);
 
   const handleNavClick = (id: string, href: string) => {
     setActiveSection(id);
     setIsMobileMenuOpen(false);
-    if (currentTab !== "home") {
+
+    if (id === "tentang-kami") {
+      router.push("/tentang-kami");
+      return;
+    }
+
+    if (pathname !== "/") {
+      router.push(`/${href}`);
+      return;
+    }
+
+    if (setCurrentTab && currentTab !== "home") {
       setCurrentTab("home");
       setTimeout(() => {
         const el = document.querySelector(href);
@@ -86,11 +105,12 @@ export default function Navbar({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-24 flex items-center justify-between">
         {/* Left Logo (Icon Image Only) */}
         <div className="flex items-center gap-4">
-          <button
+          <Link
+            href="/"
             onClick={() => {
               setActiveSection("home");
               setIsMobileMenuOpen(false);
-              setCurrentTab("home");
+              if (setCurrentTab) setCurrentTab("home");
             }}
             className="flex items-center group focus:outline-none"
             title="Smart Kids - Ke Beranda"
@@ -104,13 +124,16 @@ export default function Navbar({
                 className="object-contain"
               />
             </div>
-          </button>
+          </Link>
         </div>
 
         {/* Center Nav Links (Desktop) */}
         <nav className="hidden md:flex items-center space-x-1 lg:space-x-3">
           {navItems.map((item) => {
-            const isActive = currentTab === "home" && activeSection === item.id;
+            const isActive =
+              pathname === "/tentang-kami"
+                ? item.id === "tentang-kami"
+                : currentTab === "home" && activeSection === item.id;
             return (
               <button
                 key={item.label}
@@ -163,7 +186,13 @@ export default function Navbar({
           <div className="flex items-center gap-2">
             {currentTab === "home" ? (
               <button
-                onClick={() => setCurrentTab("ppdb")}
+                onClick={() => {
+                  if (setCurrentTab) {
+                    setCurrentTab("ppdb");
+                  } else {
+                    router.push("/?tab=ppdb");
+                  }
+                }}
                 className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-bold px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
               >
                 <UserPlus className="w-4 h-4" />
@@ -171,7 +200,13 @@ export default function Navbar({
               </button>
             ) : (
               <button
-                onClick={() => setCurrentTab("home")}
+                onClick={() => {
+                  if (setCurrentTab) {
+                    setCurrentTab("home");
+                  } else {
+                    router.push("/");
+                  }
+                }}
                 className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm font-bold px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
               >
                 <Home className="w-4 h-4" />
@@ -220,7 +255,10 @@ export default function Navbar({
 
           <div className="flex flex-col space-y-1">
             {navItems.map((item) => {
-              const isActive = currentTab === "home" && activeSection === item.id;
+              const isActive =
+                pathname === "/tentang-kami"
+                  ? item.id === "tentang-kami"
+                  : currentTab === "home" && activeSection === item.id;
               return (
                 <button
                   key={item.label}
@@ -254,7 +292,11 @@ export default function Navbar({
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
-                  setCurrentTab("ppdb");
+                  if (setCurrentTab) {
+                    setCurrentTab("ppdb");
+                  } else {
+                    router.push("/?tab=ppdb");
+                  }
                 }}
                 className="w-full flex items-center justify-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold py-3.5 rounded-full shadow-md"
               >
@@ -265,7 +307,11 @@ export default function Navbar({
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
-                  setCurrentTab("home");
+                  if (setCurrentTab) {
+                    setCurrentTab("home");
+                  } else {
+                    router.push("/");
+                  }
                 }}
                 className="w-full flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold py-3.5 rounded-full shadow-md"
               >

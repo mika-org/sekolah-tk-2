@@ -32,6 +32,11 @@ export default function Home() {
       if (qSchool) {
         detectedCode = qSchool.toLowerCase();
       }
+
+      const qTab = params.get("tab");
+      if (qTab === "ppdb") {
+        setCurrentTab("ppdb");
+      }
     }
 
     fetch("/api/schools")

@@ -13,14 +13,29 @@ export async function PATCH(
     }
 
     const { id } = await params;
-    const { status, paymentDate } = await req.json();
+    const body = await req.json();
+
+    const dataToUpdate: any = {};
+    if (body.studentId !== undefined) dataToUpdate.studentId = body.studentId;
+    if (body.studentName !== undefined) dataToUpdate.studentName = body.studentName;
+    if (body.nisn !== undefined) dataToUpdate.nisn = body.nisn;
+    if (body.className !== undefined) dataToUpdate.className = body.className;
+    if (body.month !== undefined) dataToUpdate.month = body.month;
+    if (body.amount !== undefined) dataToUpdate.amount = Number(body.amount);
+    if (body.status !== undefined) {
+      dataToUpdate.status = body.status;
+      if (body.status === "lunas" && !body.paymentDate) {
+        dataToUpdate.paymentDate = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+      }
+    }
+    if (body.paymentDate !== undefined) dataToUpdate.paymentDate = body.paymentDate;
+    if (body.proofUrl !== undefined) dataToUpdate.proofUrl = body.proofUrl;
+    if (body.paymentMethod !== undefined) dataToUpdate.paymentMethod = body.paymentMethod;
+    if (body.note !== undefined) dataToUpdate.note = body.note;
 
     const updated = await prisma.sppRecord.update({
       where: { id },
-      data: {
-        status,
-        paymentDate: paymentDate || new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
-      },
+      data: dataToUpdate,
     });
 
     return NextResponse.json({ success: true, data: updated });

@@ -9,8 +9,8 @@ export async function POST(req: Request) {
     const file = formData.get("file") as File | null;
     const folderInput = (formData.get("folder") as string) || "uploads";
 
-    // Validate folder target: must be uploads, profile, or ppdb
-    const allowedFolders = ["uploads", "profile", "ppdb"];
+    // Validate folder target: must be uploads, profile, ppdb, spp, or payments
+    const allowedFolders = ["uploads", "profile", "ppdb", "spp", "payments"];
     const folder = allowedFolders.includes(folderInput.toLowerCase())
       ? folderInput.toLowerCase()
       : "uploads";

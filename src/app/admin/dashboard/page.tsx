@@ -117,6 +117,24 @@ export default function AdminDashboardPage() {
 
   const [studentsList, setStudentsList] = useState<any[]>([]);
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
+  const [dailyGradesList, setDailyGradesList] = useState<any[]>([]);
+  const [dailyGradeModal, setDailyGradeModal] = useState<{
+    isOpen: boolean;
+    studentId: string;
+    studentName: string;
+    subject: string;
+    score: number;
+    date: string;
+    notes: string;
+  }>({
+    isOpen: false,
+    studentId: "",
+    studentName: "",
+    subject: "Moral & Agama",
+    score: 85,
+    date: new Date().toISOString().split("T")[0],
+    notes: "",
+  });
   const [sendingAccount, setSendingAccount] = useState<boolean>(false);
   const [selectedCredentialModal, setSelectedCredentialModal] = useState<{
     studentName: string;
@@ -134,11 +152,40 @@ export default function AdminDashboardPage() {
 
   const [sppList, setSppList] = useState<any[]>([]);
   const [editingSpp, setEditingSpp] = useState<any | null>(null);
+  const [sppStatusFilter, setSppStatusFilter] = useState<string>("ALL");
+  const [sppPaymentModal, setSppPaymentModal] = useState<{
+    isOpen: boolean;
+    studentId: string;
+    studentName: string;
+    nisn: string;
+    className: string;
+    month: string;
+    amount: number;
+    paymentMethod: string;
+    proofUrl: string;
+    note: string;
+    uploading: boolean;
+  }>({
+    isOpen: false,
+    studentId: "",
+    studentName: "",
+    nisn: "",
+    className: "",
+    month: "Juli 2026",
+    amount: 350000,
+    paymentMethod: "TRANSFER_BCA",
+    proofUrl: "",
+    note: "",
+    uploading: false,
+  });
 
   const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
   const [editingAnnouncement, setEditingAnnouncement] = useState<any | null>(null);
 
   const [leaveRequestsList, setLeaveRequestsList] = useState<any[]>([]);
+  const [editingLeaveRequest, setEditingLeaveRequest] = useState<any | null>(null);
+  const [leaveStatusFilter, setLeaveStatusFilter] = useState<string>("ALL");
+  const [leaveUploading, setLeaveUploading] = useState<boolean>(false);
   const [teacherAttendanceList, setTeacherAttendanceList] = useState<any[]>([]);
 
   // QR Code Presensi Modal State
@@ -396,7 +443,7 @@ export default function AdminDashboardPage() {
     try {
       const queryParam = selectedSchoolId && selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : "";
 
-      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp, resTeachAtt, resClasses] = await Promise.all([
+      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp, resTeachAtt, resClasses, resDailyGrades] = await Promise.all([
         fetch(`/api/ppdb${queryParam}`).then((r) => r.json()),
         fetch(`/api/programs${queryParam}`).then((r) => r.json()),
         fetch(`/api/teachers${queryParam}`).then((r) => r.json()),
@@ -411,6 +458,7 @@ export default function AdminDashboardPage() {
         fetch(`/api/spp${queryParam}`).then((r) => r.json()),
         fetch(`/api/teacher-attendance${queryParam}`).then((r) => r.json()),
         fetch(`/api/classes${queryParam}`).then((r) => r.json()),
+        fetch(`/api/daily-grades${queryParam}`).then((r) => r.json()),
       ]);
 
       if (resPpdb.success) setPpdbList(resPpdb.data || []);
@@ -427,6 +475,7 @@ export default function AdminDashboardPage() {
       if (resSpp.success) setSppList(resSpp.data || []);
       if (resTeachAtt.success) setTeacherAttendanceList(resTeachAtt.data || []);
       if (resClasses.success) setClassesList(resClasses.data || []);
+      if (resDailyGrades.success) setDailyGradesList(resDailyGrades.data || []);
     } catch (err: any) {
       showMessage("Gagal memuat data", "error");
     } finally {
@@ -872,6 +921,42 @@ export default function AdminDashboardPage() {
       showMessage(err.message, "error");
     }
   };
+
+  const handleSaveDailyGrade = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/daily-grades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dailyGradeModal),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(`Nilai harian ${dailyGradeModal.studentName} (${dailyGradeModal.subject}: ${dailyGradeModal.score}) berhasil disimpan & Nilai Akhir terkalkulasi!`, "success");
+      setDailyGradeModal((prev) => ({ ...prev, isOpen: false, notes: "" }));
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteDailyGrade = async (id: string) => {
+    if (!confirm("Hapus catatan nilai harian ini?")) return;
+    try {
+      const res = await fetch(`/api/daily-grades/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Catatan nilai harian dihapus & Nilai Akhir dikalkulasi ulang!", "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
   // Attendance Handler
   const handleSaveAttendance = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -983,6 +1068,46 @@ export default function AdminDashboardPage() {
   };
 
   // Leave Request Handlers
+  const handleSaveLeaveRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/leave-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingLeaveRequest,
+          schoolId: editingLeaveRequest.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Pengajuan izin/cuti mengajar berhasil dikirim!", "success");
+      setEditingLeaveRequest(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUploadLeaveAttachment = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setLeaveUploading(true);
+      const url = await uploadFile(file, "profile" as any);
+      setEditingLeaveRequest((prev: any) => ({ ...prev, attachment: url }));
+      showMessage("Lampiran berhasil diunggah!", "success");
+    } catch (err: any) {
+      showMessage(err.message || "Gagal mengunggah lampiran", "error");
+    } finally {
+      setLeaveUploading(false);
+    }
+  };
+
   const handleUpdateLeaveStatus = async (id: string, status: string) => {
     try {
       const res = await fetch(`/api/leave-requests/${id}`, {
@@ -1019,15 +1144,19 @@ export default function AdminDashboardPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch("/api/spp", {
-        method: "POST",
+      const isEdit = !!editingSpp.id;
+      const url = isEdit ? `/api/spp/${editingSpp.id}` : "/api/spp";
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingSpp),
       });
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
 
-      showMessage("Catatan SPP berhasil ditambahkan", "success");
+      showMessage(isEdit ? "Detail Pembayaran SPP berhasil diperbarui" : "Catatan SPP berhasil ditambahkan", "success");
       setEditingSpp(null);
       loadDataForSelectedSchool();
     } catch (err: any) {
@@ -1065,6 +1194,57 @@ export default function AdminDashboardPage() {
       setSppList((prev) => prev.filter((s) => s.id !== id));
     } catch (err: any) {
       showMessage(err.message, "error");
+    }
+  };
+
+  const handleUploadSppProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setSppPaymentModal((prev) => ({ ...prev, uploading: true }));
+      const url = await uploadFile(file, "spp" as any);
+      setSppPaymentModal((prev) => ({ ...prev, proofUrl: url, uploading: false }));
+      showMessage("Foto bukti transfer berhasil diunggah!", "success");
+    } catch (err: any) {
+      setSppPaymentModal((prev) => ({ ...prev, uploading: false }));
+      showMessage(err.message || "Gagal mengunggah bukti transfer", "error");
+    }
+  };
+
+  const handleSubmitSppPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!sppPaymentModal.proofUrl && !sppPaymentModal.paymentMethod.includes("TUNAI")) {
+      showMessage("Harap unggah foto bukti transfer/pembayaran terlebih dahulu", "error");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch("/api/spp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId: sppPaymentModal.studentId || undefined,
+          studentName: sppPaymentModal.studentName || admin?.name || "Siswa",
+          nisn: sppPaymentModal.nisn || "123456789",
+          className: sppPaymentModal.className || "TK A",
+          month: sppPaymentModal.month,
+          amount: Number(sppPaymentModal.amount),
+          status: "menunggu_konfirmasi",
+          paymentMethod: sppPaymentModal.paymentMethod,
+          proofUrl: sppPaymentModal.proofUrl || null,
+          note: sppPaymentModal.note || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Konfirmasi pembayaran SPP berhasil dikirim! Menunggu verifikasi admin.", "success");
+      setSppPaymentModal((prev) => ({ ...prev, isOpen: false, proofUrl: "", note: "" }));
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1798,7 +1978,7 @@ export default function AdminDashboardPage() {
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* SUB CARD 1: INFORMASI SISWA */}
                       <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
                         <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
@@ -1853,6 +2033,67 @@ export default function AdminDashboardPage() {
                             <span className="font-medium text-slate-300">{parentStudent.address || "-"}</span>
                           </div>
                         </div>
+                      </div>
+
+                      {/* SUB CARD 3: STATUS KEUANGAN & SPP */}
+                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3 flex flex-col justify-between">
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
+                            <CreditCard className="w-4 h-4" />
+                            <span>SPP & Catatan Keuangan</span>
+                          </h4>
+                          
+                          {(() => {
+                            const childSpp = sppList.filter(
+                              (s) =>
+                                s.studentId === parentStudent.id ||
+                                (s.studentName && s.studentName.toLowerCase().includes(parentStudent.name.toLowerCase()))
+                            );
+                            const lunasCount = childSpp.filter((s) => s.status === "lunas").length;
+                            const pendingCount = childSpp.filter((s) => s.status === "menunggu_konfirmasi").length;
+
+                            return (
+                              <div className="space-y-2 text-xs">
+                                <div className="flex justify-between items-center py-1">
+                                  <span className="text-slate-400">Total Record SPP:</span>
+                                  <span className="font-bold text-white">{childSpp.length} Bulan</span>
+                                </div>
+                                <div className="flex justify-between items-center py-1">
+                                  <span className="text-slate-400">Status Terakhir:</span>
+                                  <span className="font-bold text-emerald-400">
+                                    {lunasCount} Lunas • {pendingCount > 0 ? `${pendingCount} Menunggu` : "0 Pending"}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-slate-400 leading-tight pt-1">
+                                  Upload bukti pembayaran untuk konfirmasi transaksi SPP ananda.
+                                </p>
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setActiveTab("spp");
+                            setSppPaymentModal({
+                              isOpen: true,
+                              studentId: parentStudent.id,
+                              studentName: parentStudent.name,
+                              nisn: parentStudent.nisn,
+                              className: parentStudent.className,
+                              month: "Juli 2026",
+                              amount: 350000,
+                              paymentMethod: "TRANSFER_BCA",
+                              proofUrl: "",
+                              note: "",
+                              uploading: false,
+                            });
+                          }}
+                          className="w-full py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                        >
+                          <Upload className="w-4 h-4 text-amber-400" />
+                          <span>Bayar & Upload Bukti SPP</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -2071,15 +2312,12 @@ export default function AdminDashboardPage() {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-300 mb-1">
-                        Tingkat / Jenjang
+                        Kelompok / Kelas (TKA & TKB)
                       </label>
                       <SearchableSelect
                         options={[
-                          { value: "TK A", label: "TK A (Usia 4-5 Thn)" },
-                          { value: "TK B", label: "TK B (Usia 5-6 Thn)" },
-                          { value: "Playground", label: "Playground (Usia 3-4 Thn)" },
-                          { value: "Kindergarten", label: "Kindergarten" },
-                          { value: "Pre Kindergarten", label: "Pre Kindergarten" },
+                          { value: "TK A", label: "TKA (Tingkat TK A - Usia 4-5 Thn)" },
+                          { value: "TK B", label: "TKB (Tingkat TK B - Usia 5-6 Thn)" },
                         ]}
                         value={editingClassRoom.gradeLevel || "TK A"}
                         onChange={(val) => setEditingClassRoom({ ...editingClassRoom, gradeLevel: val })}
@@ -2090,7 +2328,7 @@ export default function AdminDashboardPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-300 mb-1">
-                        Tahun Ajaran
+                        TA (Tahun Ajaran)
                       </label>
                       <input
                         type="text"
@@ -3645,49 +3883,355 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
+                  {/* SECTION 3: INPUT NILAI HARIAN, SEMESTER, TRANSKRIP NILAI -> NILAI AKHIR */}
+                  <div className="space-y-4 pt-3 border-t border-slate-800">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
+                          <GraduationCap className="w-4 h-4 text-amber-400" />
+                          <span>Kalkulasi Nilai Akhir & Transkrip Akademik</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          Kalkulasi otomatis dari Persentase Kehadiran, Nilai Harian yang tersimpan, dan Nilai Semester.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDailyGradeModal({
+                              isOpen: true,
+                              studentId: editingStudent.id || "",
+                              studentName: editingStudent.name || "Siswa",
+                              subject: "Moral & Agama",
+                              score: 85,
+                              date: new Date().toISOString().split("T")[0],
+                              notes: "",
+                            })
+                          }
+                          className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Input Nilai Harian Siswa</span>
+                        </button>
+                        <span className="text-sm font-black text-emerald-400 bg-emerald-500/10 px-3.5 py-1.5 rounded-xl border border-emerald-500/30 shadow-sm">
+                          Nilai Akhir: {editingStudent.averageGrade ?? 88.5}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* METRIK RINCIAN KOMPONEN NILAI */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                          📊 Kehadiran (%) <span className="text-emerald-400 font-mono">[{editingStudent.attendanceRate ?? 95}%]</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={editingStudent.attendanceRate ?? 95.0}
+                          onChange={(e) => setEditingStudent({ ...editingStudent, attendanceRate: Number(e.target.value) })}
+                          className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                          📝 Rata-Rata Nilai Harian <span className="text-amber-400 font-mono">[{editingStudent.dailyGrade ?? 85}]</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={editingStudent.dailyGrade ?? 85}
+                          onChange={(e) => setEditingStudent({ ...editingStudent, dailyGrade: Number(e.target.value) })}
+                          className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                          🎓 Nilai Semester / Ujian <span className="text-purple-400 font-mono">[{editingStudent.semesterGrade ?? 90}]</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={editingStudent.semesterGrade ?? 90}
+                          onChange={(e) => setEditingStudent({ ...editingStudent, semesterGrade: Number(e.target.value) })}
+                          className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-400 mb-1">
+                          ⚖️ Komposisi Bobot (%)
+                        </label>
+                        <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-amber-400 bg-slate-900 p-2.5 rounded-xl border border-slate-800">
+                          <span>20% Att</span> + <span>40% Har</span> + <span>40% Sem</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* RIWAYAT CATATAN NILAI HARIAN SISWA TERDAFTAR */}
+                    <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-300 pb-2 border-b border-slate-800">
+                        <span className="flex items-center gap-1.5">
+                          <BookOpen className="w-4 h-4 text-emerald-400" />
+                          <span>Riwayat Catatan Nilai Harian Siswa</span>
+                        </span>
+                        <span className="text-slate-400 text-[11px]">
+                          Total {dailyGradesList.filter((g) => g.studentId === editingStudent.id).length} Inputan Harian
+                        </span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs text-slate-300">
+                          <thead>
+                            <tr className="text-slate-500 border-b border-slate-800/60 uppercase text-[10px] tracking-wider">
+                              <th className="py-2.5">Tanggal</th>
+                              <th className="py-2.5">Aspek Perkembangan</th>
+                              <th className="py-2.5 text-center">Nilai Harian</th>
+                              <th className="py-2.5">Catatan Evaluasi</th>
+                              <th className="py-2.5 text-right">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/40 text-[11px]">
+                            {dailyGradesList.filter((g) => g.studentId === editingStudent.id).length === 0 ? (
+                              <tr>
+                                <td colSpan={5} className="py-4 text-center text-slate-500 italic">
+                                  Belum ada catatan nilai harian untuk siswa ini. Klik tombol &quot;+ Input Nilai Harian Siswa&quot; di atas.
+                                </td>
+                              </tr>
+                            ) : (
+                              dailyGradesList
+                                .filter((g) => g.studentId === editingStudent.id)
+                                .map((g) => (
+                                  <tr key={g.id} className="hover:bg-slate-900/40 transition">
+                                    <td className="py-2.5 font-mono text-slate-400">{g.date}</td>
+                                    <td className="py-2.5 font-bold text-white">{g.subject}</td>
+                                    <td className="py-2.5 text-center font-extrabold text-amber-400 text-xs">
+                                      {g.score}
+                                    </td>
+                                    <td className="py-2.5 text-slate-300 italic max-w-xs truncate">{g.notes || "-"}</td>
+                                    <td className="py-2.5 text-right">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteDailyGrade(g.id)}
+                                        className="p-1 text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition"
+                                        title="Hapus Nilai Harian Ini"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
-                    <button type="button" onClick={() => setEditingStudent(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700">Batal</button>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-500">
-                      {saving ? "Menyimpan..." : "Simpan Data Siswa & Ortu"}
+                    <button type="button" onClick={() => setEditingStudent(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 cursor-pointer">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer">
+                      {saving ? "Menyimpan..." : "Simpan Data Siswa & Transkrip"}
                     </button>
                   </div>
                 </form>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {studentsList.map((s) => (
-                  <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* MODAL INPUT NILAI HARIAN (POPUP) */}
+              {dailyGradeModal.isOpen && (
+                <form onSubmit={handleSaveDailyGrade} className="bg-slate-900/95 border border-amber-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-3">
-                      <div
-                        className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
-                        onClick={() => handleOpenPreview(s.avatarUrl || "https://i.pravatar.cc/150", `Avatar Siswa: ${s.name}`)}
-                        title="Klik untuk melihat foto avatar"
-                      >
-                        {s.name.charAt(0)}
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold border border-amber-500/30">
+                        📝
                       </div>
                       <div>
-                        <h4 className="font-bold text-white text-sm">{s.name}</h4>
-                        <p className="text-xs text-slate-400">{s.nisn} • <span className="text-emerald-400 font-semibold">{s.className}</span></p>
-                        <p className="text-[11px] text-slate-500">Ortu: {s.parentName} ({s.parentPhone})</p>
-                        {s.username && (
-                          <span className="inline-block text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 mt-1">
-                            User: {s.username}
-                          </span>
-                        )}
+                        <h3 className="font-extrabold text-white text-base">Input Nilai Harian Siswa</h3>
+                        <p className="text-xs text-slate-400">Catat perkembangan harian siswa per tanggal & aspek belajar.</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setDailyGradeModal((prev) => ({ ...prev, isOpen: false }))}
+                      className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Siswa / Murid</label>
+                      <SearchableSelect
+                        options={studentsList.map((s) => ({
+                          value: s.id,
+                          label: s.name,
+                          sublabel: `NISN: ${s.nisn} • ${s.className}`,
+                        }))}
+                        value={dailyGradeModal.studentId}
+                        onChange={(selectedId) => {
+                          const found = studentsList.find((s) => s.id === selectedId);
+                          if (found) {
+                            setDailyGradeModal((prev) => ({
+                              ...prev,
+                              studentId: found.id,
+                              studentName: found.name,
+                            }));
+                          }
+                        }}
+                        placeholder="Pilih nama siswa..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Penilaian</label>
+                      <input
+                        type="date"
+                        required
+                        value={dailyGradeModal.date}
+                        onChange={(e) => setDailyGradeModal((prev) => ({ ...prev, date: e.target.value }))}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Aspek Perkembangan / Matpel</label>
+                      <SearchableSelect
+                        options={[
+                          { value: "Moral & Agama", label: "🕋 Moral & Agama" },
+                          { value: "Kognitif & Motorik", label: "🧩 Kognitif & Motorik" },
+                          { value: "Seni & Bahasa", label: "🎨 Seni & Bahasa" },
+                          { value: "Sosial Emosional", label: "🤝 Sosial Emosional" },
+                        ]}
+                        value={dailyGradeModal.subject}
+                        onChange={(val) => setDailyGradeModal((prev) => ({ ...prev, subject: val }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Nilai Harian (0 - 100) <span className="text-amber-400 font-bold">→ Score: {dailyGradeModal.score}</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        required
+                        value={dailyGradeModal.score}
+                        onChange={(e) => setDailyGradeModal((prev) => ({ ...prev, score: Number(e.target.value) }))}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Catatan Evaluasi Guru (Opsional)</label>
+                      <input
+                        type="text"
+                        placeholder="Misal: Sangat antusias dalam mengikuti hafalan surat pendek."
+                        value={dailyGradeModal.notes}
+                        onChange={(e) => setDailyGradeModal((prev) => ({ ...prev, notes: e.target.value }))}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button
+                      type="button"
+                      onClick={() => setDailyGradeModal((prev) => ({ ...prev, isOpen: false }))}
+                      className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30 flex items-center gap-2 cursor-pointer"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>{saving ? "Menyimpan..." : "Simpan Nilai Harian & Kalkulasi"}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* DAFTAR KARTU SISWA TERDAFTAR */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {studentsList.map((s) => (
+                  <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3.5 flex flex-col justify-between">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                          onClick={() => handleOpenPreview(s.avatarUrl || "https://i.pravatar.cc/150", `Avatar Siswa: ${s.name}`)}
+                          title="Klik untuk melihat foto avatar"
+                        >
+                          {s.name.charAt(0)}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                          <p className="text-xs text-slate-400">{s.nisn} • <span className="text-emerald-400 font-semibold">{s.className}</span></p>
+                          <p className="text-[11px] text-slate-500">Ortu: {s.parentName} ({s.parentPhone})</p>
+                          {s.username && (
+                            <span className="inline-block text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 mt-1">
+                              User: {s.username}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 grid grid-cols-3 gap-2 text-center text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Presensi</span>
+                        <span className="font-extrabold text-emerald-400">{s.attendanceRate ?? 95}%</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Rata Harian</span>
+                        <span className="font-extrabold text-amber-400">{s.dailyGrade ?? 85}</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block">Nilai Akhir</span>
+                        <span className="font-extrabold text-purple-400">{s.averageGrade ?? 88.5}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-800/80">
                       <button
-                        onClick={() => handleSendStudentCredentials(s.id)}
-                        disabled={sendingAccount}
-                        className="px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
-                        title="Kirim Akun Login Ortu"
+                        onClick={() =>
+                          setDailyGradeModal({
+                            isOpen: true,
+                            studentId: s.id,
+                            studentName: s.name,
+                            subject: "Moral & Agama",
+                            score: 85,
+                            date: new Date().toISOString().split("T")[0],
+                            notes: "",
+                          })
+                        }
+                        className="px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                        title="Input Nilai Harian Hari Ini"
                       >
-                        <Key className="w-3.5 h-3.5" />
-                        <span>Akun Ortu</span>
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Input Nilai</span>
                       </button>
-                      <button onClick={() => setEditingStudent(s)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl" title="Edit Siswa"><Edit className="w-4 h-4" /></button>
-                      <button onClick={() => handleDeleteStudent(s.id)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl" title="Hapus Siswa"><Trash2 className="w-4 h-4" /></button>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleSendStudentCredentials(s.id)}
+                          disabled={sendingAccount}
+                          className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1 transition-all disabled:opacity-50 cursor-pointer"
+                          title="Kirim Akun Login Ortu"
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                          <span>Akun</span>
+                        </button>
+                        <button onClick={() => setEditingStudent(s)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Edit Data & Transkrip Siswa"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteStudent(s.id)} className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer" title="Hapus Siswa"><Trash2 className="w-4 h-4" /></button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -3894,39 +4438,292 @@ export default function AdminDashboardPage() {
           {/* TAB: SPP & KEUANGAN */}
           {activeTab === "spp" && (
             <div className="space-y-6 w-full">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">SPP & Catatan Keuangan</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-black text-white tracking-tight">SPP & Catatan Keuangan</h2>
+                    {sppList.filter((s) => s.status === "menunggu_konfirmasi").length > 0 && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 animate-pulse">
+                        {sppList.filter((s) => s.status === "menunggu_konfirmasi").length} Menunggu Konfirmasi
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-slate-400">
-                    {admin?.role === "ORTU"
-                      ? "Status dan riwayat pembayaran SPP ananda."
-                      : "Kelola status pembayaran SPP bulanan siswa."}
+                    {admin?.role === "ORTU" || admin?.role === "ORANG_TUA"
+                      ? "Status, riwayat pembayaran SPP ananda, serta fitur unggah bukti transfer."
+                      : "Kelola status dan verifikasi bukti pembayaran SPP bulanan siswa."}
                   </p>
                 </div>
-                {admin?.role !== "ORTU" && (
-                  <button
-                    onClick={() =>
-                      setEditingSpp({
-                        studentName: studentsList[0]?.name || "Siswa Smart Kids",
-                        nisn: studentsList[0]?.nisn || "123456789",
-                        className: studentsList[0]?.className || "TK A",
-                        month: "Juli 2026",
-                        amount: 350000,
-                        status: "lunas",
-                        paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
-                      })
-                    }
-                    className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Tambah Catatan SPP</span>
-                  </button>
-                )}
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {(admin?.role === "ORTU" || admin?.role === "ORANG_TUA") && (
+                    <button
+                      onClick={() => {
+                        const child = studentsList.find(
+                          (s) =>
+                            (s.parentPhone && admin?.phone && s.parentPhone === admin.phone) ||
+                            (s.username && admin?.username && s.username === admin.username) ||
+                            (s.parentName && admin?.name && s.parentName.toLowerCase().includes(admin.name.toLowerCase()))
+                        ) || studentsList[0];
+                        setSppPaymentModal({
+                          isOpen: true,
+                          studentId: child?.id || "",
+                          studentName: child?.name || admin?.name || "Siswa Smart Kids",
+                          nisn: child?.nisn || "123456789",
+                          className: child?.className || "TK A",
+                          month: "Juli 2026",
+                          amount: 350000,
+                          paymentMethod: "TRANSFER_BCA",
+                          proofUrl: "",
+                          note: "",
+                          uploading: false,
+                        });
+                      }}
+                      className="bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer"
+                    >
+                      <CreditCard className="w-4 h-4 text-emerald-200" />
+                      <Upload className="w-4 h-4 text-emerald-200" />
+                      <span>Bayar SPP & Upload Bukti</span>
+                    </button>
+                  )}
+
+                  {admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+                    <button
+                      onClick={() =>
+                        setEditingSpp({
+                          studentName: studentsList[0]?.name || "Siswa Smart Kids",
+                          nisn: studentsList[0]?.nisn || "123456789",
+                          className: studentsList[0]?.className || "TK A",
+                          month: "Juli 2026",
+                          amount: 350000,
+                          status: "lunas",
+                          paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                        })
+                      }
+                      className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Tambah Catatan SPP</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
+              {/* MODAL / FORM PEMBAYARAN & UPLOAD BUKTI UNTUK ORANG TUA */}
+              {sppPaymentModal.isOpen && (
+                <div className="bg-slate-900/95 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                        💳
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-base">Pembayaran SPP & Unggah Bukti Transfer</h3>
+                        <p className="text-xs text-slate-400">Silakan lakukan pembayaran lalu unggah foto bukti transfer di bawah ini.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSppPaymentModal((prev) => ({ ...prev, isOpen: false }))}
+                      className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSubmitSppPayment} className="space-y-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Nama Siswa / Ananda</label>
+                        <SearchableSelect
+                          options={studentsList.map((s) => ({
+                            value: s.id,
+                            label: s.name,
+                            sublabel: `NISN: ${s.nisn} • ${s.className}`,
+                          }))}
+                          value={sppPaymentModal.studentId}
+                          onChange={(selectedId) => {
+                            const found = studentsList.find((s) => s.id === selectedId);
+                            if (found) {
+                              setSppPaymentModal((prev) => ({
+                                ...prev,
+                                studentId: found.id,
+                                studentName: found.name,
+                                nisn: found.nisn,
+                                className: found.className,
+                              }));
+                            }
+                          }}
+                          placeholder="Pilih nama anak..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Bulan Pembayaran SPP</label>
+                        <SearchableSelect
+                          options={[
+                            { value: "Juli 2026", label: "Juli 2026" },
+                            { value: "Agustus 2026", label: "Agustus 2026" },
+                            { value: "September 2026", label: "September 2026" },
+                            { value: "Oktober 2026", label: "Oktober 2026" },
+                            { value: "November 2026", label: "November 2026" },
+                            { value: "Desember 2026", label: "Desember 2026" },
+                            { value: "Januari 2027", label: "Januari 2027" },
+                            { value: "Februari 2027", label: "Februari 2027" },
+                            { value: "Maret 2027", label: "Maret 2027" },
+                          ]}
+                          value={sppPaymentModal.month}
+                          onChange={(val) => setSppPaymentModal((prev) => ({ ...prev, month: val }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">
+                          Nominal SPP (Rp)
+                        </label>
+                        <input
+                          type="number"
+                          required
+                          value={sppPaymentModal.amount}
+                          onChange={(e) => setSppPaymentModal((prev) => ({ ...prev, amount: Number(e.target.value) }))}
+                          className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* METODE PEMBAYARAN & INSTRUKSI METODE */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Metode Pembayaran</label>
+                        <SearchableSelect
+                          options={[
+                            { value: "TRANSFER_BCA", label: "🏦 Transfer Bank BCA" },
+                            { value: "TRANSFER_MANDIRI", label: "🏦 Transfer Bank Mandiri" },
+                            { value: "QRIS", label: "📱 QRIS (Scan QR Code)" },
+                            { value: "TUNAI", label: "💵 Tunai di Kasir Sekolah" },
+                          ]}
+                          value={sppPaymentModal.paymentMethod}
+                          onChange={(val) => setSppPaymentModal((prev) => ({ ...prev, paymentMethod: val }))}
+                        />
+                      </div>
+
+                      {/* INFORMASI REKENING TUJUAN */}
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-1.5">
+                        <span className="font-bold uppercase text-emerald-400 text-[11px] tracking-wider block">
+                          📌 Instruksi Pembayaran Tujuan:
+                        </span>
+                        {sppPaymentModal.paymentMethod === "TRANSFER_BCA" && (
+                          <div className="space-y-1 text-slate-300">
+                            <p>Bank: <strong className="text-white">Bank BCA</strong></p>
+                            <p>No. Rekening: <strong className="font-mono text-emerald-300 text-sm">8830-123-456</strong></p>
+                            <p>Atas Nama: <strong className="text-white">Yayasan Pendidikan YAPCHI</strong></p>
+                          </div>
+                        )}
+                        {sppPaymentModal.paymentMethod === "TRANSFER_MANDIRI" && (
+                          <div className="space-y-1 text-slate-300">
+                            <p>Bank: <strong className="text-white">Bank Mandiri</strong></p>
+                            <p>No. Rekening: <strong className="font-mono text-emerald-300 text-sm">137-00-98765-43</strong></p>
+                            <p>Atas Nama: <strong className="text-white">Yayasan Pendidikan YAPCHI</strong></p>
+                          </div>
+                        )}
+                        {sppPaymentModal.paymentMethod === "QRIS" && (
+                          <div className="space-y-1 text-slate-300">
+                            <p>QRIS Name: <strong className="text-white">YAPCHI Smart Kids School</strong></p>
+                            <p className="text-[11px] text-amber-300">Scan melalui BCA Mobile, GoPay, OVO, ShopeePay, DANA, dll.</p>
+                          </div>
+                        )}
+                        {sppPaymentModal.paymentMethod === "TUNAI" && (
+                          <div className="space-y-1 text-slate-300">
+                            <p>Lokasi: <strong className="text-white">Kasir Keuangan Sekolah</strong></p>
+                            <p className="text-[11px] text-slate-400">Pembayaran langsung saat jam kerja sekolah (07.30 - 14.00 WIB).</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* FIELD UPLOAD BUKTI BAYAR */}
+                    <div className="space-y-2">
+                      <label className="block text-xs font-bold text-slate-400">
+                        Bukti Transfer / Pembayaran <span className="text-amber-400 font-normal">(Foto / Screenshot / Struk PDF)</span>
+                      </label>
+
+                      <div className="flex flex-col sm:flex-row items-center gap-4">
+                        <label className="flex-1 w-full flex items-center justify-center gap-2 p-4 bg-slate-950 hover:bg-slate-800 border-2 border-dashed border-slate-700 hover:border-emerald-500 rounded-2xl cursor-pointer transition">
+                          <Upload className="w-5 h-5 text-emerald-400" />
+                          <span className="text-xs text-slate-300 font-medium">
+                            {sppPaymentModal.uploading
+                              ? "Mengunggah foto..."
+                              : sppPaymentModal.proofUrl
+                              ? "Ganti File Bukti Transfer"
+                              : "Pilih / Ambil Foto Bukti Transfer"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={handleUploadSppProof}
+                            className="hidden"
+                          />
+                        </label>
+
+                        {sppPaymentModal.proofUrl && (
+                          <div className="flex items-center gap-3 bg-slate-950 p-2.5 rounded-2xl border border-emerald-500/30 shrink-0">
+                            <div className="w-12 h-12 relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800">
+                              <img
+                                src={sppPaymentModal.proofUrl}
+                                alt="Bukti Transfer"
+                                className="w-full h-full object-cover cursor-pointer"
+                                onClick={() => handleOpenPreview(sppPaymentModal.proofUrl, "Pratinjau Bukti Transfer")}
+                              />
+                            </div>
+                            <div className="text-xs">
+                              <span className="text-emerald-400 font-bold block">✓ File Berhasil Diunggah</span>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPreview(sppPaymentModal.proofUrl, "Pratinjau Bukti Transfer")}
+                                className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                              >
+                                Lihat Gambar Full
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Catatan Tambahan (Opsional)</label>
+                      <input
+                        type="text"
+                        placeholder="Misal: Transfer dari BCA a.n Budi Santoso"
+                        value={sppPaymentModal.note}
+                        onChange={(e) => setSppPaymentModal((prev) => ({ ...prev, note: e.target.value }))}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setSppPaymentModal((prev) => ({ ...prev, isOpen: false }))}
+                        className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 cursor-pointer"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={saving || sppPaymentModal.uploading}
+                        className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>{saving ? "Mengirim..." : "Kirim Konfirmasi Pembayaran"}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
+              {/* ADMIN FORM EDIT SPP */}
               {editingSpp && (
                 <form onSubmit={handleSaveSpp} className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
-                  <h3 className="font-bold text-white text-base">Tambah Pembayaran SPP</h3>
+                  <h3 className="font-bold text-white text-base">{editingSpp.id ? "Edit Detail Pembayaran SPP" : "Tambah Record SPP Siswa"}</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Murid / Siswa</label>
@@ -3962,7 +4759,9 @@ export default function AdminDashboardPage() {
                       <input type="text" required value={editingSpp.month} onChange={(e) => setEditingSpp({ ...editingSpp, month: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Nominal (Rp)</label>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Nominal (Rp) <span className="text-amber-400 font-normal">→ Rp {Number(editingSpp.amount || 0).toLocaleString("id-ID")}</span>
+                      </label>
                       <input type="number" required value={editingSpp.amount} onChange={(e) => setEditingSpp({ ...editingSpp, amount: Number(e.target.value) })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                     </div>
                   </div>
@@ -3971,8 +4770,10 @@ export default function AdminDashboardPage() {
                       <label className="block text-xs font-bold text-slate-400 mb-1">Status Pembayaran</label>
                       <SearchableSelect
                         options={[
-                          { value: "lunas", label: "Lunas" },
+                          { value: "lunas", label: "Lunas (Sudah Bayar)" },
+                          { value: "menunggu_konfirmasi", label: "Menunggu Konfirmasi Admin" },
                           { value: "belum_bayar", label: "Belum Bayar" },
+                          { value: "ditolak", label: "Ditolak / Bukti Tidak Valid" },
                         ]}
                         value={editingSpp.status}
                         onChange={(val) => setEditingSpp({ ...editingSpp, status: val })}
@@ -3980,20 +4781,74 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Pembayaran</label>
-                      <input type="text" value={editingSpp.paymentDate} onChange={(e) => setEditingSpp({ ...editingSpp, paymentDate: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <input type="text" value={editingSpp.paymentDate || ""} onChange={(e) => setEditingSpp({ ...editingSpp, paymentDate: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="26 Juli 2026" />
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setEditingSpp(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-amber-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30">Simpan Record SPP</button>
+                    <button type="button" onClick={() => setEditingSpp(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl cursor-pointer">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30 cursor-pointer">
+                      {editingSpp.id ? "Update Detail Pembayaran" : "Simpan Record SPP"}
+                    </button>
                   </div>
                 </form>
               )}
 
+              {/* FILTER STATUS TABS FOR ADMIN & ORTU */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                  onClick={() => setSppStatusFilter("ALL")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    sppStatusFilter === "ALL"
+                      ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  Semua Record ({sppList.length})
+                </button>
+                <button
+                  onClick={() => setSppStatusFilter("menunggu_konfirmasi")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
+                    sppStatusFilter === "menunggu_konfirmasi"
+                      ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30"
+                      : "bg-slate-900 text-amber-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  <span>⏳ Menunggu Konfirmasi</span>
+                  {sppList.filter((s) => s.status === "menunggu_konfirmasi").length > 0 && (
+                    <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
+                      {sppList.filter((s) => s.status === "menunggu_konfirmasi").length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setSppStatusFilter("lunas")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    sppStatusFilter === "lunas"
+                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+                      : "bg-slate-900 text-emerald-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  ✓ Lunas ({sppList.filter((s) => s.status === "lunas").length})
+                </button>
+                <button
+                  onClick={() => setSppStatusFilter("belum_bayar")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    sppStatusFilter === "belum_bayar"
+                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                      : "bg-slate-900 text-red-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  ✕ Belum Bayar ({sppList.filter((s) => s.status === "belum_bayar").length})
+                </button>
+              </div>
+
+              {/* SPP RECORDS CARDS GRID */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                 {sppList
                   .filter((spp) => {
-                    if (admin?.role !== "ORTU") return true;
+                    if (sppStatusFilter !== "ALL" && spp.status !== sppStatusFilter) return false;
+
+                    if (admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA") return true;
                     const u = (admin?.username || "").toLowerCase();
                     const n = (admin?.name || "").toLowerCase();
                     const sName = (spp.studentName || "").toLowerCase();
@@ -4005,18 +4860,122 @@ export default function AdminDashboardPage() {
                     );
                   })
                   .map((spp) => (
-                    <div key={spp.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex items-center justify-between">
-                      <div>
-                        <h4 className="font-bold text-white text-sm">{spp.studentName}</h4>
-                        <p className="text-xs text-slate-400">{spp.month} • Rp {Number(spp.amount).toLocaleString("id-ID")}</p>
-                        {spp.paymentDate && <p className="text-[11px] text-emerald-400">Bayar: {spp.paymentDate}</p>}
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${spp.status === "lunas" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
-                          {spp.status}
+                    <div
+                      key={spp.id}
+                      className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl ${
+                        spp.status === "menunggu_konfirmasi"
+                          ? "border-amber-500/50 bg-amber-950/20"
+                          : spp.status === "lunas"
+                          ? "border-slate-800 hover:border-emerald-500/40"
+                          : "border-red-500/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                            {spp.month}
+                          </span>
+                          <h4 className="font-extrabold text-white text-base mt-1.5">{spp.studentName}</h4>
+                          <p className="text-xs text-slate-400">
+                            NISN: <span className="font-mono text-emerald-300 font-bold">{spp.nisn}</span> • {spp.className}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-center shrink-0 ${
+                            spp.status === "lunas"
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              : spp.status === "menunggu_konfirmasi"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                              : spp.status === "ditolak"
+                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                              : "bg-red-500/20 text-red-300 border border-red-500/30"
+                          }`}
+                        >
+                          {spp.status === "menunggu_konfirmasi"
+                            ? "Menunggu Konfirmasi"
+                            : spp.status}
                         </span>
-                        {admin?.role !== "ORTU" && (
-                          <button onClick={() => handleDeleteSpp(spp.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                      </div>
+
+                      <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400">Nominal SPP:</span>
+                          <span className="font-extrabold text-amber-400">
+                            Rp {Number(spp.amount).toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        {spp.paymentMethod && (
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Metode:</span>
+                            <span className="font-bold text-slate-200 uppercase bg-slate-800 px-2 py-0.5 rounded-md">
+                              {spp.paymentMethod.replace("_", " ")}
+                            </span>
+                          </div>
+                        )}
+                        {spp.paymentDate && (
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Tgl Bayar:</span>
+                            <span className="font-bold text-emerald-400">{spp.paymentDate}</span>
+                          </div>
+                        )}
+                        {spp.note && (
+                          <div className="text-[11px] text-slate-300 pt-1 border-t border-slate-800">
+                            <span className="text-slate-400 italic">Catatan: </span>
+                            <span>{spp.note}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* BUKTI TRANSFER & VERIFIKASI ADMIN */}
+                      <div className="flex items-center justify-between pt-1">
+                        {spp.proofUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(spp.proofUrl, `Bukti Transfer SPP: ${spp.studentName} (${spp.month})`)}
+                            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Lihat Bukti Transfer</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-500 italic">Belum ada foto bukti</span>
+                        )}
+
+                        {admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+                          <div className="flex items-center gap-1.5">
+                            {spp.status === "menunggu_konfirmasi" && (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateSppStatus(spp.id, "lunas")}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+                                  title="Setujui Pembayaran SPP (Lunas)"
+                                >
+                                  Setujui
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateSppStatus(spp.id, "ditolak")}
+                                  className="px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+                                  title="Tolak Bukti Pembayaran"
+                                >
+                                  Tolak
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => setEditingSpp(spp)}
+                              className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-xl cursor-pointer"
+                              title="Edit Detail Pembayaran"
+                            >
+                              <Edit className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSpp(spp.id)}
+                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer"
+                              title="Hapus Data SPP"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -4114,71 +5073,353 @@ export default function AdminDashboardPage() {
           {/* TAB: IZIN & CUTI GURU */}
           {activeTab === "leave-requests" && (
             <div className="space-y-6 w-full">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Pengajuan Izin & Cuti Guru</h2>
-                  <p className="text-xs text-slate-400">
-                    {admin?.role === "GURU"
-                      ? "Status pengajuan izin / cuti mengajar Anda."
-                      : "Verifikasi dan beri persetujuan atas pengajuan izin/cuti dari guru."}
-                  </p>
-                </div>
-                {admin?.role === "GURU" && (
-                  <button
-                    onClick={() => {
-                      const reason = prompt("Masukkan alasan izin / cuti mengajar:");
-                      if (reason) {
-                        fetch("/api/leave-requests", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            teacherName: admin?.name || "Guru",
-                            type: "Cuti",
-                            startDate: new Date().toISOString().split("T")[0],
-                            endDate: new Date().toISOString().split("T")[0],
-                            reason,
-                            schoolId: admin?.schoolId || selectedSchoolId,
-                          }),
-                        })
-                          .then((r) => r.json())
-                          .then((res) => {
-                            if (res.success) {
-                              showMessage("Pengajuan izin berhasil dikirim!", "success");
-                              fetch(`/api/leave-requests${selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : ""}`)
-                                .then((r) => r.json())
-                                .then((d) => setLeaveRequestsList(d.data || []));
-                            }
-                          });
-                      }
-                    }}
-                    className="bg-rose-600 hover:bg-rose-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Ajukan Izin / Cuti Baru</span>
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-                {leaveRequestsList.map((leave) => (
-                  <div key={leave.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-white text-base">{leave.teacherName}</h4>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${leave.status === "disetujui" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : leave.status === "ditolak" ? "bg-red-500/20 text-red-300 border border-red-500/30" : "bg-amber-500/20 text-amber-300 border border-amber-500/30"}`}>
-                        {leave.status}
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-black text-white tracking-tight">Pengajuan Izin & Cuti Guru</h2>
+                    {leaveRequestsList.filter((l) => l.status === "pending" || l.status === "PENDING").length > 0 && (
+                      <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30 animate-pulse">
+                        {leaveRequestsList.filter((l) => l.status === "pending" || l.status === "PENDING").length} Menunggu Persetujuan
                       </span>
-                    </div>
-                    <p className="text-xs text-slate-300">Tipe: <span className="font-bold text-emerald-400 uppercase">{leave.type}</span> ({leave.startDate} - {leave.endDate})</p>
-                    <p className="text-xs text-slate-400 italic bg-slate-950 p-3 rounded-2xl border border-slate-800">&quot;{leave.reason}&quot;</p>
-                    {admin?.role !== "GURU" && (
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                        <button onClick={() => handleUpdateLeaveStatus(leave.id, "disetujui")} className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><CheckCircle className="w-3.5 h-3.5" /><span>Setujui</span></button>
-                        <button onClick={() => handleUpdateLeaveStatus(leave.id, "ditolak")} className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5"><XCircle className="w-3.5 h-3.5" /><span>Tolak</span></button>
-                        <button onClick={() => handleDeleteLeaveRequest(leave.id)} className="p-2 bg-slate-800 text-slate-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
-                      </div>
                     )}
                   </div>
-                ))}
+                  <p className="text-xs text-slate-400">
+                    {admin?.role === "GURU"
+                      ? "Kelola dan pantau status pengajuan izin atau cuti mengajar Anda."
+                      : "Verifikasi, periksa lampiran, dan beri persetujuan atas pengajuan izin/cuti guru."}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() =>
+                    setEditingLeaveRequest({
+                      teacherName: admin?.role === "GURU" ? (admin?.name || "Guru") : (teachersList[0]?.name || "Guru Smart Kids"),
+                      type: "Izin Sakit",
+                      startDate: new Date().toISOString().split("T")[0],
+                      endDate: new Date().toISOString().split("T")[0],
+                      reason: "",
+                      attachment: "",
+                      schoolId: admin?.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+                    })
+                  }
+                  className="bg-rose-600 hover:bg-rose-500 text-white px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Ajukan Izin / Cuti Baru</span>
+                </button>
+              </div>
+
+              {/* FORM MODAL PENGAJUAN IZIN & CUTI GURU */}
+              {editingLeaveRequest && (
+                <form onSubmit={handleSaveLeaveRequest} className="bg-slate-900/95 border border-rose-500/40 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold border border-rose-500/30">
+                        📑
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-white text-base">Form Permohonan Izin & Cuti Mengajar</h3>
+                        <p className="text-xs text-slate-400">Isi rincian izin dan unggah surat keterangan dokter/lampiran pendukung jika ada.</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingLeaveRequest(null)}
+                      className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Nama Guru / Pengajar</label>
+                      {admin?.role === "GURU" ? (
+                        <input
+                          type="text"
+                          readOnly
+                          value={editingLeaveRequest.teacherName}
+                          className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white opacity-80"
+                        />
+                      ) : (
+                        <SearchableSelect
+                          options={teachersList.map((t) => ({
+                            value: t.name,
+                            label: t.name,
+                            sublabel: t.role || "Guru Pengajar",
+                          }))}
+                          value={editingLeaveRequest.teacherName}
+                          onChange={(val) => setEditingLeaveRequest({ ...editingLeaveRequest, teacherName: val })}
+                          placeholder="Pilih nama guru..."
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Jenis Izin / Cuti</label>
+                      <SearchableSelect
+                        options={[
+                          { value: "Izin Sakit", label: "🏥 Izin Sakit (Surat Dokter)" },
+                          { value: "Cuti Tahunan", label: "🏖️ Cuti Tahunan" },
+                          { value: "Izin Acara Keluarga", label: "🏠 Izin Kepentingan Keluarga" },
+                          { value: "Cuti Melahirkan", label: "👶 Cuti Melahirkan / Bersalin" },
+                          { value: "Izin Duka Cita", label: "🕊️ Izin Duka Cita" },
+                          { value: "Izin Mendesak", label: "⚠️ Izin Keperluan Mendesak" },
+                        ]}
+                        value={editingLeaveRequest.type}
+                        onChange={(val) => setEditingLeaveRequest({ ...editingLeaveRequest, type: val })}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Mulai</label>
+                      <input
+                        type="date"
+                        required
+                        value={editingLeaveRequest.startDate}
+                        onChange={(e) => setEditingLeaveRequest({ ...editingLeaveRequest, startDate: e.target.value })}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal Selesai</label>
+                      <input
+                        type="date"
+                        required
+                        value={editingLeaveRequest.endDate}
+                        onChange={(e) => setEditingLeaveRequest({ ...editingLeaveRequest, endDate: e.target.value })}
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">Alasan Permohonan Izin / Cuti</label>
+                    <textarea
+                      rows={3}
+                      required
+                      placeholder="Jelaskan alasan pengajuan izin atau keterlibatan tugas luar mengajar..."
+                      value={editingLeaveRequest.reason}
+                      onChange={(e) => setEditingLeaveRequest({ ...editingLeaveRequest, reason: e.target.value })}
+                      className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    />
+                  </div>
+
+                  {/* FIELD UPLOAD LAMPIRAN SURAT DOKTER / BERKAS */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-400">
+                      Upload Lampiran Berkas / Surat Dokter <span className="text-rose-400 font-normal">(Foto Surat Keterangan / Dokumen PDF)</span>
+                    </label>
+                    
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                      <label className="flex-1 w-full flex items-center justify-center gap-2 p-4 bg-slate-950 hover:bg-slate-800 border-2 border-dashed border-slate-700 hover:border-rose-500 rounded-2xl cursor-pointer transition">
+                        <Upload className="w-5 h-5 text-rose-400" />
+                        <span className="text-xs text-slate-300 font-medium">
+                          {leaveUploading
+                            ? "Mengunggah berkas..."
+                            : editingLeaveRequest.attachment
+                            ? "Ganti Berkas Lampiran"
+                            : "Pilih / Ambil Foto Surat Keterangan"}
+                        </span>
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={handleUploadLeaveAttachment}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {editingLeaveRequest.attachment && (
+                        <div className="flex items-center gap-3 bg-slate-950 p-2.5 rounded-2xl border border-rose-500/30 shrink-0">
+                          <div className="w-12 h-12 relative rounded-xl overflow-hidden bg-slate-900 border border-slate-800 flex items-center justify-center text-rose-400 font-bold text-xs">
+                            📷
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-rose-400 font-bold block">✓ Lampiran Terunggah</span>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPreview(editingLeaveRequest.attachment, "Pratinjau Surat Lampiran Izin")}
+                              className="text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                            >
+                              Lihat Berkas Full
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingLeaveRequest(null)}
+                      className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving || leaveUploading}
+                      className="px-6 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-600/30 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                      <span>{saving ? "Kirimkan..." : "Kirim Pengajuan Izin"}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* FILTER STATUS TAB FOR LEAVE REQUESTS */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                <button
+                  onClick={() => setLeaveStatusFilter("ALL")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    leaveStatusFilter === "ALL"
+                      ? "bg-rose-600 text-white shadow-md shadow-rose-600/30"
+                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  Semua Pengajuan ({leaveRequestsList.length})
+                </button>
+                <button
+                  onClick={() => setLeaveStatusFilter("pending")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
+                    leaveStatusFilter === "pending"
+                      ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30"
+                      : "bg-slate-900 text-amber-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  <span>⏳ Menunggu Persetujuan</span>
+                  {leaveRequestsList.filter((l) => l.status === "pending" || l.status === "PENDING").length > 0 && (
+                    <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
+                      {leaveRequestsList.filter((l) => l.status === "pending" || l.status === "PENDING").length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setLeaveStatusFilter("disetujui")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    leaveStatusFilter === "disetujui"
+                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+                      : "bg-slate-900 text-emerald-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  ✓ Disetujui ({leaveRequestsList.filter((l) => l.status === "disetujui" || l.status === "APPROVED").length})
+                </button>
+                <button
+                  onClick={() => setLeaveStatusFilter("ditolak")}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                    leaveStatusFilter === "ditolak"
+                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                      : "bg-slate-900 text-red-400 hover:bg-slate-800 border border-slate-800"
+                  }`}
+                >
+                  ✕ Ditolak ({leaveRequestsList.filter((l) => l.status === "ditolak" || l.status === "REJECTED").length})
+                </button>
+              </div>
+
+              {/* LEAVE REQUESTS GRID DISPLAY */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
+                {leaveRequestsList
+                  .filter((leave) => {
+                    if (leaveStatusFilter !== "ALL") {
+                      if (leaveStatusFilter === "pending" && leave.status !== "pending" && leave.status !== "PENDING") return false;
+                      if (leaveStatusFilter === "disetujui" && leave.status !== "disetujui" && leave.status !== "APPROVED") return false;
+                      if (leaveStatusFilter === "ditolak" && leave.status !== "ditolak" && leave.status !== "REJECTED") return false;
+                    }
+                    if (admin?.role === "GURU") {
+                      const teacherName = (leave.teacherName || "").toLowerCase();
+                      const myName = (admin?.name || "").toLowerCase();
+                      return teacherName.includes(myName) || myName.includes(teacherName);
+                    }
+                    return true;
+                  })
+                  .map((leave) => (
+                    <div
+                      key={leave.id}
+                      className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl ${
+                        leave.status === "pending" || leave.status === "PENDING"
+                          ? "border-amber-500/50 bg-amber-950/20"
+                          : leave.status === "disetujui" || leave.status === "APPROVED"
+                          ? "border-slate-800 hover:border-emerald-500/40"
+                          : "border-red-500/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-rose-400 bg-rose-500/10 px-2.5 py-0.5 rounded-full border border-rose-500/20">
+                            {leave.type || "Izin Mengajar"}
+                          </span>
+                          <h4 className="font-extrabold text-white text-base mt-1.5">{leave.teacherName}</h4>
+                          <p className="text-xs text-slate-400">
+                            Periode: <span className="font-mono text-emerald-300 font-bold">{leave.startDate}</span> s/d <span className="font-mono text-emerald-300 font-bold">{leave.endDate}</span>
+                          </p>
+                        </div>
+                        <span
+                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider shrink-0 ${
+                            leave.status === "disetujui" || leave.status === "APPROVED"
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              : leave.status === "pending" || leave.status === "PENDING"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                              : "bg-red-500/20 text-red-300 border border-red-500/30"
+                          }`}
+                        >
+                          {leave.status === "pending" || leave.status === "PENDING" ? "Menunggu Approval" : leave.status}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800/80 space-y-1 text-xs">
+                        <span className="text-slate-400 font-bold block text-[11px] uppercase tracking-wider">Alasan Pengajuan:</span>
+                        <p className="text-slate-200 italic leading-relaxed">&quot;{leave.reason}&quot;</p>
+                      </div>
+
+                      {/* LAMPIRAN BERKAS SURAT & AKSI PERSUTUJUAN ADMIN */}
+                      <div className="flex items-center justify-between pt-1">
+                        {leave.attachment ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(leave.attachment, `Lampiran Surat Izin: ${leave.teacherName}`)}
+                            className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Lihat Surat Dokter / Lampiran</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-500 italic">Tanpa lampiran berkas</span>
+                        )}
+
+                        {admin?.role !== "GURU" && (
+                          <div className="flex items-center gap-1.5">
+                            {(leave.status === "pending" || leave.status === "PENDING") && (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateLeaveStatus(leave.id, "disetujui")}
+                                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1 cursor-pointer"
+                                  title="Setujui Izin Guru"
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  <span>Setujui</span>
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateLeaveStatus(leave.id, "ditolak")}
+                                  className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold transition shadow-sm flex items-center gap-1 cursor-pointer"
+                                  title="Tolak Pengajuan Izin"
+                                >
+                                  <XCircle className="w-3.5 h-3.5" />
+                                  <span>Tolak</span>
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={() => handleDeleteLeaveRequest(leave.id)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-xl cursor-pointer"
+                              title="Hapus Record Izin"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
               </div>
             </div>
           )}

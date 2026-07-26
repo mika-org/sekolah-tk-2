@@ -96,6 +96,14 @@ export async function POST(req: Request) {
       },
     });
 
+    // Automatically recalculate attendance percentage & final grade in DB
+    try {
+      const { recalculateStudentGrades } = await import("../daily-grades/route");
+      await recalculateStudentGrades(targetStudentId);
+    } catch (recalcErr) {
+      console.warn("Attendance grade recalculation warning:", recalcErr);
+    }
+
     return NextResponse.json({ success: true, data: attendance });
   } catch (error: any) {
     return NextResponse.json(
