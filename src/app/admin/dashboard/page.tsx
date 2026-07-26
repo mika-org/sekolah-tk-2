@@ -156,6 +156,28 @@ export default function AdminDashboardPage() {
     error: null,
   });
 
+  // Detail Plotting Kelas Modal State
+  const [selectedDetailClass, setSelectedDetailClass] = useState<any | null>(null);
+  const [addStudentToClassModal, setAddStudentToClassModal] = useState<boolean>(false);
+  const [selectedStudentToAdd, setSelectedStudentToAdd] = useState<string>("");
+
+  const handlePlotStudent = async (studentId: string, targetClassId: string | null, action?: "REMOVE") => {
+    try {
+      const res = await fetch("/api/classes/plot-student", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, targetClassId, action }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(data.message, "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
   // Plotting Wali Kelas Modal State
   const [plottingModal, setPlottingModal] = useState<{
     isOpen: boolean;
@@ -1900,10 +1922,161 @@ export default function AdminDashboardPage() {
                           <span className="font-bold text-slate-400">{cls.academicYear}</span>
                         </div>
                       </div>
+
+                      <div className="pt-2 border-t border-slate-800 flex justify-end">
+                        <button
+                          onClick={() => setSelectedDetailClass(cls)}
+                          className="w-full py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all"
+                        >
+                          <Users className="w-4 h-4 text-emerald-400" />
+                          <span>Lihat Detail & Plotting Siswa</span>
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
               </div>
+
+              {/* MODAL DETAIL PLOTTING KELAS */}
+              {selectedDetailClass && (
+                <div className="fixed inset-0 z-100 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-fadeIn">
+                    {/* Header */}
+                    <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                          {selectedDetailClass.gradeLevel} • {selectedDetailClass.academicYear}
+                        </span>
+                        <h3 className="text-2xl font-black text-white mt-1">{selectedDetailClass.name}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Wali Kelas: <span className="font-bold text-emerald-300">{selectedDetailClass.homeroomTeacherName || "Belum ditentukan"}</span>
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedDetailClass(null)}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+
+                    {/* Stats & Add Button */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                      <div>
+                        <span className="text-xs text-slate-400">Total Siswa Terdaftar:</span>
+                        <h4 className="text-xl font-extrabold text-white">
+                          {studentsList.filter((s) => s.classId === selectedDetailClass.id || s.className?.toLowerCase() === selectedDetailClass.name?.toLowerCase()).length} / {selectedDetailClass.capacity} Siswa
+                        </h4>
+                      </div>
+                      <button
+                        onClick={() => setAddStudentToClassModal(true)}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Tambah Siswa ke Kelas Ini</span>
+                      </button>
+                    </div>
+
+                    {/* Modal Inner: Add Student Picker */}
+                    {addStudentToClassModal && (
+                      <div className="bg-slate-950 border border-emerald-500/30 p-5 rounded-2xl space-y-4">
+                        <h4 className="font-bold text-white text-sm">Pilih Siswa untuk Ditambahkan / Dipindahkan</h4>
+                        <SearchableSelect
+                          options={studentsList
+                            .filter((s) => s.classId !== selectedDetailClass.id && s.className?.toLowerCase() !== selectedDetailClass.name?.toLowerCase())
+                            .map((s) => ({
+                              value: s.id,
+                              label: `${s.name} (NISN: ${s.nisn})`,
+                              sublabel: `Kelas Saat Ini: ${s.className || "Belum Berkelas"}`,
+                            }))}
+                          value={selectedStudentToAdd}
+                          onChange={(val) => setSelectedStudentToAdd(val)}
+                          placeholder="Cari nama atau NISN siswa..."
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setAddStudentToClassModal(false);
+                              setSelectedStudentToAdd("");
+                            }}
+                            className="px-4 py-2 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl"
+                          >
+                            Batal
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (selectedStudentToAdd) {
+                                await handlePlotStudent(selectedStudentToAdd, selectedDetailClass.id);
+                                setAddStudentToClassModal(false);
+                                setSelectedStudentToAdd("");
+                              }
+                            }}
+                            disabled={!selectedStudentToAdd}
+                            className="px-5 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl disabled:opacity-50"
+                          >
+                            Plotkan ke Kelas Ini
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Student List in Class */}
+                    <div className="space-y-3">
+                      <h4 className="font-bold text-white text-sm">Daftar Siswa dalam Kelas</h4>
+                      {studentsList.filter((s) => s.classId === selectedDetailClass.id || s.className?.toLowerCase() === selectedDetailClass.name?.toLowerCase()).length === 0 ? (
+                        <div className="text-center py-8 bg-slate-950/60 rounded-2xl border border-dashed border-slate-800">
+                          <p className="text-xs text-slate-400">Belum ada siswa yang terdaftar di kelas ini.</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {studentsList
+                            .filter((s) => s.classId === selectedDetailClass.id || s.className?.toLowerCase() === selectedDetailClass.name?.toLowerCase())
+                            .map((st) => (
+                              <div key={st.id} className="bg-slate-950 border border-slate-800 p-4 rounded-2xl space-y-3 flex flex-col justify-between">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 font-extrabold flex items-center justify-center text-sm border border-emerald-500/30">
+                                    {st.name?.substring(0, 2).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <h5 className="font-bold text-white text-sm">{st.name}</h5>
+                                    <p className="text-[11px] text-slate-400">NISN: {st.nisn} • Ortu: {st.parentName || "-"} ({st.parentPhone || "-"})</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                                  {/* Select target class to move */}
+                                  <div className="w-48">
+                                    <SearchableSelect
+                                      options={[
+                                        { value: "", label: "Pindah Kelas..." },
+                                        ...classesList
+                                          .filter((c) => c.id !== selectedDetailClass.id)
+                                          .map((c) => ({ value: c.id, label: c.name })),
+                                      ]}
+                                      value=""
+                                      onChange={(targetClsId) => {
+                                        if (targetClsId) {
+                                          handlePlotStudent(st.id, targetClsId);
+                                        }
+                                      }}
+                                    />
+                                  </div>
+
+                                  <button
+                                    onClick={() => handlePlotStudent(st.id, null, "REMOVE")}
+                                    className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-bold transition-all border border-red-500/20 shrink-0"
+                                  >
+                                    Keluarkan
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -2214,8 +2387,11 @@ export default function AdminDashboardPage() {
                       </label>
                       <SearchableSelect
                         options={[
-                          { value: "SUPER_ADMIN", label: "👑 SUPER_ADMIN (Akses Semua Yayasan)" },
-                          { value: "SCHOOL_ADMIN", label: "🏫 SCHOOL_ADMIN (Khusus Cabang)" },
+                          { value: "SUPER_ADMIN", label: "👑 Super Admin (Akses Yayasan)" },
+                          { value: "ADMIN_CABANG", label: "🏫 Admin Cabang (Khusus Sekolah)" },
+                          { value: "GURU", label: "👩‍🏫 Guru (Wali Kelas / Pengajar)" },
+                          { value: "ORANG_TUA", label: "👨‍👩‍👧 Orang Tua (Wali Murid)" },
+                          { value: "BELUM_MASUK", label: "⏳ Belum Masuk (Akses Dibatasi)" },
                         ]}
                         value={editingAdminUser.role}
                         onChange={(val) => setEditingAdminUser({ ...editingAdminUser, role: val })}
@@ -3104,8 +3280,26 @@ export default function AdminDashboardPage() {
                       <input type="text" required value={editingStudent.nisn} onChange={(e) => setEditingStudent({ ...editingStudent, nisn: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Kelas</label>
-                      <input type="text" required value={editingStudent.className} onChange={(e) => setEditingStudent({ ...editingStudent, className: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Master Kelas</label>
+                      <SearchableSelect
+                        options={classesList.map((c) => ({
+                          value: c.id,
+                          label: c.name,
+                          sublabel: `Wali: ${c.homeroomTeacherName || "-"}`,
+                        }))}
+                        value={editingStudent.classId || classesList.find((c) => c.name === editingStudent.className)?.id || ""}
+                        onChange={(selectedClassId) => {
+                          const foundClass = classesList.find((c) => c.id === selectedClassId);
+                          if (foundClass) {
+                            setEditingStudent({
+                              ...editingStudent,
+                              classId: foundClass.id,
+                              className: foundClass.name,
+                            });
+                          }
+                        }}
+                        placeholder="Pilih Master Kelas..."
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -3658,29 +3852,69 @@ export default function AdminDashboardPage() {
 
               {editingSchedule && (
                 <form onSubmit={handleSaveSchedule} className="bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
-                  <h3 className="font-bold text-white text-base">Tambah Jadwal Pelajaran</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <h3 className="font-bold text-white text-base">
+                    {editingSchedule.id ? "Edit Jadwal Pelajaran" : "Tambah Jadwal Pelajaran Baru"}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Sekolah</label>
+                      <SearchableSelect
+                        options={schoolsList.map((sch) => ({
+                          value: sch.id,
+                          label: sch.name,
+                        }))}
+                        value={editingSchedule.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id || "")}
+                        onChange={(selectedSchId) => {
+                          setEditingSchedule({
+                            ...editingSchedule,
+                            schoolId: selectedSchId,
+                            classId: "",
+                            className: "",
+                          });
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Master Kelas</label>
+                      <SearchableSelect
+                        options={classesList
+                          .filter((c) => !editingSchedule.schoolId || editingSchedule.schoolId === "ALL" || c.schoolId === editingSchedule.schoolId)
+                          .map((c) => ({
+                            value: c.id,
+                            label: c.name,
+                            sublabel: `Wali: ${c.homeroomTeacherName || "-"}`,
+                          }))}
+                        value={editingSchedule.classId || classesList.find((c) => c.name === editingSchedule.className)?.id || ""}
+                        onChange={(selectedClassId) => {
+                          const foundClass = classesList.find((c) => c.id === selectedClassId);
+                          if (foundClass) {
+                            setEditingSchedule({
+                              ...editingSchedule,
+                              classId: foundClass.id,
+                              className: foundClass.name,
+                            });
+                          }
+                        }}
+                        placeholder="Pilih Kelas..."
+                      />
+                    </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Waktu (Jam)</label>
-                      <input type="text" required value={editingSchedule.timeRange} onChange={(e) => setEditingSchedule({ ...editingSchedule, timeRange: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <input type="text" required value={editingSchedule.timeRange} onChange={(e) => setEditingSchedule({ ...editingSchedule, timeRange: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold" placeholder="08.00 - 09.30" />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Kelas</label>
-                      <input type="text" required value={editingSchedule.className} onChange={(e) => setEditingSchedule({ ...editingSchedule, className: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Ruangan</label>
-                      <input type="text" required value={editingSchedule.room} onChange={(e) => setEditingSchedule({ ...editingSchedule, room: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Ruangan / Tempat</label>
+                      <input type="text" required value={editingSchedule.room} onChange={(e) => setEditingSchedule({ ...editingSchedule, room: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold" placeholder="Ruang Kelas Melati" />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Materi / Subjek</label>
-                      <input type="text" required value={editingSchedule.subject} onChange={(e) => setEditingSchedule({ ...editingSchedule, subject: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Materi / Mata Pelajaran</label>
+                      <input type="text" required value={editingSchedule.subject} onChange={(e) => setEditingSchedule({ ...editingSchedule, subject: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold" placeholder="Contoh: Mengenal Abjad & Bernyanyi" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Aktivitas Belajar</label>
-                      <input type="text" required value={editingSchedule.activities} onChange={(e) => setEditingSchedule({ ...editingSchedule, activities: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                      <input type="text" required value={editingSchedule.activities} onChange={(e) => setEditingSchedule({ ...editingSchedule, activities: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold" placeholder="Contoh: Bernyanyi, menebalkan huruf vokal" />
                     </div>
                   </div>
                   <div className="flex justify-end gap-3 pt-2">

@@ -8,34 +8,34 @@ generator client {
 }
 
 model Foundation {
-  id        String   @id @default("default")
-  name      String   @default("YAPCHI Foundation")
-  tagline   String   @default("Yayasan Pendidikan Anak Indonesia")
-  logoUrl   String?  @default("/images/yapchi_logo.png")
-  phone     String?  @default("0812 3456 7890")
-  email     String?  @default("info@yapchi.or.id")
-  address   String?  @default("Jl. Raya DeKeraton No. 1, Karawang")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String   @id @default(uuid())
+  nama      String   @default("YAPCHI Foundation") @map("nama")
+  tagline   String   @default("Yayasan Pendidikan Anak Indonesia") @map("tagline")
+  logoUrl   String?  @default("/images/yapchi_logo.png") @map("logo_url")
+  telepon   String?  @default("0812 3456 7890") @map("telepon")
+  email     String?  @default("info@yapchi.or.id") @map("email")
+  alamat    String?  @default("Jl. Raya DeKeraton No. 1, Karawang") @map("alamat")
+  createdAt DateTime @default(now()) @map("dibuat_pada")
+  updatedAt DateTime @updatedAt @map("diperbarui_pada")
 
   schools School[]
 
-  @@map("foundations")
+  @@map("yayasan")
 }
 
 model School {
-  id           String     @id @default(cuid())
-  foundationId String     @default("default")
+  id           String     @id @default(uuid())
+  foundationId String     @default("default") @map("id_yayasan")
   foundation   Foundation @relation(fields: [foundationId], references: [id], onDelete: Cascade)
-  code         String     @unique // e.g. "dekeraton", "cikarang"
-  name         String     // e.g. "TK Smart Kids DeKeraton"
-  level        String     @default("TK") // TK, KB, PAUD
-  address      String
-  phone        String
-  logoUrl      String?    @default("/images/smart_kids_logo.png")
-  orderIndex   Int        @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  code         String     @unique @map("kode")
+  name         String     @map("nama")
+  level        String     @default("TK") @map("jenjang")
+  address      String     @map("alamat")
+  phone        String     @map("telepon")
+  logoUrl      String?    @default("/images/smart_kids_logo.png") @map("logo_url")
+  orderIndex   Int        @default(0) @map("urutan")
+  createdAt    DateTime   @default(now()) @map("dibuat_pada")
+  updatedAt    DateTime   @updatedAt @map("diperbarui_pada")
 
   adminUsers        AdminUser[]
   siteProfile       SiteProfile?
@@ -50,281 +50,292 @@ model School {
   leaveRequests     LeaveRequest[]
   classRooms        ClassRoom[]
 
-  @@map("schools")
+  @@map("sekolah")
+}
+
+model ClassRoom {
+  id                  String   @id @default(uuid())
+  schoolId            String   @map("id_sekolah")
+  school              School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  name                String   @map("nama_kelas")
+  gradeLevel          String   @default("TK A") @map("tingkat")
+  academicYear        String   @default("2026/2027") @map("tahun_ajaran")
+  capacity            Int      @default(20) @map("kapasitas")
+  homeroomTeacherId   String?  @map("id_guru_wali")
+  homeroomTeacherName String?  @map("nama_guru_wali")
+  createdAt           DateTime @default(now()) @map("dibuat_pada")
+  updatedAt           DateTime @updatedAt @map("diperbarui_pada")
+
+  teachers Teacher[]
+  students Student[]
+  schedules Schedule[]
+
+  @@map("kelas")
 }
 
 model AdminUser {
-  id           String   @id @default(cuid())
-  schoolId     String?  // Null means ADMIN_PUSAT for Foundation
-  school       School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
-  username     String   @unique
-  passwordHash String
-  name         String
-  role         String   @default("ADMIN_PUSAT") // ADMIN_PUSAT, ADMIN_SEKOLAH, GURU, ORTU
-  assignedClass String? // e.g. "Kelas TK A"
-  phone        String?
-  email        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid())
+  schoolId      String?  @map("id_sekolah")
+  school        School?  @relation(fields: [schoolId], references: [id], onDelete: SetNull)
+  username      String   @unique @map("nama_pengguna")
+  passwordHash  String   @map("kata_sandi_hash")
+  name          String   @map("nama")
+  role          String   @default("SUPER_ADMIN") @map("peran") // SUPER_ADMIN, ADMIN_CABANG, GURU, ORANG_TUA, BELUM_MASUK
+  assignedClass String?  @map("kelas_ditugaskan")
+  classId       String?  @map("id_kelas")
+  phone         String?  @map("telepon")
+  email         String?  @map("email")
+  createdAt     DateTime @default(now()) @map("dibuat_pada")
+  updatedAt     DateTime @updatedAt @map("diperbarui_pada")
 
-  @@map("admin_users")
+  @@map("pengguna_admin")
 }
 
 model SiteProfile {
-  id            String   @id @default(cuid())
-  schoolId      String   @unique
+  id            String   @id @default(uuid())
+  schoolId      String   @unique @map("id_sekolah")
   school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  heroBadge     String   @default("Pendaftaran PPDB 2026/2027 Telah Dibuka!")
-  heroTitle     String   @default("Belajar Seru, Tumbuh Bahagia")
-  heroSubtitle  String   @default("Bimbingan belajar untuk anak usia 3-8 tahun dengan metode bermain sambil belajar yang menyenangkan")
-  heroMascotUrl String   @default("/images/owl_mascot.png")
-  ctaTitle      String   @default("Yuk, Daftarkan Si Kecil Sekarang!")
-  ctaSubtitle   String   @default("Bergabunglah bersama Smart Kids dan berikan pengalaman belajar terbaik untuk masa depan cerah mereka")
-  phone         String   @default("0812 3456 7890")
-  instagram     String   @default("smartkids")
-  facebook      String   @default("Smart Kids")
-  address       String?  @default("DeKeraton, Karawang")
-  updatedAt     DateTime @updatedAt
+  heroBadge     String   @default("Pendaftaran PPDB 2026/2027 Telah Dibuka!") @map("lencana_pahlawan")
+  heroTitle     String   @default("Belajar Seru, Tumbuh Bahagia") @map("judul_pahlawan")
+  heroSubtitle  String   @default("Bimbingan belajar untuk anak usia 3-8 tahun dengan metode bermain sambil belajar yang menyenangkan") @map("subjudul_pahlawan")
+  heroMascotUrl String   @default("/images/owl_mascot.png") @map("url_maskot_pahlawan")
+  ctaTitle      String   @default("Yuk, Daftarkan Si Kecil Sekarang!") @map("judul_panggilan_aksi")
+  ctaSubtitle   String   @default("Bergabunglah bersama Smart Kids dan berikan pengalaman belajar terbaik untuk masa depan cerah mereka") @map("subjudul_panggilan_aksi")
+  phone         String   @default("0812 3456 7890") @map("telepon")
+  instagram     String   @default("smartkids") @map("instagram")
+  facebook      String   @default("Smart Kids") @map("facebook")
+  address       String?  @default("DeKeraton, Karawang") @map("alamat")
+  updatedAt     DateTime @updatedAt @map("diperbarui_pada")
 
-  @@map("site_profiles")
+  @@map("profil_situs")
 }
 
 model Program {
-  id         String   @id @default(cuid())
-  schoolId   String
+  id         String   @id @default(uuid())
+  schoolId   String   @map("id_sekolah")
   school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  title      String
-  ageRange   String
-  iconUrl    String
-  features   String   // JSON stringified array of strings
-  orderIndex Int      @default(0)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  title      String   @map("judul")
+  ageRange   String   @map("rentang_usia")
+  iconUrl    String   @map("url_ikon")
+  features   String   @map("fitur")
+  orderIndex Int      @default(0) @map("urutan")
+  createdAt  DateTime @default(now()) @map("dibuat_pada")
+  updatedAt  DateTime @updatedAt @map("diperbarui_pada")
 
-  @@map("programs")
+  @@map("program")
 }
 
 model GalleryItem {
-  id         String   @id @default(cuid())
-  schoolId   String
+  id         String   @id @default(uuid())
+  schoolId   String   @map("id_sekolah")
   school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  title      String
-  imageUrl   String
-  folder     String   @default("uploads")
-  orderIndex Int      @default(0)
-  createdAt  DateTime @default(now())
+  title      String   @map("judul")
+  imageUrl   String   @map("url_gambar")
+  folder     String   @default("uploads") @map("folder")
+  orderIndex Int      @default(0) @map("urutan")
+  createdAt  DateTime @default(now()) @map("dibuat_pada")
 
-  @@map("gallery_items")
+  @@map("item_galeri")
 }
 
 model Testimonial {
-  id         String   @id @default(cuid())
-  schoolId   String
+  id         String   @id @default(uuid())
+  schoolId   String   @map("id_sekolah")
   school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  parentName String
-  role       String   @default("Orang Tua Siswa")
-  initials   String
-  content    String
-  rating     Int      @default(5)
-  bgColor    String   @default("emerald")
-  orderIndex Int      @default(0)
-  createdAt  DateTime @default(now())
+  parentName String   @map("nama_orang_tua")
+  role       String   @default("Orang Tua Siswa") @map("peran")
+  initials   String   @map("inisial")
+  content    String   @map("konten")
+  rating     Int      @default(5) @map("penilaian")
+  bgColor    String   @default("emerald") @map("warna_latar")
+  orderIndex Int      @default(0) @map("urutan")
+  createdAt  DateTime @default(now()) @map("dibuat_pada")
 
-  @@map("testimonials")
+  @@map("testimoni")
 }
 
 model PpdbRegistration {
-  id             String   @id @default(cuid())
-  schoolId       String
+  id             String   @id @default(uuid())
+  schoolId       String   @map("id_sekolah")
   school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  registrationNo String   @unique
-  namaAnak       String
-  jenisKelamin   String
-  agama          String
-  tempatLahir    String
-  tanggalLahir   String
-  usiaAnak       String
-  program        String
-  namaOrtu       String
-  noWhatsapp     String
-  email          String
-  alamatRumah    String
-  docKkUrl       String?
-  docAktaUrl     String?
-  docFotoUrl     String?
-  docKtpUrl      String?
-  buktiBayarUrl  String?
-  paymentMethod  String   @default("bank")
-  status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  registrationNo String   @unique @map("nomor_pendaftaran")
+  namaAnak       String   @map("nama_anak")
+  jenisKelamin   String   @map("jenis_kelamin")
+  agama          String   @map("agama")
+  tempatLahir    String   @map("tempat_lahir")
+  tanggalLahir   String   @map("tanggal_lahir")
+  usiaAnak       String   @map("usia_anak")
+  program        String   @map("program")
+  namaOrtu       String   @map("nama_ortu")
+  noWhatsapp     String   @map("no_whatsapp")
+  email          String   @map("email")
+  alamatRumah    String   @map("alamat_rumah")
+  docKkUrl       String?  @map("url_doc_kk")
+  docAktaUrl     String?  @map("url_doc_akta")
+  docFotoUrl     String?  @map("url_doc_foto")
+  docKtpUrl      String?  @map("url_doc_ktp")
+  buktiBayarUrl  String?  @map("url_bukti_bayar")
+  paymentMethod  String   @default("bank") @map("metode_pembayaran")
+  status         String   @default("PENDING") @map("status")
+  createdAt      DateTime @default(now()) @map("dibuat_pada")
+  updatedAt      DateTime @updatedAt @map("diperbarui_pada")
 
-  @@map("ppdb_registrations")
+  @@map("pendaftaran_ppdb")
 }
 
 model UploadLog {
-  id         String   @id @default(cuid())
-  fileName   String
-  fileFolder String   // uploads, profile, ppdb
-  fileUrl    String
-  fileSize   Int?
-  mimeType   String?
-  createdAt  DateTime @default(now())
+  id         String   @id @default(uuid())
+  fileName   String   @map("nama_berkas")
+  fileFolder String   @map("folder_berkas")
+  fileUrl    String   @map("url_berkas")
+  fileSize   Int?     @map("ukuran_berkas")
+  mimeType   String?  @map("tipe_mime")
+  createdAt  DateTime @default(now()) @map("dibuat_pada")
 
-  @@map("upload_logs")
+  @@map("log_unggahan")
 }
 
 model Teacher {
-  id            String   @id @default(cuid())
-  schoolId      String
-  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  name          String
-  role          String   // e.g. "Kepala Sekolah", "Wali Kelas Kindergarten", "Guru Pendamping"
-  assignedClass String?  // e.g. "Kelas TK A"
-  qrCode        String?  // e.g. "TEACHER:tech_123"
-  photoUrl      String   @default("/images/teacher_default.png")
-  bio           String?  // e.g. "Mendidik dengan kasih sayang"
-  education     String?  // e.g. "S1 Pendidikan PAUD"
-  orderIndex    Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id            String     @id @default(uuid())
+  schoolId      String     @map("id_sekolah")
+  school        School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId       String?    @map("id_kelas")
+  classRoom     ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name          String     @map("nama")
+  role          String     @map("jabatan")
+  assignedClass String?    @map("kelas_ditugaskan")
+  qrCode        String?    @map("kode_qr")
+  photoUrl      String     @default("/images/teacher_default.png") @map("url_foto")
+  bio           String?    @map("bio")
+  education     String?    @map("pendidikan")
+  orderIndex    Int        @default(0) @map("urutan")
+  createdAt     DateTime   @default(now()) @map("dibuat_pada")
+  updatedAt     DateTime   @updatedAt @map("diperbarui_pada")
 
-  @@map("teachers")
+  @@map("guru")
 }
 
 model Student {
-  id              String   @id @default(cuid())
-  schoolId        String
-  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  name            String
-  nisn            String   @unique
-  username        String?  @unique
-  passwordHash    String?
-  className       String   // e.g. "Kelas TK A"
-  gender          String   @default("L") // L / P
-  qrCode          String?  // e.g. "STUDENT:nisn_123"
-  avatarUrl       String   @default("https://i.pravatar.cc/150")
-  birthPlaceDate  String
-  parentName      String
-  parentPhone     String
-  parentEmail     String?
-  address         String
-  attendanceRate  Float    @default(95.0)
-  averageGrade    Float    @default(88.5)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id              String     @id @default(uuid())
+  schoolId        String     @map("id_sekolah")
+  school          School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId         String?    @map("id_kelas")
+  classRoom       ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name            String     @map("nama")
+  nisn            String     @unique @map("nisn")
+  username        String?    @unique @map("nama_pengguna")
+  passwordHash    String?    @map("kata_sandi_hash")
+  className       String     @map("nama_kelas")
+  gender          String     @default("L") @map("jenis_kelamin")
+  qrCode          String?    @map("kode_qr")
+  avatarUrl       String     @default("https://i.pravatar.cc/150") @map("url_avatar")
+  birthPlaceDate  String     @map("tempat_tanggal_lahir")
+  parentName      String     @map("nama_orang_tua")
+  parentPhone     String     @map("telepon_orang_tua")
+  parentEmail     String?    @map("email_orang_tua")
+  address         String     @map("alamat")
+  attendanceRate  Float      @default(95.0) @map("persentase_kehadiran")
+  averageGrade    Float      @default(88.5) @map("rata_rata_nilai")
+  createdAt       DateTime   @default(now()) @map("dibuat_pada")
+  updatedAt       DateTime   @updatedAt @map("diperbarui_pada")
 
   attendances     Attendance[]
   sppRecords      SppRecord[]
 
-  @@map("students")
+  @@map("siswa")
 }
 
 model Schedule {
-  id          String   @id @default(cuid())
-  schoolId    String
-  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  timeRange   String   // e.g. "08.00 - 09.30"
-  className   String   // e.g. "Kelas TK A"
-  room        String   // e.g. "Ruang Melati"
-  subject     String   // e.g. "Mengenal huruf vokal"
-  activities  String   // e.g. "Bernyanyi, menebalkan huruf"
-  isCompleted Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id          String     @id @default(uuid())
+  schoolId    String     @map("id_sekolah")
+  school      School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId     String?    @map("id_kelas")
+  classRoom   ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  timeRange   String     @map("rentang_waktu")
+  className   String     @map("nama_kelas")
+  room        String     @map("ruangan")
+  subject     String     @map("mata_pelajaran")
+  activities  String     @map("aktivitas")
+  isCompleted Boolean    @default(false) @map("selesai")
+  createdAt   DateTime   @default(now()) @map("dibuat_pada")
+  updatedAt   DateTime   @updatedAt @map("diperbarui_pada")
 
-  @@map("schedules")
+  @@map("jadwal_kbm")
 }
 
 model Attendance {
-  id          String   @id @default(cuid())
-  studentId   String
+  id          String   @id @default(uuid())
+  studentId   String   @map("id_siswa")
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  studentName String
-  className   String
-  status      String   @default("hadir") // hadir, sakit, izin, alfa
-  time        String?  // e.g. "07:30"
-  reason      String?
-  date        String   // e.g. "2026-07-26"
-  createdAt   DateTime @default(now())
+  studentName String   @map("nama_siswa")
+  className   String   @map("nama_kelas")
+  status      String   @default("hadir") @map("status")
+  time        String?  @map("waktu")
+  reason      String?  @map("alasan")
+  date        String   @map("tanggal")
+  createdAt   DateTime @default(now()) @map("dibuat_pada")
 
-  @@map("attendances")
+  @@map("presensi_siswa")
 }
 
 model TeacherAttendance {
-  id          String   @id @default(cuid())
-  teacherId   String
-  teacherName String
-  schoolId    String?
-  className   String?
-  status      String   @default("hadir") // hadir, sakit, izin, alfa
-  time        String?  // e.g. "07:15"
-  reason      String?
-  date        String   // e.g. "2026-07-26"
-  createdAt   DateTime @default(now())
+  id          String   @id @default(uuid())
+  teacherId   String   @map("id_guru")
+  teacherName String   @map("nama_guru")
+  schoolId    String?  @map("id_sekolah")
+  className   String?  @map("nama_kelas")
+  status      String   @default("hadir") @map("status")
+  time        String?  @map("waktu")
+  reason      String?  @map("alasan")
+  date        String   @map("tanggal")
+  createdAt   DateTime @default(now()) @map("dibuat_pada")
 
-  @@map("teacher_attendances")
+  @@map("presensi_guru")
 }
 
 model LeaveRequest {
-  id          String   @id @default(cuid())
-  schoolId    String?
+  id          String   @id @default(uuid())
+  schoolId    String?  @map("id_sekolah")
   school      School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  teacherName String
-  type        String   @default("izin") // izin, cuti
-  startDate   String
-  endDate     String
-  reason      String
-  attachment  String?
-  status      String   @default("pending") // pending, disetujui, ditolak
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  teacherName String   @map("nama_guru")
+  type        String   @default("izin") @map("jenis")
+  startDate   String   @map("tanggal_mulai")
+  endDate     String   @map("tanggal_selesai")
+  reason      String   @map("alasan")
+  attachment  String?  @map("lampiran")
+  status      String   @default("pending") @map("status")
+  createdAt   DateTime @default(now()) @map("dibuat_pada")
+  updatedAt   DateTime @updatedAt @map("diperbarui_pada")
 
-  @@map("leave_requests")
+  @@map("pengajuan_cuti")
 }
 
 model Announcement {
-  id         String   @id @default(cuid())
-  schoolId   String
+  id         String   @id @default(uuid())
+  schoolId   String   @map("id_sekolah")
   school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  title      String
-  content    String
-  date       String
-  targetRole String   @default("Semua") // Semua, Guru, Siswa
-  sender     String   @default("Pengelola Sekolah")
-  createdAt  DateTime @default(now())
+  title      String   @map("judul")
+  content    String   @map("konten")
+  date       String   @map("tanggal")
+  targetRole String   @default("Semua") @map("target_peran")
+  sender     String   @default("Pengelola Sekolah") @map("pengirim")
+  createdAt  DateTime @default(now()) @map("dibuat_pada")
 
-  @@map("announcements")
+  @@map("pengumuman")
 }
 
 model SppRecord {
-  id          String   @id @default(cuid())
-  studentId   String?
+  id          String   @id @default(uuid())
+  studentId   String?  @map("id_siswa")
   student     Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
-  studentName String
-  nisn        String
-  className   String
-  month       String
-  amount      Float    @default(350000)
-  status      String   @default("lunas") // lunas, belumLunas, proses
-  paymentDate String?
-  createdAt   DateTime @default(now())
+  studentName String   @map("nama_siswa")
+  nisn        String   @map("nisn")
+  className   String   @map("nama_kelas")
+  month       String   @map("bulan")
+  amount      Float    @default(350000) @map("jumlah")
+  status      String   @default("lunas") @map("status")
+  paymentDate String?  @map("tanggal_pembayaran")
+  createdAt   DateTime @default(now()) @map("dibuat_pada")
 
-  @@map("spp_records")
-}
-
-model ClassRoom {
-  id                  String   @id @default(cuid())
-  schoolId            String
-  school              School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  name                String   // e.g. "Kelas TK A"
-  gradeLevel          String   @default("TK A") // TK A, TK B, KB, PAUD
-  academicYear        String   @default("2026/2027")
-  capacity            Int      @default(20)
-  homeroomTeacherId   String?
-  homeroomTeacherName String?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  @@map("class_rooms")
+  @@map("catatan_spp")
 }

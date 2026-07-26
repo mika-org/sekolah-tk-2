@@ -8,27 +8,43 @@ export async function GET(req: Request) {
     const schoolId = searchParams.get("schoolId");
     const schoolCode = searchParams.get("schoolCode");
 
-    const where: any = {};
+    let query = `
+      SELECT 
+        c.id, 
+        c."id_sekolah" as "schoolId", 
+        c."nama_kelas" as name, 
+        c."tingkat" as "gradeLevel", 
+        c."tahun_ajaran" as "academicYear", 
+        c."kapasitas" as capacity, 
+        c."id_guru_wali" as "homeroomTeacherId", 
+        c."nama_guru_wali" as "homeroomTeacherName", 
+        c."dibuat_pada" as "createdAt", 
+        c."diperbarui_pada" as "updatedAt",
+        json_build_object(
+          'id', s.id,
+          'code', s.kode,
+          'name', s.nama
+        ) as school
+      FROM "kelas" c
+      LEFT JOIN "sekolah" s ON c."id_sekolah" = s.id
+    `;
+
+    const whereConditions: string[] = [];
     if (schoolId && schoolId !== "ALL") {
-      where.schoolId = schoolId;
+      whereConditions.push(`c."id_sekolah" = '${schoolId}'`);
     } else if (schoolCode && schoolCode !== "ALL") {
-      const school = await prisma.school.findUnique({ where: { code: schoolCode } });
-      if (school) where.schoolId = school.id;
+      whereConditions.push(`s."kode" = '${schoolCode}'`);
     }
 
-    const db = prisma as any;
-    const classes = await db.classRoom.findMany({
-      where,
-      orderBy: { name: "asc" },
-      include: { school: true },
-    });
+    if (whereConditions.length > 0) {
+      query += ` WHERE ` + whereConditions.join(" AND ");
+    }
+    query += ` ORDER BY c."nama_kelas" ASC`;
 
+    const classes: any[] = await prisma.$queryRawUnsafe(query);
     return NextResponse.json({ success: true, data: classes });
   } catch (error: any) {
-    return NextResponse.json(
-      { success: false, error: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }
 
@@ -43,17 +59,41 @@ export async function POST(req: Request) {
 
     let targetSchoolId = schoolId || admin.schoolId;
     if (!targetSchoolId) {
-      const defaultSchool = await prisma.school.findFirst({ orderBy: { orderIndex: "asc" } });
-      targetSchoolId = defaultSchool?.id;
+      const defaultSchool: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM "sekolah" ORDER BY "urutan" ASC LIMIT 1`);
+      targetSchoolId = defaultSchool[0]?.id;
     }
 
     if (!targetSchoolId) {
       return NextResponse.json({ success: false, error: "Sekolah tidak ditemukan" }, { status: 400 });
     }
 
-    const db = prisma as any;
-    const classRoom = await db.classRoom.create({
+    const res: any[] = await prisma.$queryRawUnsafe(
+      `INSERT INTO "kelas" ("id", "id_sekolah", "nama_kelas", "tingkat", "tahun_ajaran", "kapasitas", "id_guru_wali", "nama_guru_wali", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, NOW(), NOW()) RETURNING id`,
+      targetSchoolId,
+      name,
+      gradeLevel || "TK A",
+      academicYear || "2026/2027",
+      Number(capacity) || 20,
+      homeroomTeacherId || null,
+      homeroomTeacherName || null
+    );
+
+    const newClassId = res[0].id;
+
+    // If homeroom teacher assigned, update teacher's id_kelas and assignedClass
+    if (homeroomTeacherId) {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "guru" SET "id_kelas" = $1, "kelas_ditugaskan" = $2 WHERE "id" = $3`,
+        newClassId,
+        name,
+        homeroomTeacherId
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
       data: {
+        id: newClassId,
         schoolId: targetSchoolId,
         name,
         gradeLevel: gradeLevel || "TK A",
@@ -63,16 +103,6 @@ export async function POST(req: Request) {
         homeroomTeacherName: homeroomTeacherName || null,
       },
     });
-
-    // If homeroom teacher assigned, update teacher's assignedClass
-    if (homeroomTeacherId) {
-      await db.teacher.update({
-        where: { id: homeroomTeacherId },
-        data: { assignedClass: name },
-      });
-    }
-
-    return NextResponse.json({ success: true, data: classRoom });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }

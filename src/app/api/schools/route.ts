@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
 
+const isSuperAdmin = (role?: string) => {
+  if (!role) return false;
+  const upper = role.toUpperCase();
+  return upper === "SUPER_ADMIN" || upper === "ADMIN_PUSAT";
+};
+
 export async function GET() {
   try {
     const schools = await prisma.school.findMany({
@@ -22,9 +28,9 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const admin = await getAdminFromCookies();
-    if (!admin || admin.role !== "SUPER_ADMIN") {
+    if (!admin || !isSuperAdmin(admin.role)) {
       return NextResponse.json(
-        { success: false, error: "Hanya Super Admin Yayasan yang dapat menambah sekolah" },
+        { success: false, error: "Hanya Super Admin / Admin Pusat Yayasan yang dapat menambah sekolah" },
         { status: 403 }
       );
     }

@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     } else if (schoolCode && schoolCode !== "ALL") {
       const school = await prisma.school.findUnique({ where: { code: schoolCode } });
       if (school) where.schoolId = school.id;
-    } else if (admin.role !== "SUPER_ADMIN" && admin.schoolId) {
+    } else if (admin.role !== "SUPER_ADMIN" && admin.role !== "ADMIN_PUSAT" && admin.schoolId) {
       where.schoolId = admin.schoolId;
     }
 

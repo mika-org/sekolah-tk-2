@@ -2,13 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
 
+const isSuperAdmin = (role?: string) => {
+  if (!role) return false;
+  const upper = role.toUpperCase();
+  return upper === "SUPER_ADMIN" || upper === "ADMIN_PUSAT";
+};
+
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const admin = await getAdminFromCookies();
-    if (!admin || admin.role !== "SUPER_ADMIN") {
+    if (!admin || !isSuperAdmin(admin.role)) {
       return NextResponse.json(
         { success: false, error: "Akses ditolak" },
         { status: 403 }
@@ -45,7 +51,7 @@ export async function DELETE(
 ) {
   try {
     const admin = await getAdminFromCookies();
-    if (!admin || admin.role !== "SUPER_ADMIN") {
+    if (!admin || !isSuperAdmin(admin.role)) {
       return NextResponse.json(
         { success: false, error: "Akses ditolak" },
         { status: 403 }
