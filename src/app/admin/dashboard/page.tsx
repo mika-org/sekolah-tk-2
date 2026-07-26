@@ -214,6 +214,70 @@ export default function AdminDashboardPage() {
     address: "",
   });
 
+  // QR Code Camera scanner integration using html5-qrcode
+  useEffect(() => {
+    let html5QrCode: any = null;
+    let isActive = true;
+
+    if (qrModal.isOpen) {
+      const initScanner = () => {
+        const readerElement = document.getElementById("reader");
+        if (!readerElement) {
+          if (isActive) {
+            setTimeout(initScanner, 100);
+          }
+          return;
+        }
+
+        import("html5-qrcode").then((module) => {
+          if (!isActive) return;
+          try {
+            html5QrCode = new module.Html5Qrcode("reader");
+            html5QrCode.start(
+              { facingMode: "environment" },
+              {
+                fps: 10,
+                qrbox: { width: 220, height: 220 },
+              },
+              (decodedText: string) => {
+                setQrModal((prev) => ({ ...prev, inputCode: decodedText }));
+                handleScanQr(decodedText, qrModal.type);
+                if (html5QrCode && html5QrCode.isScanning) {
+                  html5QrCode.stop().catch((err: any) => console.error("Error stopping scanner", err));
+                }
+              },
+              (errorMessage: string) => {
+                // Quiet
+              }
+            ).catch((err: any) => {
+              console.error("Error starting Html5Qrcode camera", err);
+              setQrModal((prev) => ({ ...prev, error: "Kamera diblokir atau tidak tersedia. Masukkan kode secara manual di bawah." }));
+            });
+          } catch (e) {
+            console.error("Html5Qrcode constructor error", e);
+          }
+        }).catch((err: any) => {
+          console.error("Html5Qrcode dynamic import failed:", err);
+        });
+      };
+
+      initScanner();
+    }
+
+    return () => {
+      isActive = false;
+      if (html5QrCode) {
+        try {
+          if (html5QrCode.isScanning) {
+            html5QrCode.stop().catch((err: any) => console.error("Error stopping scanner on cleanup", err));
+          }
+        } catch (e) {
+          console.error("Error stopping scanner during cleanup", e);
+        }
+      }
+    };
+  }, [qrModal.isOpen, qrModal.type]);
+
   // Real-time clock display
   const [currentTime, setCurrentTime] = useState<string>("");
 
@@ -1220,7 +1284,7 @@ export default function AdminDashboardPage() {
             </div>
             <span className="text-xs font-bold text-slate-200">{admin?.name || admin?.username}</span>
             <span
-              className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+              className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider whitespace-nowrap inline-flex items-center ${
                 admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN"
                   ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                   : admin?.role === "ADMIN_SEKOLAH"
@@ -1570,7 +1634,7 @@ export default function AdminDashboardPage() {
           {activeTab === "overview" && (
             <div className="space-y-8 w-full">
               {/* HERO BANNER CARD WITH GRADIENT BACKGROUND */}
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-900/60 via-slate-900 to-slate-900 border border-emerald-500/30 p-6 sm:p-8 shadow-2xl">
+              <div className="relative overflow-hidden rounded-3xl bg-linear-to-r from-emerald-900/60 via-slate-900 to-slate-900 border border-emerald-500/30 p-6 sm:p-8 shadow-2xl">
                 <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
                 
                 <div className="relative z-10 space-y-3">
@@ -1594,6 +1658,104 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
               </div>
+
+              {/* SPECIAL PARENT STUDENT DETAILS CARD (Khusus Wali Murid / Ortu) */}
+              {(() => {
+                if (admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA") return null;
+
+                const parentStudent = studentsList.find(
+                  (s) =>
+                    (s.parentPhone && admin?.phone && s.parentPhone === admin.phone) ||
+                    (s.username && admin?.username && s.username === admin.username) ||
+                    (s.parentName && admin?.name && s.parentName.toLowerCase().includes(admin.name.toLowerCase()))
+                ) || studentsList[0];
+
+                if (!parentStudent) return null;
+
+                return (
+                  <div className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xl border border-emerald-500/30 shrink-0">
+                          👶
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                            Ringkasan Siswa Terdaftar
+                          </span>
+                          <h3 className="text-xl font-black text-white mt-1">{parentStudent.name}</h3>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setEditingStudent(parentStudent)}
+                        className="px-4 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                      >
+                        <Edit className="w-4 h-4 text-emerald-400" />
+                        <span>Edit Data Siswa & Ortu</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* SUB CARD 1: INFORMASI SISWA */}
+                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                        <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
+                          <GraduationCap className="w-4 h-4" />
+                          <span>Informasi Murid / Siswa</span>
+                        </h4>
+                        <div className="space-y-2 text-xs divide-y divide-slate-800/60">
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">Nama Lengkap:</span>
+                            <span className="font-bold text-white">{parentStudent.name}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">NISN / No Induk:</span>
+                            <span className="font-mono font-bold text-emerald-300">{parentStudent.nisn}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">Master Kelas:</span>
+                            <span className="font-bold text-emerald-400">{parentStudent.className}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">Jenis Kelamin:</span>
+                            <span className="font-bold text-slate-200">{parentStudent.gender === "L" ? "Laki-laki (L)" : "Perempuan (P)"}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">Tempat, Tgl Lahir:</span>
+                            <span className="font-medium text-slate-300">{parentStudent.birthPlaceDate || "-"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* SUB CARD 2: INFORMASI ORANG TUA / WALI */}
+                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                        <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>Informasi Orang Tua / Wali</span>
+                        </h4>
+                        <div className="space-y-2 text-xs divide-y divide-slate-800/60">
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">Nama Orang Tua:</span>
+                            <span className="font-bold text-white">{parentStudent.parentName || admin?.name || "-"}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">No. WhatsApp / HP:</span>
+                            <span className="font-mono font-bold text-emerald-300">{parentStudent.parentPhone || admin?.phone || "-"}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">Email Orang Tua:</span>
+                            <span className="font-medium text-slate-300">{parentStudent.parentEmail || admin?.email || "-"}</span>
+                          </div>
+                          <div className="flex justify-between py-1.5 text-slate-300">
+                            <span className="text-slate-400">Alamat Rumah:</span>
+                            <span className="font-medium text-slate-300">{parentStudent.address || "-"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* STAT CARDS FULL WIDTH GRID */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
@@ -2463,15 +2625,25 @@ export default function AdminDashboardPage() {
                           <td className="p-4 font-mono font-bold text-purple-300">
                             {userItem.username}
                           </td>
-                          <td className="p-4">
+                          <td className="p-4 whitespace-nowrap">
                             <span
-                              className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                userItem.role === "SUPER_ADMIN"
+                              className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider whitespace-nowrap ${
+                                userItem.role === "SUPER_ADMIN" || userItem.role === "ADMIN_PUSAT"
                                   ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
+                                  : userItem.role === "GURU"
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                  : userItem.role === "ORTU" || userItem.role === "ORANG_TUA"
+                                  ? "bg-blue-500/20 text-blue-300 border border-blue-500/30"
                                   : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                               }`}
                             >
-                              {userItem.role === "SUPER_ADMIN" ? "👑 SUPER ADMIN" : "🏫 SCHOOL ADMIN"}
+                              {userItem.role === "SUPER_ADMIN" || userItem.role === "ADMIN_PUSAT"
+                                ? "👑 Super Admin"
+                                : userItem.role === "GURU"
+                                ? "👨‍🏫 Guru / Pengajar"
+                                : userItem.role === "ORTU" || userItem.role === "ORANG_TUA"
+                                ? "👨‍👩‍👧 Wali Murid"
+                                : "🏫 Admin Cabang"}
                             </span>
                           </td>
                           <td className="p-4 font-bold text-slate-300">
@@ -3268,64 +3440,98 @@ export default function AdminDashboardPage() {
               </div>
 
               {editingStudent && (
-                <form onSubmit={handleSaveStudent} className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
-                  <h3 className="font-bold text-white text-base">{editingStudent.id ? "Edit Data Siswa" : "Tambah Siswa Baru"}</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Nama Siswa</label>
-                      <input type="text" required value={editingStudent.name} onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+                <form onSubmit={handleSaveStudent} className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 className="font-bold text-white text-base">{editingStudent.id ? "Edit Data Siswa & Orang Tua" : "Tambah Siswa & Orang Tua Baru"}</h3>
+                    <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                      ID: {editingStudent.id || "BARU"}
+                    </span>
+                  </div>
+
+                  {/* SECTION 1: DATA SISWA */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider">👶 Informasi Murid / Siswa</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Nama Siswa</label>
+                        <input type="text" required value={editingStudent.name || ""} onChange={(e) => setEditingStudent({ ...editingStudent, name: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="Nama lengkap siswa" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">NISN / No Induk</label>
+                        <input type="text" required value={editingStudent.nisn || ""} onChange={(e) => setEditingStudent({ ...editingStudent, nisn: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="1001" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Master Kelas</label>
+                        <SearchableSelect
+                          options={classesList.map((c) => ({
+                            value: c.id,
+                            label: c.name,
+                            sublabel: `Wali: ${c.homeroomTeacherName || "-"}`,
+                          }))}
+                          value={editingStudent.classId || classesList.find((c) => c.name === editingStudent.className)?.id || ""}
+                          onChange={(selectedClassId) => {
+                            const foundClass = classesList.find((c) => c.id === selectedClassId);
+                            if (foundClass) {
+                              setEditingStudent({
+                                ...editingStudent,
+                                classId: foundClass.id,
+                                className: foundClass.name,
+                              });
+                            }
+                          }}
+                          placeholder="Pilih Master Kelas..."
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">NISN / No Induk</label>
-                      <input type="text" required value={editingStudent.nisn} onChange={(e) => setEditingStudent({ ...editingStudent, nisn: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Master Kelas</label>
-                      <SearchableSelect
-                        options={classesList.map((c) => ({
-                          value: c.id,
-                          label: c.name,
-                          sublabel: `Wali: ${c.homeroomTeacherName || "-"}`,
-                        }))}
-                        value={editingStudent.classId || classesList.find((c) => c.name === editingStudent.className)?.id || ""}
-                        onChange={(selectedClassId) => {
-                          const foundClass = classesList.find((c) => c.id === selectedClassId);
-                          if (foundClass) {
-                            setEditingStudent({
-                              ...editingStudent,
-                              classId: foundClass.id,
-                              className: foundClass.name,
-                            });
-                          }
-                        }}
-                        placeholder="Pilih Master Kelas..."
-                      />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Jenis Kelamin</label>
+                        <SearchableSelect
+                          options={[
+                            { value: "L", label: "Laki-laki (L)" },
+                            { value: "P", label: "Perempuan (P)" },
+                          ]}
+                          value={editingStudent.gender || "L"}
+                          onChange={(val) => setEditingStudent({ ...editingStudent, gender: val })}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Tempat, Tanggal Lahir Siswa</label>
+                        <input type="text" value={editingStudent.birthPlaceDate || ""} onChange={(e) => setEditingStudent({ ...editingStudent, birthPlaceDate: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="Karawang, 15 Mei 2021" />
+                      </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Nama Orang Tua</label>
-                      <input type="text" value={editingStudent.parentName} onChange={(e) => setEditingStudent({ ...editingStudent, parentName: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
+
+                  {/* SECTION 2: DATA ORANG TUA / WALI */}
+                  <div className="space-y-3 pt-3 border-t border-slate-800">
+                    <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider">👨‍👩‍👧 Data Orang Tua / Wali</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Nama Orang Tua / Wali</label>
+                        <input type="text" value={editingStudent.parentName || ""} onChange={(e) => setEditingStudent({ ...editingStudent, parentName: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="Bapak Budi Santoso" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">No. WhatsApp / HP Ortu</label>
+                        <input type="text" value={editingStudent.parentPhone || ""} onChange={(e) => setEditingStudent({ ...editingStudent, parentPhone: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="081234567890" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Email Orang Tua</label>
+                        <input type="email" value={editingStudent.parentEmail || ""} onChange={(e) => setEditingStudent({ ...editingStudent, parentEmail: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="ortu.budi@gmail.com" />
+                      </div>
                     </div>
+
                     <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">No WhatsApp Ortu</label>
-                      <input type="text" value={editingStudent.parentPhone} onChange={(e) => setEditingStudent({ ...editingStudent, parentPhone: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-400 mb-1">Jenis Kelamin</label>
-                      <SearchableSelect
-                        options={[
-                          { value: "L", label: "Laki-laki (L)" },
-                          { value: "P", label: "Perempuan (P)" },
-                        ]}
-                        value={editingStudent.gender}
-                        onChange={(val) => setEditingStudent({ ...editingStudent, gender: val })}
-                      />
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Alamat Rumah Orang Tua / Wali</label>
+                      <input type="text" value={editingStudent.address || ""} onChange={(e) => setEditingStudent({ ...editingStudent, address: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="Jl. Raya DeKeraton No. 12, Karawang" />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setEditingStudent(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30">Simpan Siswa</button>
+
+                  <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                    <button type="button" onClick={() => setEditingStudent(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-500">
+                      {saving ? "Menyimpan..." : "Simpan Data Siswa & Ortu"}
+                    </button>
                   </div>
                 </form>
               )}
@@ -4351,12 +4557,15 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="space-y-4 text-center">
-              <div className="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3 flex flex-col items-center justify-center">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-pulse">
-                  <Camera className="w-8 h-8" />
+              <div id="reader" className="w-full bg-slate-950 rounded-2xl border border-slate-800/80 overflow-hidden flex flex-col items-center justify-center p-6 space-y-3 min-h-[240px] relative">
+                <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-pulse">
+                  <Camera className="w-7 h-7" />
                 </div>
                 <p className="text-xs text-slate-300">
-                  Arahkan Kode QR ke kamera atau masukkan Kode QR / NISN / ID di bawah ini:
+                  Mengaktifkan kamera scanner presensi...
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Arahkan Kode QR kartu siswa / guru ke depan webcam Anda.
                 </p>
               </div>
 

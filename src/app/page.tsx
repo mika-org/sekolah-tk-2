@@ -12,14 +12,63 @@ export default function Home() {
   const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("dekeraton");
 
   useEffect(() => {
+    let detectedCode = "";
+
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname.toLowerCase();
+      // Match subdomain e.g. cikarang.elevore.web.id -> cikarang
+      const hostParts = host.split(".");
+      if (hostParts.length >= 3 && hostParts[0] !== "www" && hostParts[0] !== "localhost" && hostParts[0] !== "127") {
+        detectedCode = hostParts[0];
+      }
+
+      if (!detectedCode) {
+        if (host.includes("cikarang")) detectedCode = "cikarang";
+        else if (host.includes("dekeraton")) detectedCode = "dekeraton";
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const qSchool = params.get("school") || params.get("code") || params.get("cabang");
+      if (qSchool) {
+        detectedCode = qSchool.toLowerCase();
+      }
+    }
+
     fetch("/api/schools")
       .then((r) => r.json())
       .then((data) => {
         if (data.success && data.data?.length) {
-          setSchools(data.data);
-          // Default to first school if current selected is invalid
-          if (!data.data.some((s: any) => s.code === selectedSchoolCode)) {
-            setSelectedSchoolCode(data.data[0].code);
+          const loadedSchools = data.data;
+          setSchools(loadedSchools);
+
+          if (detectedCode) {
+            const matched = loadedSchools.find(
+              (s: any) =>
+                s.code.toLowerCase() === detectedCode ||
+                s.code.toLowerCase().includes(detectedCode) ||
+                detectedCode.includes(s.code.toLowerCase()) ||
+                s.name.toLowerCase().includes(detectedCode)
+            );
+            if (matched) {
+              setSelectedSchoolCode(matched.code);
+              return;
+            }
+          }
+
+          if (typeof window !== "undefined") {
+            const host = window.location.hostname.toLowerCase();
+            const matchedHost = loadedSchools.find((s: any) =>
+              host.includes(s.code.toLowerCase()) ||
+              s.code.toLowerCase().includes(host.split(".")[0])
+            );
+            if (matchedHost) {
+              setSelectedSchoolCode(matchedHost.code);
+              return;
+            }
+          }
+
+          if (!loadedSchools.some((s: any) => s.code === selectedSchoolCode)) {
+            setSelectedSchoolCode(loadedSchools[0].code);
           }
         }
       })

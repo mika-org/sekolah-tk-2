@@ -73,7 +73,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 401 });
     }
 
-    const { schoolId, classId, name, nisn, className, gender, avatarUrl, birthPlaceDate, parentName, parentPhone, address, attendanceRate, averageGrade } = await req.json();
+    const { schoolId, classId, name, nisn, className, gender, avatarUrl, birthPlaceDate, parentName, parentPhone, parentEmail, address, attendanceRate, averageGrade } = await req.json();
 
     let targetSchoolId = schoolId || admin.schoolId;
     if (!targetSchoolId) {
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
     }
 
     const res: any[] = await prisma.$queryRawUnsafe(
-      `INSERT INTO "siswa" ("id", "id_sekolah", "id_kelas", "nama", "nisn", "nama_kelas", "jenis_kelamin", "kode_qr", "url_avatar", "tempat_tanggal_lahir", "nama_orang_tua", "telepon_orang_tua", "alamat", "persentase_kehadiran", "rata_rata_nilai", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW()) RETURNING id`,
+      `INSERT INTO "siswa" ("id", "id_sekolah", "id_kelas", "nama", "nisn", "nama_kelas", "jenis_kelamin", "kode_qr", "url_avatar", "tempat_tanggal_lahir", "nama_orang_tua", "telepon_orang_tua", "email_orang_tua", "alamat", "persentase_kehadiran", "rata_rata_nilai", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW()) RETURNING id`,
       targetSchoolId,
       targetClassId,
       name,
@@ -105,6 +105,7 @@ export async function POST(req: Request) {
       birthPlaceDate || "-",
       parentName || "-",
       parentPhone || "-",
+      parentEmail || null,
       address || "-",
       Number(attendanceRate) || 95.0,
       Number(averageGrade) || 88.5
@@ -119,6 +120,10 @@ export async function POST(req: Request) {
         name,
         nisn: studentNisn,
         className: finalClassName,
+        parentName,
+        parentPhone,
+        parentEmail,
+        address,
         gender: gender || "L",
         qrCode: `STUDENT:${studentNisn}`,
       },
