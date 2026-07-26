@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy:
+ deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -14,7 +14,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Record Start Time
+        run: echo "START_TIME=$(date +%s)" >> $GITHUB_ENV
+
       - name: Deploy to VPS
+        id: deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -32,3 +36,63 @@ jobs:
             npm run build
 
             pm2 restart sekolah-tk-2
+
+      - name: Calculate Duration
+        if: always()
+        run: |
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "DURATION=$DURATION" >> $GITHUB_ENV
+
+      - name: Telegram Success Notification
+        if: success()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ✅ *Deploy Successful*
+
+            📦 Repository: `${{ github.repository }}`
+            🌿 Branch: `${{ github.ref_name }}`
+            👤 Committer: `${{ github.actor }}`
+            📝 Commit:
+            `${{ github.event.head_commit.message }}`
+
+            🔗 Commit:
+            https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+
+            🖥 Server:
+            `${{ secrets.VPS_HOST }}`
+
+            ⏱ Duration: `${{ env.DURATION }} sec`
+
+            🚀 Status: *SUCCESS*
+
+      - name: Telegram Failed Notification
+        if: failure()
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ *Deploy Failed*
+
+            📦 Repository: `${{ github.repository }}`
+            🌿 Branch: `${{ github.ref_name }}`
+            👤 Committer: `${{ github.actor }}`
+            📝 Commit:
+            `${{ github.event.head_commit.message }}`
+
+            🔗 Commit:
+            https://github.com/${{ github.repository }}/commit/${{ github.sha }}
+
+            🖥 Server:
+            `${{ secrets.VPS_HOST }}`
+
+            ⏱ Duration: `${{ env.DURATION }} sec`
+
+            🚨 Status: *FAILED*
+
+            👉 Check GitHub Actions:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
