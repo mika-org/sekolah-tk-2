@@ -1136,6 +1136,15 @@ export default function AdminDashboardPage() {
       if (!res.ok || !data.success) throw new Error(data.error);
 
       showMessage(isEdit ? "Testimoni diperbarui" : "Testimoni ditambahkan", "success");
+      if (data.data) {
+        if (isEdit) {
+          setTestimonialsList((prev) =>
+            prev.map((item) => (item.id === data.data.id ? data.data : item))
+          );
+        } else {
+          setTestimonialsList((prev) => [data.data, ...prev]);
+        }
+      }
       setEditingTestimonial(null);
       loadDataForSelectedSchool();
     } catch (err: any) {
@@ -1651,6 +1660,78 @@ export default function AdminDashboardPage() {
 
         {/* FULL-WIDTH BODY DISPLAY */}
         <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full space-y-8">
+          {/* MOBILE HORIZONTAL NAVIGATION TABS */}
+          <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-3 mb-2 scrollbar-none">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
+                activeTab === "overview" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
+              }`}
+            >
+              Ringkasan
+            </button>
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+              <button
+                onClick={() => setActiveTab("ppdb")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
+                  activeTab === "ppdb" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
+                }`}
+              >
+                PPDB
+              </button>
+            )}
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+              <button
+                onClick={() => setActiveTab("programs")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
+                  activeTab === "programs" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
+                }`}
+              >
+                Program
+              </button>
+            )}
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+              <button
+                onClick={() => setActiveTab("teachers")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
+                  activeTab === "teachers" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
+                }`}
+              >
+                Guru
+              </button>
+            )}
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+              <button
+                onClick={() => setActiveTab("gallery")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
+                  activeTab === "gallery" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
+                }`}
+              >
+                Galeri
+              </button>
+            )}
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+              <button
+                onClick={() => setActiveTab("testimonials")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
+                  activeTab === "testimonials" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
+                }`}
+              >
+                Testimoni
+              </button>
+            )}
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+              <button
+                onClick={() => setActiveTab("profile")}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
+                  activeTab === "profile" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
+                }`}
+              >
+                Pengaturan
+              </button>
+            )}
+          </div>
+
           {/* TAB 1: OVERVIEW */}
           {activeTab === "overview" && (
             <div className="space-y-8 w-full">
@@ -1779,7 +1860,7 @@ export default function AdminDashboardPage() {
               })()}
 
               {/* STAT CARDS FULL WIDTH GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 w-full">
                 <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-400">Cabang Sekolah</span>
@@ -1825,6 +1906,22 @@ export default function AdminDashboardPage() {
                   <p className="text-3xl font-black text-white tracking-tight">{programsList.length}</p>
                   <p className="text-[11px] text-slate-400 mt-1">Program belajar aktif</p>
                 </div>
+
+                {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+                  <div 
+                    onClick={() => setActiveTab("testimonials")}
+                    className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-400">Testimoni Orang Tua</span>
+                      <div className="w-10 h-10 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-teal-500/20">
+                        <MessageSquare className="w-5 h-5" />
+                      </div>
+                    </div>
+                    <p className="text-3xl font-black text-white tracking-tight">{testimonialsList.length}</p>
+                    <p className="text-[11px] text-teal-400 mt-1 font-bold group-hover:underline">Klik untuk kelola &rarr;</p>
+                  </div>
+                )}
               </div>
 
               {/* RECENT REGISTRATIONS TABLE CARD */}
@@ -4322,7 +4419,7 @@ export default function AdminDashboardPage() {
           {/* TAB 6: TESTIMONIALS */}
           {activeTab === "testimonials" && (
             <div className="space-y-6 w-full">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
                 <div>
                   <h2 className="text-2xl font-black text-white tracking-tight">
                     Kelola Testimoni Orang Tua
@@ -4336,47 +4433,291 @@ export default function AdminDashboardPage() {
                     setEditingTestimonial({
                       parentName: "",
                       role: "Orang Tua Siswa",
-                      initials: "BE",
+                      initials: "",
                       content: "",
                       rating: 5,
                       bgColor: "emerald",
+                      orderIndex: testimonialsList.length + 1,
                       schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
                     })
                   }
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Tambah Testimoni</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
-                {testimonialsList.map((testi) => (
-                  <div
-                    key={testi.id}
-                    className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-3 flex flex-col justify-between shadow-xl"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-extrabold text-white text-sm">{testi.parentName}</h4>
-                        <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                          {testi.school?.name}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 italic leading-relaxed">&quot;{testi.content}&quot;</p>
+              {editingTestimonial && (
+                <form
+                  onSubmit={handleSaveTestimonial}
+                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
+                >
+                  <h3 className="font-bold text-white text-base">
+                    {editingTestimonial.id ? "Edit Testimoni" : "Tambah Testimoni Baru"}
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Pilih Cabang Sekolah
+                      </label>
+                      <select
+                        value={editingTestimonial.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id || "")}
+                        onChange={(e) =>
+                          setEditingTestimonial({ ...editingTestimonial, schoolId: e.target.value })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                      >
+                        {schoolsList.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
 
-                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
-                      <button
-                        onClick={() => handleDeleteTestimonial(testi.id)}
-                        className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Nama Orang Tua
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={editingTestimonial.parentName || ""}
+                        onChange={(e) => {
+                          const name = e.target.value;
+                          const autoInitials = name.trim().length >= 2
+                            ? name.trim().substring(0, 2).toUpperCase()
+                            : editingTestimonial.initials;
+                          setEditingTestimonial({
+                            ...editingTestimonial,
+                            parentName: name,
+                            initials: editingTestimonial.id ? editingTestimonial.initials : autoInitials,
+                          });
+                        }}
+                        placeholder="Contoh: Ibu Sarah / Bpk. Rudi"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Peran / Status
+                      </label>
+                      <input
+                        type="text"
+                        value={editingTestimonial.role || "Orang Tua Siswa"}
+                        onChange={(e) =>
+                          setEditingTestimonial({ ...editingTestimonial, role: e.target.value })
+                        }
+                        placeholder="Contoh: Orang Tua Ananda Kenzie (TK B)"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
                     </div>
                   </div>
-                ))}
-              </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Inisial (2-3 Karakter)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={3}
+                        value={editingTestimonial.initials || ""}
+                        onChange={(e) =>
+                          setEditingTestimonial({ ...editingTestimonial, initials: e.target.value.toUpperCase() })
+                        }
+                        placeholder="Contoh: SR"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Rating (1 - 5)
+                      </label>
+                      <select
+                        value={editingTestimonial.rating || 5}
+                        onChange={(e) =>
+                          setEditingTestimonial({ ...editingTestimonial, rating: Number(e.target.value) })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value={5}>⭐⭐⭐⭐⭐ (5 Bintang)</option>
+                        <option value={4}>⭐⭐⭐⭐ (4 Bintang)</option>
+                        <option value={3}>⭐⭐⭐ (3 Bintang)</option>
+                        <option value={2}>⭐⭐ (2 Bintang)</option>
+                        <option value={1}>⭐ (1 Bintang)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Warna Tema Card
+                      </label>
+                      <select
+                        value={editingTestimonial.bgColor || "emerald"}
+                        onChange={(e) =>
+                          setEditingTestimonial({ ...editingTestimonial, bgColor: e.target.value })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="emerald">Hijau (Emerald)</option>
+                        <option value="blue">Biru (Sky/Blue)</option>
+                        <option value="amber">Kuning (Amber)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Urutan Tampil
+                      </label>
+                      <input
+                        type="number"
+                        value={editingTestimonial.orderIndex ?? 0}
+                        onChange={(e) =>
+                          setEditingTestimonial({ ...editingTestimonial, orderIndex: Number(e.target.value) })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 mb-1">
+                      Isi Testimoni
+                    </label>
+                    <textarea
+                      required
+                      rows={3}
+                      value={editingTestimonial.content || ""}
+                      onChange={(e) =>
+                        setEditingTestimonial({ ...editingTestimonial, content: e.target.value })
+                      }
+                      placeholder="Tuliskan testimoni atau ulasan kesan pesan orang tua di sini..."
+                      className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl text-xs font-bold transition"
+                    >
+                      {saving ? "Menyimpan..." : "Simpan Testimoni"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTestimonial(null)}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl text-xs font-bold transition"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {testimonialsList.length === 0 ? (
+                <div className="text-center py-16 bg-slate-900/40 rounded-3xl border border-slate-800/80 p-8 space-y-4 flex flex-col items-center justify-center">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                    <MessageSquare className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-white text-base">Belum Ada Testimoni</h3>
+                    <p className="text-slate-400 text-xs max-w-sm">
+                      Belum ada ulasan testimoni orang tua murid untuk cabang sekolah ini. Silakan tambahkan testimoni baru.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setEditingTestimonial({
+                        parentName: "",
+                        role: "Orang Tua Siswa",
+                        initials: "",
+                        content: "",
+                        rating: 5,
+                        bgColor: "emerald",
+                        orderIndex: 1,
+                        schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                      })
+                    }
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition hover:scale-105"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Tambah Testimoni Pertama</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
+                  {testimonialsList.map((testi) => (
+                    <div
+                      key={testi.id}
+                      className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4 flex flex-col justify-between shadow-xl relative group hover:border-slate-700 transition"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                testi.bgColor === "blue"
+                                  ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                  : testi.bgColor === "amber"
+                                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                  : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                              }`}
+                            >
+                              {testi.initials || "OT"}
+                            </div>
+                            <div>
+                              <h4 className="font-extrabold text-white text-sm leading-tight">{testi.parentName}</h4>
+                              <p className="text-[11px] text-slate-400">{testi.role || "Orang Tua Siswa"}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-xs pt-1">
+                          <div className="flex items-center text-amber-400 text-xs">
+                            {"★".repeat(Math.max(1, Math.min(5, testi.rating || 5)))}
+                            <span className="text-[10px] text-slate-500 ml-1">({testi.rating || 5}/5)</span>
+                          </div>
+                          {testi.school?.name && (
+                            <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                              {testi.school?.name}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-slate-300 italic leading-relaxed bg-slate-950/50 p-3 rounded-2xl border border-slate-800/50">
+                          &quot;{testi.content}&quot;
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
+                        <span className="text-[10px] text-slate-500">Urutan: #{testi.orderIndex ?? 0}</span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingTestimonial(testi)}
+                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl transition"
+                            title="Edit Testimoni"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTestimonial(testi.id)}
+                            className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl transition"
+                            title="Hapus Testimoni"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

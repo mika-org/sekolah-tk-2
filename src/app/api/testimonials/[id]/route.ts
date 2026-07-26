@@ -16,20 +16,29 @@ export async function PUT(
     }
 
     const { id } = await params;
-    const { parentName, role, initials, content, rating, bgColor, orderIndex } =
+    const { schoolId, parentName, role, initials, content, rating, bgColor, orderIndex } =
       await req.json();
+
+    if (!parentName || !content) {
+      return NextResponse.json(
+        { success: false, error: "Nama orang tua dan isi testimoni wajib diisi" },
+        { status: 400 }
+      );
+    }
 
     const updated = await prisma.testimonial.update({
       where: { id },
       data: {
+        ...(schoolId && { schoolId }),
         parentName,
-        role,
-        initials,
+        role: role || "Orang Tua Siswa",
+        initials: initials || (parentName ? parentName.substring(0, 2).toUpperCase() : "OT"),
         content,
         rating: Number(rating) || 5,
-        bgColor,
+        bgColor: bgColor || "emerald",
         orderIndex: Number(orderIndex) || 0,
       },
+      include: { school: true },
     });
 
     return NextResponse.json({ success: true, data: updated });
