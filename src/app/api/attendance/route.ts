@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { recalculateStudentGrades } from "@/lib/student-grades";
 
 export async function GET(req: Request) {
   try {
@@ -98,7 +99,6 @@ export async function POST(req: Request) {
 
     // Automatically recalculate attendance percentage & final grade in DB
     try {
-      const { recalculateStudentGrades } = await import("../daily-grades/route");
       await recalculateStudentGrades(targetStudentId);
     } catch (recalcErr) {
       console.warn("Attendance grade recalculation warning:", recalcErr);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
-import { recalculateStudentGrades } from "../route";
+import { recalculateStudentGrades } from "@/lib/student-grades";
 
 export async function DELETE(
   req: Request,
