@@ -45,6 +45,7 @@ import {
   Camera,
   Check,
   X,
+  UserCheck,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -60,6 +61,7 @@ export default function AdminDashboardPage() {
     | "teachers"
     | "students"
     | "attendance"
+    | "teacher-attendance"
     | "spp"
     | "announcements"
     | "leave-requests"
@@ -1501,6 +1503,25 @@ export default function AdminDashboardPage() {
                 {attendanceList.length}
               </span>
             </button>
+
+            {admin?.role !== "ORTU" && (
+              <button
+                onClick={() => setActiveTab("teacher-attendance")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "teacher-attendance"
+                    ? "bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <UserCheck className="w-4 h-4 text-purple-400" />
+                  <span>Presensi Guru</span>
+                </div>
+                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {teacherAttendanceList.length}
+                </span>
+              </button>
+            )}
 
             {admin?.role !== "GURU" && (
               <button
@@ -3595,17 +3616,6 @@ export default function AdminDashboardPage() {
                     <span>Scan QR Murid</span>
                   </button>
 
-                  {/* Scan QR Guru Button (Khusus Super Admin & Admin Cabang) */}
-                  {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT" || admin?.role === "ADMIN_SEKOLAH") && (
-                    <button
-                      onClick={() => setQrModal({ isOpen: true, type: "TEACHER", inputCode: "", scanning: false, result: null, error: null })}
-                      className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
-                    >
-                      <QrCode className="w-4 h-4 text-purple-300" />
-                      <span>Scan QR Guru</span>
-                    </button>
-                  )}
-
                   {/* Absensi Kolektif Wali Kelas (Khusus Guru) */}
                   {admin?.role === "GURU" && admin?.assignedClass && (
                     <button
@@ -3723,6 +3733,59 @@ export default function AdminDashboardPage() {
                         {att.reason && <p className="text-[11px] text-amber-400 italic">Keterangan: {att.reason}</p>}
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${att.status === "hadir" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : att.status === "sakit" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
+                        {att.status}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: PRESENSI GURU */}
+          {activeTab === "teacher-attendance" && (
+            <div className="space-y-6 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Presensi Guru Harian</h2>
+                  <p className="text-xs text-slate-400">Catatan kehadiran dan riwayat presensi guru & pengajar sekolah.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                  {/* Scan QR Guru Button */}
+                  {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT" || admin?.role === "ADMIN_SEKOLAH") && (
+                    <button
+                      onClick={() => setQrModal({ isOpen: true, type: "TEACHER", inputCode: "", scanning: false, result: null, error: null })}
+                      className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
+                    >
+                      <QrCode className="w-4 h-4 text-purple-300" />
+                      <span>Scan QR Guru</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {teacherAttendanceList
+                  .filter((att) => {
+                    if (admin?.role === "GURU") {
+                      const u = (admin?.username || "").toLowerCase();
+                      const n = (admin?.name || "").toLowerCase();
+                      const tName = (att.teacherName || "").toLowerCase();
+                      return (
+                        (u && tName.includes(u)) ||
+                        (n && (tName.includes(n) || n.includes(tName))) ||
+                        att.teacherId === admin?.id
+                      );
+                    }
+                    return true;
+                  })
+                  .map((att) => (
+                    <div key={att.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-2 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-white text-sm">{att.teacherName}</h4>
+                        <p className="text-xs text-slate-400">{att.className || "Guru"} • Tanggal: {att.date} • Jam: {att.time}</p>
+                        {att.reason && <p className="text-[11px] text-amber-400 italic">Keterangan: {att.reason}</p>}
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${att.status === "hadir" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : att.status === "sakit" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : att.status === "izin" ? "bg-blue-500/20 text-blue-300 border border-blue-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
                         {att.status}
                       </span>
                     </div>
