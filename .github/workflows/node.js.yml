@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
- deploy:
+  deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -27,6 +27,8 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script_stop: true
           script: |
+            set -e
+
             cd /var/www/html/sekolah-tk-2
 
             git pull origin main
@@ -41,8 +43,22 @@ jobs:
         if: always()
         run: |
           END_TIME=$(date +%s)
-          DURATION=$((END_TIME - START_TIME))
+          TOTAL=$((END_TIME - START_TIME))
+
+          HOURS=$((TOTAL / 3600))
+          MINUTES=$(((TOTAL % 3600) / 60))
+          SECONDS=$((TOTAL % 60))
+
+          if [ $HOURS -gt 0 ]; then
+            DURATION="${HOURS}h ${MINUTES}m ${SECONDS}s"
+          elif [ $MINUTES -gt 0 ]; then
+            DURATION="${MINUTES}m ${SECONDS}s"
+          else
+            DURATION="${SECONDS}s"
+          fi
+
           echo "DURATION=$DURATION" >> $GITHUB_ENV
+          echo "FINISHED=$(TZ=Asia/Jakarta date '+%Y-%m-%d %H:%M:%S WIB')" >> $GITHUB_ENV
 
       - name: Telegram Success Notification
         if: success()
@@ -50,24 +66,29 @@ jobs:
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
           message: |
+            🚀 *Deploy Notification*
+
             ✅ *Deploy Successful*
 
-            📦 Repository: `${{ github.repository }}`
-            🌿 Branch: `${{ github.ref_name }}`
-            👤 Committer: `${{ github.actor }}`
-            📝 Commit:
+            📦 *Repository:* `${{ github.repository }}`
+            🌿 *Branch:* `${{ github.ref_name }}`
+            👤 *Committer:* `${{ github.actor }}`
+
+            📝 *Commit:*
             `${{ github.event.head_commit.message }}`
 
-            🔗 Commit:
+            🔗 *Commit:*
             https://github.com/${{ github.repository }}/commit/${{ github.sha }}
 
-            🖥 Server:
+            🖥 *Server:*
             `${{ secrets.VPS_HOST }}`
 
-            ⏱ Duration: `${{ env.DURATION }} sec`
+            🕒 *Finished:* `${{ env.FINISHED }}`
+            ⏱ *Duration:* `${{ env.DURATION }}`
 
-            🚀 Status: *SUCCESS*
+            🚀 *Status:* ✅ SUCCESS
 
       - name: Telegram Failed Notification
         if: failure()
@@ -75,24 +96,29 @@ jobs:
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: markdown
           message: |
+            🚀 *Deploy Notification*
+
             ❌ *Deploy Failed*
 
-            📦 Repository: `${{ github.repository }}`
-            🌿 Branch: `${{ github.ref_name }}`
-            👤 Committer: `${{ github.actor }}`
-            📝 Commit:
+            📦 *Repository:* `${{ github.repository }}`
+            🌿 *Branch:* `${{ github.ref_name }}`
+            👤 *Committer:* `${{ github.actor }}`
+
+            📝 *Commit:*
             `${{ github.event.head_commit.message }}`
 
-            🔗 Commit:
+            🔗 *Commit:*
             https://github.com/${{ github.repository }}/commit/${{ github.sha }}
 
-            🖥 Server:
+            🖥 *Server:*
             `${{ secrets.VPS_HOST }}`
 
-            ⏱ Duration: `${{ env.DURATION }} sec`
+            🕒 *Finished:* `${{ env.FINISHED }}`
+            ⏱ *Duration:* `${{ env.DURATION }}`
 
-            🚨 Status: *FAILED*
+            🚨 *Status:* ❌ FAILED
 
-            👉 Check GitHub Actions:
+            👉 *Check GitHub Actions:*
             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
