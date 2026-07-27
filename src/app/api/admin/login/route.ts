@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     if (checkCount.length > 0 && checkCount[0].cnt === 0) {
       const defaultHash = await bcrypt.hash("password123", 10);
       const schoolRes: any[] = await prisma.$queryRawUnsafe(
-        `INSERT INTO "sekolah" ("id", "kode", "nama", "jenjang", "alamat", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, 'dekeraton', 'TK Smart Kids DeKeraton', 'TK', 'DeKeraton', NOW(), NOW()) RETURNING id`
+        `INSERT INTO "sekolah" ("id", "kode", "nama", "jenjang", "alamat", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, 'sadjati', 'Smart Kids Sadjati', 'TK', 'Sadjati', NOW(), NOW()) RETURNING id`
       );
       const schoolId = schoolRes[0]?.id;
       await prisma.$executeRawUnsafe(
@@ -141,8 +141,8 @@ export async function POST(req: Request) {
           role: admin.role,
           schoolId: admin.schoolId,
           classId: admin.classId || null,
-          schoolName: admin.schoolName || "TK Smart Kids DeKeraton",
-          schoolCode: admin.schoolCode || "dekeraton",
+          schoolName: admin.schoolName || "Smart Kids Sadjati",
+          schoolCode: admin.schoolCode || "sadjati",
           assignedClass: admin.assignedClass || null,
           phone: admin.phone || null,
           email: admin.email || null,
@@ -214,14 +214,14 @@ export async function POST(req: Request) {
             role: "ORANG_TUA",
             schoolId: student.schoolId,
             classId: student.classId || null,
-            schoolName: student.schoolName || "TK Smart Kids DeKeraton",
-            schoolCode: student.schoolCode || "dekeraton",
+            schoolName: student.schoolName || "Smart Kids Sadjati",
+            schoolCode: student.schoolCode || "sadjati",
             assignedClass: student.className,
             parentName: student.parentName,
             parentPhone: student.parentPhone,
             nip: student.nisn || "-",
             avatarUrl: student.avatarUrl || "https://i.pravatar.cc/150?img=12",
-            address: student.address || "DeKeraton, Karawang",
+            address: student.address || "Sadjati, Karawang",
             email: student.email || null,
             phone: student.parentPhone || null,
           },
@@ -275,8 +275,8 @@ export async function POST(req: Request) {
             role: "GURU",
             schoolId: teacher.schoolId,
             classId: teacher.classId || null,
-            schoolName: teacher.schoolName || "TK Smart Kids DeKeraton",
-            schoolCode: teacher.schoolCode || "dekeraton",
+            schoolName: teacher.schoolName || "Smart Kids Sadjati",
+            schoolCode: teacher.schoolCode || "sadjati",
             assignedClass: teacher.assignedClass,
             nip: teacher.id,
             avatarUrl: teacher.avatarUrl || "https://i.pravatar.cc/150?img=5",

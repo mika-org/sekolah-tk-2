@@ -9,9 +9,9 @@ const plusJakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "TK Smart Kids DeKeraton - Penerimaan Peserta Didik Baru (PPDB)",
+  title: "Smart Kids - Penerimaan Peserta Didik Baru (PPDB)",
   description:
-    "Bimbingan belajar dan pendidikan anak usia 3-8 tahun dengan metode bermain sambil belajar yang menyenangkan di Smart Kids DeKeraton.",
+    "Bimbingan belajar dan pendidikan anak usia 3-8 tahun dengan metode bermain sambil belajar yang menyenangkan di Smart Kids.",
 };
 
 export default function RootLayout({

@@ -9,7 +9,7 @@ interface FooterProps {
   selectedSchoolCode?: string;
 }
 
-export default function Footer({ selectedSchoolCode = "dekeraton" }: FooterProps) {
+export default function Footer({ selectedSchoolCode = "sadjati" }: FooterProps) {
   const [siteProfile, setSiteProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function Footer({ selectedSchoolCode = "dekeraton" }: FooterProps
     `${schoolName} adalah lembaga pendidikan anak di bawah YAPCHI Foundation yang menghadirkan pembelajaran menyenangkan.`;
 
   return (
-    <footer id="footer" className="bg-[#3b71ca] text-white pt-10 pb-8 mt-auto">
+    <footer id="footer" className="bg-linear-to-r from-blue-900 via-blue-800 to-indigo-900 text-white pt-10 pb-8 mt-auto border-t border-blue-700">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center pb-8 border-b border-blue-400/30">
           {/* Brand Info (Left) */}

@@ -177,7 +177,31 @@ export async function createStudentAccountAndSendEmail(ppdb: {
       },
     });
 
-    // 5. Send credential email to parent
+    // 5. Auto-create initial SPP record bound to student program SPP amount
+    const ppdbAny = ppdb as any;
+    const sppAmountToSet = ppdbAny.sppAmount || 200000;
+    const existingSpp = await prisma.sppRecord.findFirst({
+      where: { nisn: ppdb.registrationNo },
+    });
+    if (!existingSpp) {
+      await prisma.sppRecord.create({
+        data: {
+          studentId: student.id,
+          studentName: ppdb.namaAnak,
+          nisn: ppdb.registrationNo,
+          className: ppdb.program || "S3",
+          month: "Juli 2026",
+          amount: Number(sppAmountToSet),
+          status: ppdbAny.buktiBayarUrl ? "lunas" : "belum_lunas",
+          paymentDate: ppdbAny.buktiBayarUrl ? new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : null,
+          proofUrl: ppdbAny.buktiBayarUrl || null,
+          paymentMethod: ppdbAny.paymentMethod ? ppdbAny.paymentMethod.toUpperCase() : "TRANSFER",
+          note: `Pembayaran SPP Pendaftaran Program ${ppdb.program || "S3"}`,
+        },
+      });
+    }
+
+    // 6. Send credential email to parent
     if (ppdb.email) {
       await sendCredentialEmail(ppdb.email, ppdb.namaAnak, username, passwordStr);
     }

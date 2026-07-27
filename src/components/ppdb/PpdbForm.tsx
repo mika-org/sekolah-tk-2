@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
@@ -31,7 +31,7 @@ interface PpdbFormProps {
 
 export default function PpdbForm({
   onBackToHome,
-  selectedSchoolCode = "dekeraton",
+  selectedSchoolCode = "sadjati",
   schools = [],
 }: PpdbFormProps) {
   const [step, setStep] = useState<number>(1);
@@ -45,12 +45,28 @@ export default function PpdbForm({
     tanggalLahir: "",
     usiaAnak: "",
     program: "",
+    sppAmount: 200000,
     namaOrtu: "",
     noWhatsapp: "",
     email: "",
     alamatRumah: "",
     agreedTerms: false,
   });
+
+  const [programsList, setProgramsList] = useState<any[]>([]);
+
+  // Fetch school programs
+  useEffect(() => {
+    if (!selectedSchoolCode) return;
+    fetch(`/api/programs?schoolCode=${selectedSchoolCode}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.data?.length) {
+          setProgramsList(data.data);
+        }
+      })
+      .catch((err) => console.error("Error fetching programs for PPDB:", err));
+  }, [selectedSchoolCode]);
 
   // Selected file objects stored in local state (deferred batch upload)
   const [selectedFileObjects, setSelectedFileObjects] = useState<{
@@ -159,6 +175,7 @@ export default function PpdbForm({
           tanggalLahir: formData.tanggalLahir,
           usiaAnak: formData.usiaAnak,
           program: formData.program,
+          sppAmount: formData.sppAmount,
           namaOrtu: formData.namaOrtu,
           noWhatsapp: formData.noWhatsapp,
           email: formData.email,
@@ -410,16 +427,49 @@ export default function PpdbForm({
                         Program Belajar
                       </label>
                       <SearchableSelect
-                        options={[
-                          { value: "Playground", label: "Playground", sublabel: "Usia 3-4 Tahun" },
-                          { value: "Kindergarten", label: "Kindergarten", sublabel: "Usia 4-5 Tahun" },
-                          { value: "Pre Kindergarten", label: "Pre Kindergarten", sublabel: "Usia 5-6 Tahun" },
-                        ]}
+                        options={
+                          programsList.length > 0
+                            ? programsList.map((p: any) => ({
+                                value: p.title,
+                                label: `${p.title} (${p.ageRange})`,
+                                sublabel: `SPP Rp ${Number(p.sppAmount || 200000).toLocaleString("id-ID")}/bulan`,
+                                sppAmount: Number(p.sppAmount || 200000),
+                              }))
+                            : [
+                                { value: "S3", label: "S3 (1 Minggu 3X Pertemuan)", sublabel: "SPP Rp 200.000/bulan", sppAmount: 200000 },
+                                { value: "S4", label: "S4 (1 Minggu 4X Pertemuan)", sublabel: "SPP Rp 250.000/bulan", sppAmount: 250000 },
+                                { value: "S5", label: "S5 (1 Minggu 5X Pertemuan)", sublabel: "SPP Rp 300.000/bulan", sppAmount: 300000 },
+                                { value: "BEST PROGRAM", label: "BEST PROGRAM (1 Minggu 3X - 1 Guru 1 Siswa)", sublabel: "SPP Rp 300.000/bulan", sppAmount: 300000 },
+                              ]
+                        }
                         value={formData.program}
-                        onChange={(val) => setFormData((prev) => ({ ...prev, program: val }))}
+                        onChange={(val) => {
+                          const availableOptions = programsList.length > 0
+                            ? programsList.map((p: any) => ({ value: p.title, sppAmount: Number(p.sppAmount || 200000) }))
+                            : [
+                                { value: "S3", sppAmount: 200000 },
+                                { value: "S4", sppAmount: 250000 },
+                                { value: "S5", sppAmount: 300000 },
+                                { value: "BEST PROGRAM", sppAmount: 300000 },
+                              ];
+                          const matched = availableOptions.find((opt) => opt.value === val);
+                          setFormData((prev) => ({
+                            ...prev,
+                            program: val,
+                            sppAmount: matched ? matched.sppAmount : 200000,
+                          }));
+                        }}
                         variant="light"
                         placeholder="Pilih program belajar..."
                       />
+                      {formData.program && (
+                        <div className="mt-2 p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+                          <span className="font-semibold">Tarif SPP Bulanan:</span>
+                          <span className="font-extrabold text-emerald-700 text-sm">
+                            Rp {formData.sppAmount.toLocaleString("id-ID")} / bulan
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -720,11 +770,11 @@ export default function PpdbForm({
 
                   <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Program
+                      Program & SPP
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
                     <span className="col-span-6 sm:col-span-7 font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded inline-block">
-                      {formData.program}
+                      {formData.program || "S3"} (SPP Rp {formData.sppAmount.toLocaleString("id-ID")}/bulan)
                     </span>
                   </div>
 
@@ -845,25 +895,18 @@ export default function PpdbForm({
                 <div className="space-y-2 text-xs text-slate-700 border-b border-slate-100 pb-4">
                   <div className="flex justify-between items-center py-1">
                     <span className="font-semibold text-slate-700">
-                      Biaya Pendaftaran
+                      Biaya SPP Bulan Pertama ({formData.program || "S3"})
                     </span>
                     <span className="font-semibold text-slate-400">:</span>
                     <span className="font-bold text-slate-900">
-                      Rp 250.000,00
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-1">
-                    <span className="font-semibold text-slate-700">Seragam</span>
-                    <span className="font-semibold text-slate-400">:</span>
-                    <span className="font-bold text-slate-900">
-                      Rp 150.000,00
+                      Rp {formData.sppAmount.toLocaleString("id-ID")},00
                     </span>
                   </div>
                   <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-sm">
-                    <span className="font-extrabold text-slate-900">Total</span>
+                    <span className="font-extrabold text-slate-900">Total Pembayaran</span>
                     <span className="font-semibold text-slate-400">:</span>
                     <span className="font-extrabold text-emerald-700 text-base">
-                      Rp 400.000,00
+                      Rp {formData.sppAmount.toLocaleString("id-ID")},00
                     </span>
                   </div>
                 </div>
@@ -1035,7 +1078,7 @@ export default function PpdbForm({
                 Pendaftaran Berhasil! 🎉
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Terima kasih telah mendaftarkan <strong className="text-emerald-800">{formData.namaAnak}</strong> di TK Smart Kids DeKeraton. Tim kami akan segera melakukan verifikasi dan menghubungi Anda via WhatsApp.
+                Terima kasih telah mendaftarkan <strong className="text-emerald-800">{formData.namaAnak}</strong> di Smart Kids. Tim kami akan segera melakukan verifikasi dan menghubungi Anda via WhatsApp.
               </p>
             </div>
 

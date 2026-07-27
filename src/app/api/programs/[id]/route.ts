@@ -16,7 +16,7 @@ export async function PUT(
     }
 
     const { id } = await params;
-    const { title, ageRange, iconUrl, features, orderIndex } = await req.json();
+    const { title, ageRange, iconUrl, features, sppAmount, orderIndex } = await req.json();
 
     const updated = await prisma.program.update({
       where: { id },
@@ -25,6 +25,7 @@ export async function PUT(
         ageRange,
         iconUrl,
         features: typeof features === "string" ? features : JSON.stringify(features || []),
+        ...(sppAmount !== undefined ? { sppAmount: Number(sppAmount) } : {}),
         orderIndex: Number(orderIndex) || 0,
       },
     });

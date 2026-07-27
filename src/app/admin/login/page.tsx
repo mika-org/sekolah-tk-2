@@ -143,7 +143,7 @@ export default function AdminLoginPage() {
         </form>
 
         <div className="mt-6 pt-4 border-t border-slate-700/40 text-center text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} TK Smart Kids DeKeraton CMS</p>
+          <p>© {new Date().getFullYear()} Smart Kids Sadjati CMS</p>
         </div>
       </div>
     </div>

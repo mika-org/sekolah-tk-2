@@ -9,7 +9,7 @@ import { Award, Compass, Heart, Shield, BookOpen, ArrowRight, Star } from "lucid
 
 export default function TentangKamiPage() {
   const [schools, setSchools] = useState<any[]>([]);
-  const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("dekeraton");
+  const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("sadjati");
 
   useEffect(() => {
     let detectedCode = "";
@@ -22,8 +22,8 @@ export default function TentangKamiPage() {
       }
 
       if (!detectedCode) {
-        if (host.includes("cikarang")) detectedCode = "cikarang";
-        else if (host.includes("dekeraton")) detectedCode = "dekeraton";
+        if (host.includes("bcl")) detectedCode = "bcl";
+        else if (host.includes("sadjati")) detectedCode = "sadjati";
       }
 
       const params = new URLSearchParams(window.location.search);

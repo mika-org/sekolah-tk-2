@@ -91,6 +91,7 @@ export async function POST(req: Request) {
         tanggalLahir: body.tanggalLahir,
         usiaAnak: body.usiaAnak,
         program: body.program,
+        sppAmount: body.sppAmount ? Number(body.sppAmount) : 200000,
         namaOrtu: body.namaOrtu,
         noWhatsapp: body.noWhatsapp,
         email: body.email,

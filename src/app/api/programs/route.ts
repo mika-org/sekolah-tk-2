@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { schoolId, title, ageRange, iconUrl, features, orderIndex } = await req.json();
+    const { schoolId, title, ageRange, iconUrl, features, sppAmount, orderIndex } = await req.json();
 
     let targetSchoolId = schoolId || admin.schoolId;
     if (!targetSchoolId) {
@@ -62,6 +62,7 @@ export async function POST(req: Request) {
         ageRange,
         iconUrl: iconUrl || "/images/program_playground.png",
         features: typeof features === "string" ? features : JSON.stringify(features || []),
+        sppAmount: sppAmount !== undefined ? Number(sppAmount) : 200000,
         orderIndex: Number(orderIndex) || 0,
       },
     });

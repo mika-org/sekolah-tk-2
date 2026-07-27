@@ -18,6 +18,7 @@ export async function PUT(
     const updated = await prisma.schedule.update({
       where: { id },
       data: {
+        date: data.date || new Date().toISOString().split("T")[0],
         timeRange: data.timeRange,
         className: data.className,
         room: data.room,

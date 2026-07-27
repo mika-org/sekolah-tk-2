@@ -2202,7 +2202,7 @@ export default function AdminDashboardPage() {
                             {item.registrationNo}
                           </td>
                           <td className="p-4 font-bold text-slate-300">
-                            {item.school?.name || "DeKeraton"}
+                            {item.school?.name || "Sadjati"}
                           </td>
                           <td className="p-4 font-bold text-white">{item.namaAnak}</td>
                           <td className="p-4">{item.program}</td>
@@ -2651,7 +2651,7 @@ export default function AdminDashboardPage() {
                         onChange={(e) =>
                           setEditingSchool({ ...editingSchool, name: e.target.value })
                         }
-                        placeholder="TK Smart Kids Cikarang"
+                        placeholder="Smart Kids BCL"
                         className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
@@ -2667,7 +2667,7 @@ export default function AdminDashboardPage() {
                         onChange={(e) =>
                           setEditingSchool({ ...editingSchool, code: e.target.value })
                         }
-                        placeholder="cikarang"
+                        placeholder="bcl"
                         className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-emerald-400 focus:border-emerald-500 focus:outline-none"
                       />
                     </div>
@@ -2878,7 +2878,7 @@ export default function AdminDashboardPage() {
                         onChange={(e) =>
                           setEditingAdminUser({ ...editingAdminUser, username: e.target.value })
                         }
-                        placeholder="admin_dekeraton"
+                        placeholder="admin_sadjati"
                         className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-purple-300 focus:border-purple-500 focus:outline-none"
                       />
                     </div>
@@ -3120,7 +3120,7 @@ export default function AdminDashboardPage() {
                               {item.registrationNo}
                             </td>
                             <td className="p-4 font-bold text-slate-300">
-                              {item.school?.name || "DeKeraton"}
+                              {item.school?.name || "Sadjati"}
                             </td>
                             <td className="p-4 font-bold text-white">{item.namaAnak}</td>
                             <td className="p-4">{item.program}</td>
@@ -3879,7 +3879,7 @@ export default function AdminDashboardPage() {
 
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Alamat Rumah Orang Tua / Wali</label>
-                      <input type="text" value={editingStudent.address || ""} onChange={(e) => setEditingStudent({ ...editingStudent, address: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="Jl. Raya DeKeraton No. 12, Karawang" />
+                      <input type="text" value={editingStudent.address || ""} onChange={(e) => setEditingStudent({ ...editingStudent, address: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="Sadjati, Karawang" />
                     </div>
                   </div>
 
@@ -4470,9 +4470,9 @@ export default function AdminDashboardPage() {
                           studentId: child?.id || "",
                           studentName: child?.name || admin?.name || "Siswa Smart Kids",
                           nisn: child?.nisn || "123456789",
-                          className: child?.className || "TK A",
+                          className: child?.className || "S3",
                           month: "Juli 2026",
-                          amount: 350000,
+                          amount: 200000,
                           paymentMethod: "TRANSFER_BCA",
                           proofUrl: "",
                           note: "",
@@ -4493,9 +4493,9 @@ export default function AdminDashboardPage() {
                         setEditingSpp({
                           studentName: studentsList[0]?.name || "Siswa Smart Kids",
                           nisn: studentsList[0]?.nisn || "123456789",
-                          className: studentsList[0]?.className || "TK A",
+                          className: studentsList[0]?.className || "S3",
                           month: "Juli 2026",
-                          amount: 350000,
+                          amount: 200000,
                           status: "lunas",
                           paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
                         })
@@ -5440,6 +5440,7 @@ export default function AdminDashboardPage() {
                   <button
                     onClick={() =>
                       setEditingSchedule({
+                        date: new Date().toISOString().split("T")[0],
                         timeRange: "08.00 - 09.30",
                         className: "Kelas TK A",
                         room: "Ruang Melati",
@@ -5462,7 +5463,7 @@ export default function AdminDashboardPage() {
                   <h3 className="font-bold text-white text-base">
                     {editingSchedule.id ? "Edit Jadwal Pelajaran" : "Tambah Jadwal Pelajaran Baru"}
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Sekolah</label>
                       <SearchableSelect
@@ -5506,6 +5507,10 @@ export default function AdminDashboardPage() {
                       />
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Tanggal KBM</label>
+                      <input type="date" required value={editingSchedule.date || new Date().toISOString().split("T")[0]} onChange={(e) => setEditingSchedule({ ...editingSchedule, date: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold" />
+                    </div>
+                    <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Waktu (Jam)</label>
                       <input type="text" required value={editingSchedule.timeRange} onChange={(e) => setEditingSchedule({ ...editingSchedule, timeRange: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold" placeholder="08.00 - 09.30" />
                     </div>
@@ -5533,18 +5538,24 @@ export default function AdminDashboardPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                 {schedulesList.map((sch) => (
-                  <div key={sch.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex flex-col justify-between">
+                  <div key={sch.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3 flex flex-col justify-between hover:border-cyan-500/40 transition">
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">{sch.timeRange}</span>
-                        <span className="text-xs text-slate-400">{sch.className} • {sch.room}</span>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-400 bg-cyan-500/10 px-3 py-1 rounded-full border border-cyan-500/20">
+                          <Calendar className="w-3.5 h-3.5 text-cyan-300" />
+                          <span>{sch.date || "2026-07-27"}</span>
+                          <span>•</span>
+                          <span>{sch.timeRange}</span>
+                        </div>
+                        <span className="text-xs text-slate-400 font-medium">{sch.className} • {sch.room}</span>
                       </div>
-                      <h4 className="font-bold text-white text-base">{sch.subject}</h4>
-                      <p className="text-xs text-slate-400">{sch.activities}</p>
+                      <h4 className="font-bold text-white text-base mt-1">{sch.subject}</h4>
+                      <p className="text-xs text-slate-400 leading-relaxed">{sch.activities}</p>
                     </div>
                     {admin?.role !== "ORTU" && (
                       <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-                        <button onClick={() => handleDeleteSchedule(sch.id)} className="p-2 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => setEditingSchedule(sch)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Edit Jadwal KBM"><Edit className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => handleDeleteSchedule(sch.id)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer" title="Hapus Jadwal"><Trash2 className="w-3.5 h-3.5" /></button>
                       </div>
                     )}
                   </div>

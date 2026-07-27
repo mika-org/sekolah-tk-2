@@ -20,7 +20,7 @@ interface NavbarProps {
 export default function Navbar({
   currentTab = "home",
   setCurrentTab,
-  selectedSchoolCode = "dekeraton",
+  selectedSchoolCode = "sadjati",
   onSelectSchool,
   schools = [],
 }: NavbarProps) {
@@ -101,7 +101,7 @@ export default function Navbar({
   const activeSchool = schools.find((s) => s.code === selectedSchoolCode) || schools[0];
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-emerald-100 shadow-sm transition-all">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm transition-all">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-24 flex items-center justify-between">
         {/* Left Logo (Icon Image Only) */}
         <div className="flex items-center gap-4">
@@ -138,15 +138,15 @@ export default function Navbar({
               <button
                 key={item.label}
                 onClick={() => handleNavClick(item.id, item.href)}
-                className={`relative px-3.5 py-2 text-sm transition-all duration-200 ${
+                className={`relative px-3.5 py-2 text-sm transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? "text-[#057a44] font-extrabold"
-                    : "text-slate-600 hover:text-emerald-700 font-semibold"
+                    ? "text-[#1d4ed8] font-extrabold"
+                    : "text-slate-600 hover:text-blue-700 font-semibold"
                 }`}
               >
                 <span>{item.label}</span>
                 {isActive && (
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#057a44] rounded-full transition-all" />
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 bg-[#1d4ed8] rounded-full transition-all" />
                 )}
               </button>
             );
@@ -175,10 +175,10 @@ export default function Navbar({
           {/* LOGIN ADMIN BUTTON */}
           <Link
             href="/admin/login"
-            className="flex items-center gap-1.5 text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 text-xs sm:text-sm font-bold px-3.5 py-2 rounded-full border border-slate-200 transition-all"
+            className="flex items-center gap-1.5 text-slate-700 hover:text-blue-700 hover:bg-blue-50 text-xs sm:text-sm font-bold px-3.5 py-2 rounded-full border border-blue-200 transition-all"
             title="Masuk Ke Dashboard Admin CMS"
           >
-            <Lock className="w-3.5 h-3.5 text-emerald-600" />
+            <Lock className="w-3.5 h-3.5 text-blue-600" />
             <span className="hidden sm:inline">Login Admin</span>
           </Link>
 
@@ -193,7 +193,7 @@ export default function Navbar({
                     router.push("/?tab=ppdb");
                   }
                 }}
-                className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs sm:text-sm font-bold px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                className="flex items-center gap-2 bg-[#1d4ed8] hover:bg-blue-800 text-white text-xs sm:text-sm font-bold px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full shadow-md shadow-blue-700/20 hover:shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>Daftar PPDB</span>
@@ -207,9 +207,9 @@ export default function Navbar({
                     router.push("/");
                   }
                 }}
-                className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm font-bold px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
+                className="flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 text-xs sm:text-sm font-extrabold px-4 py-2.5 sm:px-6 sm:py-2.5 rounded-full shadow-md shadow-amber-400/20 hover:shadow-lg transition-all transform hover:-translate-y-0.5 cursor-pointer"
               >
-                <Home className="w-4 h-4" />
+                <Home className="w-4 h-4 text-slate-950" />
                 <span>Ke Beranda</span>
               </button>
             )}

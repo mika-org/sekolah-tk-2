@@ -9,22 +9,22 @@ import PpdbForm from "@/components/ppdb/PpdbForm";
 export default function Home() {
   const [currentTab, setCurrentTab] = useState<"home" | "ppdb">("home");
   const [schools, setSchools] = useState<any[]>([]);
-  const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("dekeraton");
+  const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("sadjati");
 
   useEffect(() => {
     let detectedCode = "";
 
     if (typeof window !== "undefined") {
       const host = window.location.hostname.toLowerCase();
-      // Match subdomain e.g. cikarang.elevore.web.id -> cikarang
+      // Match subdomain e.g. bcl.elevore.web.id -> bcl
       const hostParts = host.split(".");
       if (hostParts.length >= 3 && hostParts[0] !== "www" && hostParts[0] !== "localhost" && hostParts[0] !== "127") {
         detectedCode = hostParts[0];
       }
 
       if (!detectedCode) {
-        if (host.includes("cikarang")) detectedCode = "cikarang";
-        else if (host.includes("dekeraton")) detectedCode = "dekeraton";
+        if (host.includes("bcl")) detectedCode = "bcl";
+        else if (host.includes("sadjati")) detectedCode = "sadjati";
       }
 
       const params = new URLSearchParams(window.location.search);
