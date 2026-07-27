@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { syncTeacherMonthlyProgress } from "@/lib/teacher-progress";
 
 export async function POST(req: Request) {
   try {
@@ -84,6 +85,13 @@ export async function POST(req: Request) {
           date: todayStr,
         },
       });
+    }
+
+    // Automatically sync & update teacher's monthly progress history
+    try {
+      await syncTeacherMonthlyProgress(teacher.id);
+    } catch (syncErr) {
+      console.warn("Scan QR sync teacher progress warning:", syncErr);
     }
 
     return NextResponse.json({

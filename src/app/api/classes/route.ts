@@ -20,6 +20,7 @@ export async function GET(req: Request) {
         c."nama_guru_wali" as "homeroomTeacherName", 
         c."dibuat_pada" as "createdAt", 
         c."diperbarui_pada" as "updatedAt",
+        (SELECT COUNT(*)::int FROM "siswa" st WHERE st."id_kelas" = c.id OR (c.id IS NULL AND st."nama_kelas" = c."nama_kelas")) as "studentCount",
         json_build_object(
           'id', s.id,
           'code', s.kode,
@@ -41,7 +42,17 @@ export async function GET(req: Request) {
     }
     query += ` ORDER BY c."nama_kelas" ASC`;
 
-    const classes: any[] = await prisma.$queryRawUnsafe(query);
+    const classesRaw: any[] = await prisma.$queryRawUnsafe(query);
+    const classes = classesRaw.map((c) => {
+      const studentCount = Number(c.studentCount || 0);
+      const capacity = Number(c.capacity || 20);
+      return {
+        ...c,
+        studentCount,
+        capacity,
+        isFull: studentCount >= capacity,
+      };
+    });
     return NextResponse.json({ success: true, data: classes });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

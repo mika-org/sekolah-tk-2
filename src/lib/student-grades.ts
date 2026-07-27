@@ -11,13 +11,15 @@ export async function recalculateStudentGrades(studentId: string) {
 
     // 1. Calculate Attendance Rate (%)
     const totalAttendances = student.attendances.length;
-    let attendanceRate = student.attendanceRate ?? 95.0;
+    let attendanceRate = 0.0;
 
     if (totalAttendances > 0) {
       const hadirCount = student.attendances.filter(
         (a) => (a.status || "").toLowerCase() === "hadir"
       ).length;
       attendanceRate = Math.round((hadirCount / totalAttendances) * 1000) / 10;
+    } else if (student.attendanceRate !== undefined && student.attendanceRate !== null) {
+      attendanceRate = Number(student.attendanceRate);
     }
 
     // 2. Calculate Average Daily Grade from DailyGrade records

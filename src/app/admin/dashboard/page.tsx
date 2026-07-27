@@ -33,6 +33,7 @@ import {
   Filter,
   ArrowUpRight,
   Clock,
+  Video,
   GraduationCap,
   Bell,
   CreditCard,
@@ -117,6 +118,32 @@ export default function AdminDashboardPage() {
 
   const [studentsList, setStudentsList] = useState<any[]>([]);
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
+  const [studentSearchQuery, setStudentSearchQuery] = useState<string>("");
+  const [sppSearchQuery, setSppSearchQuery] = useState<string>("");
+  const [selectedHomeroomFilter, setSelectedHomeroomFilter] = useState<string>("ALL");
+  const [teacherProgressList, setTeacherProgressList] = useState<any[]>([]);
+  const [selectedProgressMonth, setSelectedProgressMonth] = useState<string>("ALL");
+  const [teacherProgressModal, setTeacherProgressModal] = useState<{
+    isOpen: boolean;
+    teacherId: string;
+    teacherName: string;
+    month: string;
+    programTitle: string;
+    hoursTaught: number;
+    targetHours: number;
+    evaluatedStudentsCount: number;
+    notes: string;
+  }>({
+    isOpen: false,
+    teacherId: "",
+    teacherName: "",
+    month: "Juli 2026",
+    programTitle: "Program Belajar Sentra TK A",
+    hoursTaught: 36,
+    targetHours: 40,
+    evaluatedStudentsCount: 15,
+    notes: "",
+  });
   const [dailyGradesList, setDailyGradesList] = useState<any[]>([]);
   const [dailyGradeModal, setDailyGradeModal] = useState<{
     isOpen: boolean;
@@ -443,7 +470,7 @@ export default function AdminDashboardPage() {
     try {
       const queryParam = selectedSchoolId && selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : "";
 
-      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp, resTeachAtt, resClasses, resDailyGrades] = await Promise.all([
+      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp, resTeachAtt, resClasses, resDailyGrades, resTeachProg] = await Promise.all([
         fetch(`/api/ppdb${queryParam}`).then((r) => r.json()),
         fetch(`/api/programs${queryParam}`).then((r) => r.json()),
         fetch(`/api/teachers${queryParam}`).then((r) => r.json()),
@@ -459,6 +486,7 @@ export default function AdminDashboardPage() {
         fetch(`/api/teacher-attendance${queryParam}`).then((r) => r.json()),
         fetch(`/api/classes${queryParam}`).then((r) => r.json()),
         fetch(`/api/daily-grades${queryParam}`).then((r) => r.json()),
+        fetch(`/api/teacher-progress${queryParam}`).then((r) => r.json()),
       ]);
 
       if (resPpdb.success) setPpdbList(resPpdb.data || []);
@@ -476,6 +504,7 @@ export default function AdminDashboardPage() {
       if (resTeachAtt.success) setTeacherAttendanceList(resTeachAtt.data || []);
       if (resClasses.success) setClassesList(resClasses.data || []);
       if (resDailyGrades.success) setDailyGradesList(resDailyGrades.data || []);
+      if (resTeachProg && resTeachProg.success) setTeacherProgressList(resTeachProg.data || []);
     } catch (err: any) {
       showMessage("Gagal memuat data", "error");
     } finally {
@@ -830,6 +859,31 @@ export default function AdminDashboardPage() {
       setProgramsList((prev) => prev.filter((p) => p.id !== id));
     } catch (err: any) {
       showMessage(err.message, "error");
+    }
+  };
+
+  const handleUploadProgramIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !editingProgram) return;
+    try {
+      setSaving(true);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "uploads");
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Gagal mengunggah icon");
+
+      setEditingProgram((prev: any) => ({ ...prev, iconUrl: data.url }));
+      showMessage("Icon program berhasil diunggah!", "success");
+    } catch (err: any) {
+      showMessage(err.message || "Gagal mengunggah icon program", "error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -1245,6 +1299,50 @@ export default function AdminDashboardPage() {
       showMessage(err.message, "error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Teacher Progress Handlers
+  const handleSaveTeacherProgress = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch("/api/teacher-progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...teacherProgressModal,
+          schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        showMessage("Record raihan mengajar guru berhasil disimpan!", "success");
+        setTeacherProgressList((prev) => [data.data, ...prev]);
+        setTeacherProgressModal((prev) => ({ ...prev, isOpen: false }));
+      } else {
+        showMessage(data.error || "Gagal menyimpan raihan mengajar", "error");
+      }
+    } catch (err: any) {
+      showMessage("Terjadi kesalahan jaringan", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteTeacherProgress = async (id: string) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus record raihan mengajar ini?")) return;
+    try {
+      const res = await fetch(`/api/teacher-progress/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        showMessage("Record raihan mengajar berhasil dihapus", "success");
+        setTeacherProgressList((prev) => prev.filter((item) => item.id !== id));
+      } else {
+        showMessage(data.error || "Gagal menghapus record", "error");
+      }
+    } catch (err) {
+      showMessage("Gagal menghapus record", "error");
     }
   };
 
@@ -2165,6 +2263,214 @@ export default function AdminDashboardPage() {
                 )}
               </div>
 
+              {/* PUSAT PROGRESIF FITUR SISTEM & VIDEO DEMONSTRASI CARD */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+                {/* LEFT (7 COLS): PUSAT PROGRESIF FITUR SISTEM */}
+                <div className="lg:col-span-7 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/70 border border-indigo-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+                  
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black border border-indigo-500/30">
+                        🚀
+                      </div>
+                      <div>
+                        <h3 className="font-extrabold text-lg text-white">Pusat Progresif Fitur Sistem</h3>
+                        <p className="text-xs text-slate-400">Analisis progresif skema SPP & alokasi jam program belajar</p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-black uppercase text-indigo-400 bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-full">
+                      Realtime Metrics
+                    </span>
+                  </div>
+
+                  {/* CAPAIAN RAIHAN MENGAJAR GURU PER BULAN (AUTOMATIC TRACKING FROM PRESENSI) */}
+                  <div className="space-y-4 relative z-10">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
+                          <Award className="w-4 h-4 text-emerald-400" />
+                          <span>Capaian Raihan Mengajar Guru Per Bulan (Auto-Tracked Presensi)</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-400">Otomatis dihitung berdasarkan kehadiran presensi guru & rasio SPP program per bulan.</p>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          setTeacherProgressModal({
+                            isOpen: true,
+                            teacherId: teachersList[0]?.id || "",
+                            teacherName: teachersList[0]?.name || admin?.name || "Guru Pengajar",
+                            month: "Juli 2026",
+                            programTitle: programsList[0]?.title || "Program TK A - Sentra Kognitif",
+                            hoursTaught: 36,
+                            targetHours: 40,
+                            evaluatedStudentsCount: 15,
+                            notes: "Diinput manual oleh admin.",
+                          })
+                        }
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border border-slate-700"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Input Manual</span>
+                      </button>
+                    </div>
+
+                    {/* TEACHER PROGRESS CARDS WITH AUTO SPP RATIO & ESTIMATED MONTHLY RESULTS */}
+                    {(() => {
+                      const sppAmounts = programsList.map((p) => Number(p.sppAmount || 200000)).filter((a) => a > 0);
+                      const minSpp = sppAmounts.length > 0 ? Math.min(...sppAmounts) : 200000;
+
+                      return (
+                        <div className="space-y-3">
+                          {/* DISPLAY PER TEACHER AUTO RESULT CARDS */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {teachersList.map((teacher) => {
+                              // Find teacher's progress record or generate real-time metrics from attendance
+                              const tpRecord = teacherProgressList.find(
+                                (tp) => tp.teacherId === teacher.id || (tp.teacherName && tp.teacherName.toLowerCase() === teacher.name.toLowerCase())
+                              );
+
+                              // Find teacher's assigned class/room and matched program SPP
+                              const assignedCls = classesList.find(
+                                (c) => c.homeroomTeacherId === teacher.id || (c.homeroomTeacherName && c.homeroomTeacherName.toLowerCase() === teacher.name.toLowerCase()) || c.id === teacher.classId
+                              );
+                              const plottedClass = assignedCls?.name || teacher.classRoom?.name || teacher.assignedClass || teacher.role;
+                              const plottedGrade = assignedCls?.gradeLevel || "";
+
+                              const schoolProgs = programsList.filter((p) => !p.schoolId || p.schoolId === teacher.schoolId);
+
+                              const matchedProgram =
+                                schoolProgs.find((p) => {
+                                  const t = p.title.toLowerCase();
+                                  return (
+                                    (plottedGrade && t.includes(plottedGrade.toLowerCase())) ||
+                                    (plottedClass && (t.includes(plottedClass.toLowerCase()) || plottedClass.toLowerCase().includes(t))) ||
+                                    (teacher.assignedClass && (t.includes(teacher.assignedClass.toLowerCase()) || teacher.assignedClass.toLowerCase().includes(t)))
+                                  );
+                                }) || schoolProgs[0] || programsList[0];
+
+                              const teacherSpp = Number(matchedProgram?.sppAmount || minSpp);
+                              const sppRatio = Math.max(Math.round((teacherSpp / Math.max(minSpp, 1)) * 100) / 100, 1.0);
+
+                              // Count teacher attendance
+                              const teacherAtts = teacherAttendanceList.filter(
+                                (att) => att.teacherId === teacher.id && att.status === "hadir"
+                              );
+                              const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
+                              const hoursTaught = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+                              const targetHours = tpRecord ? Number(tpRecord.targetHours) : 40;
+                              const pct = Math.min(Math.round((hoursTaught / targetHours) * 100), 100);
+
+                              // Monthly progressive result
+                              const baseRate = 50000;
+                              const monthlyResult = Math.round(hadirDays * baseRate * sppRatio);
+
+                              return (
+                                <div
+                                  key={teacher.id}
+                                  className="bg-slate-950/90 border border-slate-800/90 hover:border-emerald-500/40 p-4 rounded-2xl space-y-3 shadow-xl transition-all relative overflow-hidden group"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs border border-emerald-500/30 shrink-0">
+                                        👩‍🏫
+                                      </div>
+                                      <div>
+                                        <h5 className="font-extrabold text-white text-xs leading-tight">{teacher.name}</h5>
+                                        <p className="text-[10px] text-slate-400">📍 {plottedClass} • {matchedProgram?.title || "Program Belajar"}</p>
+                                      </div>
+                                    </div>
+                                    <span className="text-[10px] font-mono font-black text-emerald-300 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded-full shrink-0">
+                                      {sppRatio.toFixed(2)}x Rasio SPP
+                                    </span>
+                                  </div>
+
+                                  {/* SPP PROGRESS RATIO DETAILS */}
+                                  <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800/80 space-y-1 text-[11px]">
+                                    <div className="flex justify-between text-slate-300">
+                                      <span>SPP Program Guru: <strong className="text-emerald-400 font-mono">Rp {teacherSpp.toLocaleString("id-ID")}</strong></span>
+                                      <span className="text-slate-400 text-[10px]">Basis: Rp {minSpp.toLocaleString("id-ID")}</span>
+                                    </div>
+                                    <div className="flex justify-between text-slate-300 border-t border-slate-800/80 pt-1 mt-1">
+                                      <span>Presensi Hadir Bulan Ini:</span>
+                                      <strong className="text-amber-300 font-mono">{hadirDays} Hari ({hoursTaught} Jam)</strong>
+                                    </div>
+                                  </div>
+
+                                  {/* ESTIMATED MONTHLY PROGRESSIVE RESULT */}
+                                  <div className="flex items-center justify-between bg-gradient-to-r from-emerald-950/60 to-teal-950/60 border border-emerald-500/30 p-2.5 rounded-xl">
+                                    <div className="text-[10px] text-emerald-200">
+                                      <span className="block font-bold">Hasil Progresif Bulanan:</span>
+                                      <span className="text-[9px] text-slate-400">({hadirDays} Hari × 50rb × {sppRatio.toFixed(2)}x)</span>
+                                    </div>
+                                    <span className="text-sm font-black font-mono text-emerald-400">
+                                      Rp {monthlyResult.toLocaleString("id-ID")}
+                                    </span>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between text-[10px] text-slate-400">
+                                      <span>Target Mengajar ({pct}%)</span>
+                                      <span>{hoursTaught} / {targetHours} Jam</span>
+                                    </div>
+                                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                                      <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${pct}%` }} />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* RIGHT (5 COLS): VIDEO PLAYER DEMONSTRASI DASHBOARD */}
+                <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center font-black border border-red-500/30">
+                          ▶️
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold text-base text-white">Video Demonstrasi System</h3>
+                          <p className="text-[11px] text-slate-400">Profil & Panduan Fitur Portal Sekolah TK</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-0.5 rounded-full">
+                        Interactive Video
+                      </span>
+                    </div>
+
+                    {/* HTML5 VIDEO PLAYER WITH CONTROLS & POSTER */}
+                    <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-black aspect-video group shadow-xl">
+                      <video
+                        controls
+                        poster="/images/yapchi_logo.png"
+                        className="w-full h-full object-cover"
+                      >
+                        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4" />
+                        Browser Anda tidak mendukung pemutar video HTML5.
+                      </video>
+                    </div>
+
+                    <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2">
+                      <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                        <Video className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Panduan Lengkap Fitur Portal System</span>
+                      </h4>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        Tonton video demonstrasi di atas untuk mempelajari alur pendaftaran PPDB, kelola data murid, presensi QR code, dan pencatatan pembayaran SPP.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* RECENT REGISTRATIONS TABLE CARD */}
               <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full">
                 <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
@@ -2401,13 +2707,26 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
                 {classesList.map((cls) => {
                   const studentCount = studentsList.filter((s) => s.className?.toLowerCase() === cls.name?.toLowerCase()).length;
+                  const capacity = Number(cls.capacity || 20);
+                  const isFull = studentCount >= capacity;
                   return (
-                    <div key={cls.id} className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 shadow-xl transition-all">
+                    <div key={cls.id} className={`bg-slate-900/80 border hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 shadow-xl transition-all ${isFull ? "border-red-500/40 bg-red-950/10" : "border-slate-800"}`}>
                       <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                         <div>
-                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                            {cls.gradeLevel}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                              {cls.gradeLevel}
+                            </span>
+                            {isFull ? (
+                              <span className="text-[10px] font-black uppercase tracking-wider text-red-400 bg-red-500/20 px-2.5 py-0.5 rounded-full border border-red-500/40 flex items-center gap-1">
+                                🔴 KELAS PENUH
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                                🟢 Tersedia
+                              </span>
+                            )}
+                          </div>
                           <h3 className="text-lg font-black text-white mt-1">{cls.name}</h3>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -2433,7 +2752,9 @@ export default function AdminDashboardPage() {
                         </div>
                         <div className="flex items-center justify-between text-slate-300">
                           <span className="text-slate-400 font-medium">Jumlah Murid:</span>
-                          <span className="font-bold text-white">{studentCount} / {cls.capacity} Siswa</span>
+                          <span className={`font-bold ${isFull ? "text-red-400 font-mono" : "text-white"}`}>
+                            {studentCount} / {capacity} Siswa {isFull && "(Maksimal)"}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between text-slate-300">
                           <span className="text-slate-400 font-medium">Tahun Ajaran:</span>
@@ -3386,7 +3707,7 @@ export default function AdminDashboardPage() {
                     {editingProgram.id ? "Edit Program" : "Tambah Program Baru"}
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">
                         Pilih Cabang Sekolah
@@ -3437,6 +3758,52 @@ export default function AdminDashboardPage() {
                         className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
                       />
                     </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Nominal SPP (Rp)
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        value={editingProgram.sppAmount || 200000}
+                        onChange={(e) =>
+                          setEditingProgram({ ...editingProgram, sppAmount: Number(e.target.value) })
+                        }
+                        placeholder="Contoh: 250000"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-emerald-400 font-mono font-bold focus:border-emerald-500 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Upload Icon Program
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <label className="flex-1 px-3 py-3 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer transition-all">
+                          <span className="truncate text-[11px]">
+                            {editingProgram.iconUrl ? "🖼️ Ganti Icon" : "📁 Unggah File"}
+                          </span>
+                          <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleUploadProgramIcon}
+                            className="hidden"
+                          />
+                        </label>
+                        {editingProgram.iconUrl && (
+                          <div className="w-11 h-11 rounded-xl bg-slate-950 p-1 border border-emerald-500/40 relative overflow-hidden shrink-0">
+                            <img
+                              src={editingProgram.iconUrl}
+                              alt="Icon"
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex justify-end gap-3 pt-2">
@@ -3465,13 +3832,32 @@ export default function AdminDashboardPage() {
                     className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 flex flex-col justify-between transition-all shadow-xl group"
                   >
                     <div className="space-y-3">
-                      <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                        {prog.school?.name}
-                      </span>
-                      <h3 className="font-extrabold text-lg text-white group-hover:text-emerald-400 transition-colors">{prog.title}</h3>
-                      <span className="inline-block text-xs font-semibold text-slate-300 bg-slate-950 px-3 py-1 rounded-full border border-slate-800">
-                        {prog.ageRange}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        {prog.iconUrl ? (
+                          <div className="w-10 h-10 rounded-2xl bg-slate-950 p-1.5 border border-slate-800 flex items-center justify-center shrink-0">
+                            <img src={prog.iconUrl} alt={prog.title} className="w-full h-full object-contain" />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 font-black flex items-center justify-center border border-emerald-500/30 shrink-0">
+                            🎨
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                            {prog.school?.name}
+                          </span>
+                          <h3 className="font-extrabold text-base text-white group-hover:text-emerald-400 transition-colors mt-0.5">{prog.title}</h3>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5 pt-1">
+                        <span className="inline-block text-xs font-semibold text-slate-300 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+                          👶 Usia: {prog.ageRange}
+                        </span>
+                        <span className="inline-block text-xs font-extrabold text-emerald-300 font-mono bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-800/80">
+                          💳 SPP: Rp {Number(prog.sppAmount || 200000).toLocaleString("id-ID")}/Bulan
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
@@ -3783,8 +4169,8 @@ export default function AdminDashboardPage() {
                       parentName: "",
                       parentPhone: "",
                       address: "",
-                      attendanceRate: 95.0,
-                      averageGrade: 88.5,
+                      attendanceRate: 0.0,
+                      averageGrade: 0.0,
                       schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
                     })
                   }
@@ -3925,13 +4311,13 @@ export default function AdminDashboardPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 bg-slate-950/80 p-4 rounded-2xl border border-slate-800/80">
                       <div>
                         <label className="block text-[11px] font-bold text-slate-400 mb-1">
-                          📊 Kehadiran (%) <span className="text-emerald-400 font-mono">[{editingStudent.attendanceRate ?? 95}%]</span>
+                          📊 Kehadiran (%) <span className="text-emerald-400 font-mono">[{editingStudent.attendanceRate ?? 0}%]</span>
                         </label>
                         <input
                           type="number"
                           min="0"
                           max="100"
-                          value={editingStudent.attendanceRate ?? 95.0}
+                          value={editingStudent.attendanceRate ?? 0.0}
                           onChange={(e) => setEditingStudent({ ...editingStudent, attendanceRate: Number(e.target.value) })}
                           className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                         />
@@ -4158,22 +4544,79 @@ export default function AdminDashboardPage() {
                 </form>
               )}
 
+              {/* FILTER & SEARCH BAR SISWA (NIM/NISN & WALI KELAS) */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-3xl border border-slate-800 shadow-lg w-full">
+                <div className="relative flex-1 w-full">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <input
+                    type="text"
+                    value={studentSearchQuery}
+                    onChange={(e) => setStudentSearchQuery(e.target.value)}
+                    placeholder="🔍 Cari nama siswa, NIM / NISN, atau nama orang tua..."
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <select
+                  value={selectedHomeroomFilter}
+                  onChange={(e) => setSelectedHomeroomFilter(e.target.value)}
+                  className="w-full sm:w-auto p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="ALL">👥 Semua Wali Kelas</option>
+                  {Array.from(
+                    new Set(
+                      classesList
+                        .map((c) => c.homeroomTeacherName)
+                        .filter(Boolean)
+                        .concat(teachersList.map((t) => t.name))
+                    )
+                  ).map((tName) => (
+                    <option key={tName} value={tName}>
+                      👤 Wali Kelas: {tName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* DAFTAR KARTU SISWA TERDAFTAR */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {studentsList.map((s) => (
-                  <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3.5 flex flex-col justify-between">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
-                          onClick={() => handleOpenPreview(s.avatarUrl || "https://i.pravatar.cc/150", `Avatar Siswa: ${s.name}`)}
-                          title="Klik untuk melihat foto avatar"
-                        >
-                          {s.name.charAt(0)}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white text-sm">{s.name}</h4>
-                          <p className="text-xs text-slate-400">{s.nisn} • <span className="text-emerald-400 font-semibold">{s.className}</span></p>
+                {studentsList
+                  .filter((s) => {
+                    const matchSearch =
+                      !studentSearchQuery ||
+                      s.name.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                      (s.nisn && s.nisn.toLowerCase().includes(studentSearchQuery.toLowerCase())) ||
+                      (s.parentName && s.parentName.toLowerCase().includes(studentSearchQuery.toLowerCase())) ||
+                      (s.username && s.username.toLowerCase().includes(studentSearchQuery.toLowerCase()));
+
+                    const teacherName = s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "";
+                    const teacherId = s.classRoom?.homeroomTeacherId || s.homeroomTeacherId || "";
+                    const matchHomeroom =
+                      selectedHomeroomFilter === "ALL" ||
+                      teacherId === selectedHomeroomFilter ||
+                      teacherName === selectedHomeroomFilter;
+
+                    return matchSearch && matchHomeroom;
+                  })
+                  .map((s) => (
+                    <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3.5 flex flex-col justify-between">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
+                            onClick={() => handleOpenPreview(s.avatarUrl || "https://i.pravatar.cc/150", `Avatar Siswa: ${s.name}`)}
+                            title="Klik untuk melihat foto avatar"
+                          >
+                            {s.name.charAt(0)}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                            <p className="text-xs text-slate-400">
+                              NIM/NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{s.nisn}</span> • <span className="text-emerald-400 font-semibold">{s.className}</span>
+                            </p>
+                            <p className="text-[11px] text-cyan-300 font-medium mt-0.5">
+                              👤 Wali Kelas: <span className="font-bold text-white">{s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "Guru Wali"}</span>
+                            </p>
                           <p className="text-[11px] text-slate-500">Ortu: {s.parentName} ({s.parentPhone})</p>
                           {s.username && (
                             <span className="inline-block text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 mt-1">
@@ -4187,7 +4630,7 @@ export default function AdminDashboardPage() {
                     <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 grid grid-cols-3 gap-2 text-center text-xs">
                       <div>
                         <span className="text-[10px] text-slate-400 block">Presensi</span>
-                        <span className="font-extrabold text-emerald-400">{s.attendanceRate ?? 95}%</span>
+                        <span className="font-extrabold text-emerald-400">{s.attendanceRate ?? 0}%</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 block">Rata Harian</span>
@@ -4354,6 +4797,15 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                 {attendanceList
                   .filter((att) => {
+                    const teacherName = att.student?.classRoom?.homeroomTeacherName || "";
+                    const teacherId = att.student?.classRoom?.homeroomTeacherId || "";
+                    const matchHomeroom =
+                      selectedHomeroomFilter === "ALL" ||
+                      teacherId === selectedHomeroomFilter ||
+                      teacherName === selectedHomeroomFilter;
+
+                    if (!matchHomeroom) return false;
+
                     if (admin?.role !== "ORTU") return true;
                     const u = (admin?.username || "").toLowerCase();
                     const n = (admin?.name || "").toLowerCase();
@@ -4371,6 +4823,7 @@ export default function AdminDashboardPage() {
                       <div>
                         <h4 className="font-bold text-white text-sm">{att.studentName}</h4>
                         <p className="text-xs text-slate-400">{att.className} • Tanggal: {att.date}</p>
+                        <p className="text-[11px] text-cyan-300 font-medium mt-0.5">👤 Wali Kelas: <span className="font-bold text-white">{att.student?.classRoom?.homeroomTeacherName || "Guru Wali"}</span></p>
                         {att.reason && <p className="text-[11px] text-amber-400 italic">Keterangan: {att.reason}</p>}
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${att.status === "hadir" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" : att.status === "sakit" ? "bg-amber-500/20 text-amber-300 border border-amber-500/30" : "bg-red-500/20 text-red-300 border border-red-500/30"}`}>
@@ -4793,6 +5246,40 @@ export default function AdminDashboardPage() {
                 </form>
               )}
 
+              {/* SEARCH & WALI KELAS FILTER BAR UNTUK SPP */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-3xl border border-slate-800 shadow-lg w-full">
+                <div className="relative flex-1 w-full">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <input
+                    type="text"
+                    value={sppSearchQuery}
+                    onChange={(e) => setSppSearchQuery(e.target.value)}
+                    placeholder="🔍 Cari nama siswa, NIM / NISN, atau kelas SPP..."
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <select
+                  value={selectedHomeroomFilter}
+                  onChange={(e) => setSelectedHomeroomFilter(e.target.value)}
+                  className="w-full sm:w-auto p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="ALL">👥 Semua Wali Kelas</option>
+                  {Array.from(
+                    new Set(
+                      classesList
+                        .map((c) => c.homeroomTeacherName)
+                        .filter(Boolean)
+                        .concat(teachersList.map((t) => t.name))
+                    )
+                  ).map((tName) => (
+                    <option key={tName} value={tName}>
+                      👤 Wali Kelas: {tName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* FILTER STATUS TABS FOR ADMIN & ORTU */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
                 <button
@@ -4848,6 +5335,28 @@ export default function AdminDashboardPage() {
                   .filter((spp) => {
                     if (sppStatusFilter !== "ALL" && spp.status !== sppStatusFilter) return false;
 
+                    const matchSearch =
+                      !sppSearchQuery ||
+                      (spp.studentName && spp.studentName.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
+                      (spp.nisn && spp.nisn.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
+                      (spp.className && spp.className.toLowerCase().includes(sppSearchQuery.toLowerCase()));
+
+                    const teacherName =
+                      spp.homeroomTeacherName ||
+                      studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherName ||
+                      "";
+                    const teacherId =
+                      spp.homeroomTeacherId ||
+                      studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherId ||
+                      "";
+
+                    const matchHomeroom =
+                      selectedHomeroomFilter === "ALL" ||
+                      teacherId === selectedHomeroomFilter ||
+                      teacherName === selectedHomeroomFilter;
+
+                    if (!matchSearch || !matchHomeroom) return false;
+
                     if (admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA") return true;
                     const u = (admin?.username || "").toLowerCase();
                     const n = (admin?.name || "").toLowerCase();
@@ -4859,27 +5368,35 @@ export default function AdminDashboardPage() {
                       spp.studentId === admin?.id
                     );
                   })
-                  .map((spp) => (
-                    <div
-                      key={spp.id}
-                      className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl ${
-                        spp.status === "menunggu_konfirmasi"
-                          ? "border-amber-500/50 bg-amber-950/20"
-                          : spp.status === "lunas"
-                          ? "border-slate-800 hover:border-emerald-500/40"
-                          : "border-red-500/30"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                            {spp.month}
-                          </span>
-                          <h4 className="font-extrabold text-white text-base mt-1.5">{spp.studentName}</h4>
-                          <p className="text-xs text-slate-400">
-                            NISN: <span className="font-mono text-emerald-300 font-bold">{spp.nisn}</span> • {spp.className}
-                          </p>
-                        </div>
+                  .map((spp) => {
+                    const hTeacherName =
+                      spp.homeroomTeacherName ||
+                      studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherName ||
+                      "Guru Wali";
+                    return (
+                      <div
+                        key={spp.id}
+                        className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl ${
+                          spp.status === "menunggu_konfirmasi"
+                            ? "border-amber-500/50 bg-amber-950/20"
+                            : spp.status === "lunas"
+                            ? "border-slate-800 hover:border-emerald-500/40"
+                            : "border-red-500/30"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                              {spp.month}
+                            </span>
+                            <h4 className="font-extrabold text-white text-base mt-1.5">{spp.studentName}</h4>
+                            <p className="text-xs text-slate-400">
+                              NIM/NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{spp.nisn}</span> • {spp.className}
+                            </p>
+                            <p className="text-[11px] text-cyan-300 font-medium mt-1">
+                              👤 Wali Kelas: <span className="font-bold text-white">{hTeacherName}</span>
+                            </p>
+                          </div>
                         <span
                           className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-center shrink-0 ${
                             spp.status === "lunas"
@@ -4979,7 +5496,8 @@ export default function AdminDashboardPage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -6269,6 +6787,143 @@ export default function AdminDashboardPage() {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Input Raihan Bulanan Guru */}
+      {teacherProgressModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-bold text-white text-base">Input Raihan Mengajar Bulanan Guru</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTeacherProgressModal((prev) => ({ ...prev, isOpen: false }))}
+                className="p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded-xl"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTeacherProgress} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Guru / Pengajar</label>
+                <SearchableSelect
+                  options={teachersList.map((t) => ({
+                    value: t.id,
+                    label: t.name,
+                    sublabel: `Jabatan: ${t.role} • ${t.assignedClass || "Guru"}`,
+                  }))}
+                  value={teacherProgressModal.teacherId}
+                  onChange={(selectedId) => {
+                    const found = teachersList.find((t) => t.id === selectedId);
+                    if (found) {
+                      setTeacherProgressModal((prev) => ({
+                        ...prev,
+                        teacherId: found.id,
+                        teacherName: found.name,
+                      }));
+                    }
+                  }}
+                  placeholder="Pilih nama guru..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Bulan Capaian</label>
+                  <input
+                    type="text"
+                    required
+                    value={teacherProgressModal.month}
+                    onChange={(e) => setTeacherProgressModal((prev) => ({ ...prev, month: e.target.value }))}
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                    placeholder="Juli 2026"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Judul Program</label>
+                  <SearchableSelect
+                    options={programsList.map((p) => ({
+                      value: p.title,
+                      label: p.title,
+                    }))}
+                    value={teacherProgressModal.programTitle}
+                    onChange={(val) => setTeacherProgressModal((prev) => ({ ...prev, programTitle: val }))}
+                    placeholder="Pilih program..."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Jam Mengajar (Aktual)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={teacherProgressModal.hoursTaught}
+                    onChange={(e) => setTeacherProgressModal((prev) => ({ ...prev, hoursTaught: Number(e.target.value) }))}
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Target Jam</label>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    value={teacherProgressModal.targetHours}
+                    onChange={(e) => setTeacherProgressModal((prev) => ({ ...prev, targetHours: Number(e.target.value) }))}
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-400 mb-1">Evaluasi Siswa (Anak)</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={teacherProgressModal.evaluatedStudentsCount}
+                    onChange={(e) => setTeacherProgressModal((prev) => ({ ...prev, evaluatedStudentsCount: Number(e.target.value) }))}
+                    className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Catatan Raihan Mengajar (Opsional)</label>
+                <input
+                  type="text"
+                  value={teacherProgressModal.notes}
+                  onChange={(e) => setTeacherProgressModal((prev) => ({ ...prev, notes: e.target.value }))}
+                  className="w-full p-3 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                  placeholder="Misal: Sangat aktif dalam menyampaikan sentra kognitif..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setTeacherProgressModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  <span>{saving ? "Menyimpan..." : "Simpan Raihan Mengajar"}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

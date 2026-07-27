@@ -217,6 +217,26 @@ model Teacher {
   @@map("guru")
 }
 
+model TeacherProgress {
+  id                     String   @id @default(uuid())
+  teacherId              String?  @map("id_guru")
+  teacherName            String   @map("nama_guru")
+  schoolId               String?  @map("id_sekolah")
+  month                  String   @map("bulan")
+  programTitle           String   @map("judul_program")
+  hoursTaught            Float    @default(0.0) @map("jam_mengajar")
+  targetHours            Float    @default(40.0) @map("target_jam")
+  completionPercentage   Float    @default(0.0) @map("persentase_capaian")
+  evaluatedStudentsCount Int      @default(0) @map("jumlah_siswa_dievaluasi")
+  progressivePoints      Float    @default(1.0) @map("poin_progresif")
+  notes                  String?  @map("catatan_capaian")
+  createdAt              DateTime @default(now()) @map("dibuat_pada")
+  updatedAt              DateTime @updatedAt @map("diperbarui_pada")
+
+  @@map("capaian_progresif_guru")
+}
+
+
 model Student {
   id              String     @id @default(uuid())
   schoolId        String     @map("id_sekolah")

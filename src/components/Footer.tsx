@@ -14,7 +14,13 @@ export default function Footer({ selectedSchoolCode = "sadjati" }: FooterProps) 
 
   useEffect(() => {
     fetch(`/api/site-profile?schoolCode=${selectedSchoolCode}`)
-      .then((r) => r.json())
+      .then((r) => {
+        const contentType = r.headers.get("content-type");
+        if (r.ok && contentType && contentType.includes("application/json")) {
+          return r.json();
+        }
+        return { success: false, data: null };
+      })
       .then((data) => {
         if (data.success && data.data) {
           setSiteProfile(data.data);

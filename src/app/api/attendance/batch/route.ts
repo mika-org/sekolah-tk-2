@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { recalculateStudentGrades } from "@/lib/student-grades";
 
 export async function POST(req: Request) {
   try {
@@ -62,6 +63,16 @@ export async function POST(req: Request) {
           },
         });
         results.push(created);
+      }
+    }
+
+    // Recalculate attendance rates for all affected students
+    const updatedStudentIds = Array.from(new Set(results.map((r) => r.studentId)));
+    for (const sId of updatedStudentIds) {
+      try {
+        await recalculateStudentGrades(sId);
+      } catch (err) {
+        console.warn(`Failed to recalculate grades for student ${sId}:`, err);
       }
     }
 

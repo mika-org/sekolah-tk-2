@@ -55,7 +55,7 @@ export async function PUT(
       parentPhone,
       parentEmail,
       address,
-      Number(data.attendanceRate) || 95.0,
+      data.attendanceRate !== undefined && data.attendanceRate !== null && !isNaN(Number(data.attendanceRate)) ? Number(data.attendanceRate) : 0.0,
       Number(data.averageGrade) || 88.5,
       data.dailyGrade !== undefined && data.dailyGrade !== null ? Number(data.dailyGrade) : 85.0,
       data.semesterGrade !== undefined && data.semesterGrade !== null ? Number(data.semesterGrade) : 90.0,

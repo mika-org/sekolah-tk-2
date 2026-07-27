@@ -12,6 +12,8 @@ export async function GET(req: Request) {
     const parentPhone = searchParams.get("parentPhone");
     const nisn = searchParams.get("nisn");
     const studentId = searchParams.get("studentId");
+    const homeroomTeacherId = searchParams.get("homeroomTeacherId");
+    const search = searchParams.get("search") || searchParams.get("q");
 
     let query = `
       SELECT 
@@ -38,7 +40,9 @@ export async function GET(req: Request) {
         st."bobot_semester" as "semesterWeight",
         st."dibuat_pada" as "createdAt", 
         st."diperbarui_pada" as "updatedAt",
-        json_build_object('id', k.id, 'name', k.nama_kelas, 'gradeLevel', k.tingkat) as "classRoom",
+        k.id_guru_wali as "homeroomTeacherId",
+        k.nama_guru_wali as "homeroomTeacherName",
+        json_build_object('id', k.id, 'name', k.nama_kelas, 'gradeLevel', k.tingkat, 'homeroomTeacherName', k.nama_guru_wali) as "classRoom",
         json_build_object('id', s.id, 'code', s.kode, 'name', s.nama) as school
       FROM "siswa" st
       LEFT JOIN "kelas" k ON st."id_kelas" = k.id
@@ -47,10 +51,15 @@ export async function GET(req: Request) {
 
     const whereConditions: string[] = [];
     if (studentId) whereConditions.push(`st."id" = '${studentId}'`);
-    if (nisn) whereConditions.push(`st."nisn" = '${nisn}'`);
+    if (nisn) whereConditions.push(`(st."nisn" = '${nisn}' OR st."nisn" ILIKE '%${nisn}%')`);
     if (classId && classId !== "ALL") whereConditions.push(`st."id_kelas" = '${classId}'`);
     if (className && className !== "ALL") whereConditions.push(`st."nama_kelas" = '${className}'`);
+    if (homeroomTeacherId && homeroomTeacherId !== "ALL") whereConditions.push(`k."id_guru_wali" = '${homeroomTeacherId}'`);
     if (parentPhone) whereConditions.push(`(st."telepon_orang_tua" = '${parentPhone}' OR st."telepon_orang_tua" LIKE '%${parentPhone}%')`);
+    if (search) {
+      const sanitized = search.replace(/'/g, "''");
+      whereConditions.push(`(st."nama" ILIKE '%${sanitized}%' OR st."nisn" ILIKE '%${sanitized}%' OR st."nama_pengguna" ILIKE '%${sanitized}%' OR st."nama_orang_tua" ILIKE '%${sanitized}%')`);
+    }
 
     if (schoolId && schoolId !== "ALL") {
       whereConditions.push(`st."id_sekolah" = '${schoolId}'`);
@@ -111,7 +120,7 @@ export async function POST(req: Request) {
       parentPhone || "-",
       parentEmail || null,
       address || "-",
-      Number(attendanceRate) || 95.0,
+      attendanceRate !== undefined && attendanceRate !== null && !isNaN(Number(attendanceRate)) ? Number(attendanceRate) : 0.0,
       Number(averageGrade) || 88.5,
       dailyGrade !== undefined && dailyGrade !== null ? Number(dailyGrade) : 85.0,
       semesterGrade !== undefined && semesterGrade !== null ? Number(semesterGrade) : 90.0,

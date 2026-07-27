@@ -59,7 +59,13 @@ export default function PpdbForm({
   useEffect(() => {
     if (!selectedSchoolCode) return;
     fetch(`/api/programs?schoolCode=${selectedSchoolCode}`)
-      .then((r) => r.json())
+      .then((r) => {
+        const contentType = r.headers.get("content-type");
+        if (r.ok && contentType && contentType.includes("application/json")) {
+          return r.json();
+        }
+        return { success: false, data: [] };
+      })
       .then((data) => {
         if (data.success && data.data?.length) {
           setProgramsList(data.data);

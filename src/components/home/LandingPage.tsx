@@ -46,20 +46,29 @@ export default function LandingPage({
     async function fetchData() {
       setLoading(true);
       try {
+        const safeFetch = async (url: string) => {
+          const res = await fetch(url);
+          const contentType = res.headers.get("content-type");
+          if (res.ok && contentType && contentType.includes("application/json")) {
+            return await res.json();
+          }
+          return { success: false, data: null };
+        };
+
         const query = `?schoolCode=${selectedSchoolCode}`;
         const [resProf, resProg, resTeach, resGal, resTest] = await Promise.all([
-          fetch(`/api/site-profile${query}`).then((r) => r.json()),
-          fetch(`/api/programs${query}`).then((r) => r.json()),
-          fetch(`/api/teachers${query}`).then((r) => r.json()),
-          fetch(`/api/gallery${query}`).then((r) => r.json()),
-          fetch(`/api/testimonials${query}`).then((r) => r.json()),
+          safeFetch(`/api/site-profile${query}`),
+          safeFetch(`/api/programs${query}`),
+          safeFetch(`/api/teachers${query}`),
+          safeFetch(`/api/gallery${query}`),
+          safeFetch(`/api/testimonials${query}`),
         ]);
 
-        if (resProf.success && resProf.data) setSiteProfile(resProf.data);
-        if (resProg.success && resProg.data) setPrograms(resProg.data);
-        if (resTeach.success && resTeach.data) setTeachers(resTeach.data);
-        if (resGal.success && resGal.data) setGallery(resGal.data);
-        if (resTest.success && resTest.data) setTestimonials(resTest.data);
+        if (resProf?.success && resProf?.data) setSiteProfile(resProf.data);
+        if (resProg?.success && resProg?.data) setPrograms(resProg.data);
+        if (resTeach?.success && resTeach?.data) setTeachers(resTeach.data);
+        if (resGal?.success && resGal?.data) setGallery(resGal.data);
+        if (resTest?.success && resTest?.data) setTestimonials(resTest.data);
       } catch (err) {
         console.error("Failed to load CMS data:", err);
       } finally {

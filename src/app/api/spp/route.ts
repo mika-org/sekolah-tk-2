@@ -12,6 +12,8 @@ export async function GET(req: Request) {
     const studentId = searchParams.get("studentId");
     const parentPhone = searchParams.get("parentPhone");
 
+    const homeroomTeacherId = searchParams.get("homeroomTeacherId");
+
     const where: any = {};
 
     if (month && month !== "ALL") {
@@ -28,6 +30,7 @@ export async function GET(req: Request) {
 
     if (parentPhone) {
       where.student = {
+        ...(where.student || {}),
         parentPhone: { contains: parentPhone },
       };
     }
@@ -47,11 +50,34 @@ export async function GET(req: Request) {
       }
     }
 
-    const sppRecords = await prisma.sppRecord.findMany({
+    const sppRecordsRaw = await prisma.sppRecord.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { student: { include: { school: true } } },
+      include: {
+        student: {
+          include: {
+            school: true,
+            classRoom: true,
+          },
+        },
+      },
     });
+
+    let sppRecords = sppRecordsRaw.map((record) => {
+      const classRoom = record.student?.classRoom;
+      return {
+        ...record,
+        homeroomTeacherName: classRoom?.homeroomTeacherName || "Belum Ditentukan",
+        homeroomTeacherId: classRoom?.homeroomTeacherId || null,
+      };
+    });
+
+    if (homeroomTeacherId && homeroomTeacherId !== "ALL") {
+      sppRecords = sppRecords.filter(
+        (r) => r.homeroomTeacherId === homeroomTeacherId || r.student?.classRoom?.homeroomTeacherId === homeroomTeacherId
+      );
+    }
+
     return NextResponse.json({ success: true, data: sppRecords });
   } catch (error: any) {
     return NextResponse.json(
