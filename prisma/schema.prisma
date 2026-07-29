@@ -206,6 +206,8 @@ model Teacher {
   name          String     @map("nama")
   role          String     @map("jabatan")
   assignedClass String?    @map("kelas_ditugaskan")
+  email         String?    @map("email")
+  phone         String?    @map("telepon")
   qrCode        String?    @map("kode_qr")
   photoUrl      String     @default("/images/teacher_default.png") @map("url_foto")
   bio           String?    @map("bio")

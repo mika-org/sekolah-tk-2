@@ -16,6 +16,8 @@ export async function GET(req: Request) {
         g."nama" as name, 
         g."jabatan" as role, 
         g."kelas_ditugaskan" as "assignedClass", 
+        g."email" as email,
+        g."telepon" as phone,
         g."kode_qr" as "qrCode", 
         g."url_foto" as "photoUrl", 
         g."bio" as bio, 
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 401 });
     }
 
-    const { id, schoolId, classId, name, role, assignedClass, photoUrl, bio, education, orderIndex } = await req.json();
+    const { id, schoolId, classId, name, role, assignedClass, email, phone, photoUrl, bio, education, orderIndex } = await req.json();
 
     let targetSchoolId = schoolId || admin.schoolId;
     if (!targetSchoolId) {
@@ -76,11 +78,13 @@ export async function POST(req: Request) {
     if (id) {
       // Update existing teacher
       await prisma.$executeRawUnsafe(
-        `UPDATE "guru" SET "nama" = $1, "jabatan" = $2, "kelas_ditugaskan" = $3, "id_kelas" = $4, "url_foto" = $5, "bio" = $6, "pendidikan" = $7, "urutan" = $8, "diperbarui_pada" = NOW() WHERE "id" = $9`,
+        `UPDATE "guru" SET "nama" = $1, "jabatan" = $2, "kelas_ditugaskan" = $3, "id_kelas" = $4, "email" = $5, "telepon" = $6, "url_foto" = $7, "bio" = $8, "pendidikan" = $9, "urutan" = $10, "diperbarui_pada" = NOW() WHERE "id" = $11`,
         name,
         role,
         assignedClass || null,
         classId || null,
+        email || null,
+        phone || null,
         photoUrl || "/images/teacher_default.png",
         bio || null,
         education || null,
@@ -90,22 +94,26 @@ export async function POST(req: Request) {
 
       // Also update linked AdminUser if role GURU
       await prisma.$executeRawUnsafe(
-        `UPDATE "pengguna_admin" SET "kelas_ditugaskan" = $1, "id_kelas" = $2 WHERE "nama" = $3`,
+        `UPDATE "pengguna_admin" SET "kelas_ditugaskan" = $1, "id_kelas" = $2, "email" = $3, "telepon" = $4 WHERE "nama" = $5`,
         assignedClass || null,
         classId || null,
+        email || null,
+        phone || null,
         name
       );
 
-      return NextResponse.json({ success: true, data: { id, name, role, assignedClass } });
+      return NextResponse.json({ success: true, data: { id, name, role, assignedClass, email, phone } });
     }
 
     const res: any[] = await prisma.$queryRawUnsafe(
-      `INSERT INTO "guru" ("id", "id_sekolah", "id_kelas", "nama", "jabatan", "kelas_ditugaskan", "kode_qr", "url_foto", "bio", "pendidikan", "urutan", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW()) RETURNING id`,
+      `INSERT INTO "guru" ("id", "id_sekolah", "id_kelas", "nama", "jabatan", "kelas_ditugaskan", "email", "telepon", "kode_qr", "url_foto", "bio", "pendidikan", "urutan", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()) RETURNING id`,
       targetSchoolId,
       classId || null,
       name,
       role,
       assignedClass || null,
+      email || null,
+      phone || null,
       `TEACHER:${Date.now()}`,
       photoUrl || "/images/teacher_default.png",
       bio || null,
@@ -116,6 +124,34 @@ export async function POST(req: Request) {
     const createdId = res[0].id;
     await prisma.$executeRawUnsafe(`UPDATE "guru" SET "kode_qr" = $1 WHERE "id" = $2`, `TEACHER:${createdId}`, createdId);
 
+    // Auto-generate AdminUser login account for new teacher
+    const autoUsername = `guru_${name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+    const autoPassword = `guru123`;
+    try {
+      const existingUser: any[] = await prisma.$queryRawUnsafe(
+        `SELECT id FROM "pengguna_admin" WHERE "nama" = $1 OR "nama_pengguna" = $2 LIMIT 1`,
+        name,
+        autoUsername
+      );
+
+      if (existingUser.length === 0) {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "pengguna_admin" ("id", "id_sekolah", "id_kelas", "nama", "nama_pengguna", "kata_sandi_hash", "peran", "kelas_ditugaskan", "email", "telepon", "dibuat_pada", "diperbarui_pada") 
+           VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, 'GURU', $6, $7, $8, NOW(), NOW())`,
+          targetSchoolId,
+          classId || null,
+          name,
+          autoUsername,
+          autoPassword,
+          assignedClass || null,
+          email || null,
+          phone || null
+        );
+      }
+    } catch (accErr) {
+      console.warn("Auto generate teacher account warning:", accErr);
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -124,7 +160,13 @@ export async function POST(req: Request) {
         name,
         role,
         assignedClass: assignedClass || null,
+        email: email || null,
+        phone: phone || null,
         qrCode: `TEACHER:${createdId}`,
+        autoAccount: {
+          username: autoUsername,
+          password: autoPassword,
+        },
       },
     });
   } catch (error: any) {

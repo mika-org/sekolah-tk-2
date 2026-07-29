@@ -144,6 +144,29 @@ export default function AdminDashboardPage() {
     evaluatedStudentsCount: 15,
     notes: "",
   });
+  const [teacherCredentialModal, setTeacherCredentialModal] = useState<{
+    isOpen: boolean;
+    loading: boolean;
+    teacherId: string;
+    teacherName: string;
+    role: string;
+    assignedClass: string;
+    schoolName: string;
+    username: string;
+    password: string;
+    qrCode: string;
+  }>({
+    isOpen: false,
+    loading: false,
+    teacherId: "",
+    teacherName: "",
+    role: "",
+    assignedClass: "",
+    schoolName: "",
+    username: "",
+    password: "",
+    qrCode: "",
+  });
   const [dailyGradesList, setDailyGradesList] = useState<any[]>([]);
   const [dailyGradeModal, setDailyGradeModal] = useState<{
     isOpen: boolean;
@@ -929,6 +952,39 @@ export default function AdminDashboardPage() {
       setTeachersList((prev) => prev.filter((t) => t.id !== id));
     } catch (err: any) {
       showMessage(err.message, "error");
+    }
+  };
+
+  const handleShowTeacherCredentials = async (teacherId: string) => {
+    setTeacherCredentialModal({
+      isOpen: true,
+      loading: true,
+      teacherId: "",
+      teacherName: "",
+      role: "",
+      assignedClass: "",
+      schoolName: "",
+      username: "",
+      password: "",
+      qrCode: "",
+    });
+
+    try {
+      const res = await fetch(`/api/teachers/${teacherId}/credentials`);
+      const data = await res.json();
+      if (data.success && data.data) {
+        setTeacherCredentialModal({
+          isOpen: true,
+          loading: false,
+          ...data.data,
+        });
+      } else {
+        showMessage(data.error || "Gagal memuat akun guru", "error");
+        setTeacherCredentialModal((prev) => ({ ...prev, isOpen: false }));
+      }
+    } catch (err: any) {
+      showMessage("Gagal memuat akun guru", "error");
+      setTeacherCredentialModal((prev) => ({ ...prev, isOpen: false }));
     }
   };
 
@@ -3973,7 +4029,37 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Email Guru
+                      </label>
+                      <input
+                        type="email"
+                        value={editingTeacher.email || ""}
+                        onChange={(e) =>
+                          setEditingTeacher({ ...editingTeacher, email: e.target.value })
+                        }
+                        placeholder="guru.ani@gmail.com"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
+                        No. Telepon / WhatsApp
+                      </label>
+                      <input
+                        type="text"
+                        value={editingTeacher.phone || ""}
+                        onChange={(e) =>
+                          setEditingTeacher({ ...editingTeacher, phone: e.target.value })
+                        }
+                        placeholder="08123456789"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">
                         Pendidikan Terakhir
@@ -4114,6 +4200,12 @@ export default function AdminDashboardPage() {
                           {teacher.education && (
                             <p className="text-[11px] text-slate-400 mt-1">{teacher.education}</p>
                           )}
+                          {(teacher.email || teacher.phone) && (
+                            <div className="flex flex-col gap-0.5 mt-1.5 text-[10px] text-slate-300 font-mono bg-slate-950/60 px-2 py-1 rounded-lg border border-slate-800/80">
+                              {teacher.email && <span>📧 {teacher.email}</span>}
+                              {teacher.phone && <span>📞 {teacher.phone}</span>}
+                            </div>
+                          )}
                         </div>
 
                         {teacher.bio && (
@@ -4123,23 +4215,33 @@ export default function AdminDashboardPage() {
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between pt-3 border-t border-slate-800/80 text-xs">
-                        <span className="text-slate-500 text-[11px]">Urutan: #{teacher.orderIndex}</span>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setEditingTeacher(teacher)}
-                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl"
-                            title="Edit Data Guru"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteTeacher(teacher.id)}
-                            className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl"
-                            title="Hapus Guru"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                      <div className="pt-2 border-t border-slate-800/80">
+                        <button
+                          onClick={() => handleShowTeacherCredentials(teacher.id)}
+                          className="w-full py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer mb-2"
+                        >
+                          <Key className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Akun Login & QR Presensi</span>
+                        </button>
+
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500 text-[11px]">Urutan: #{teacher.orderIndex}</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setEditingTeacher(teacher)}
+                              className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl cursor-pointer"
+                              title="Edit Data Guru"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteTeacher(teacher.id)}
+                              className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer"
+                              title="Hapus Guru"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -6924,6 +7026,103 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Teacher Account Credentials Modal Overlay */}
+      {teacherCredentialModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Key className="w-5 h-5 text-emerald-400" />
+                <h3 className="font-bold text-white text-base">Akun Login & QR Presensi Guru</h3>
+              </div>
+              <button
+                onClick={() => setTeacherCredentialModal((prev) => ({ ...prev, isOpen: false }))}
+                className="p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded-xl"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {teacherCredentialModal.loading ? (
+              <div className="py-8 text-center text-xs text-slate-400 animate-pulse">
+                Memuat data akun login guru...
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-2 text-xs">
+                  <div className="flex justify-between border-b border-slate-900 pb-2">
+                    <span className="text-slate-400">Nama Guru:</span>
+                    <strong className="text-white font-bold">{teacherCredentialModal.teacherName}</strong>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-2">
+                    <span className="text-slate-400">Jabatan & Kelas:</span>
+                    <strong className="text-emerald-300 font-bold">{teacherCredentialModal.role} ({teacherCredentialModal.assignedClass})</strong>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-2">
+                    <span className="text-slate-400">Email & Telepon:</span>
+                    <strong className="text-slate-300 font-mono text-[11px]">
+                      {(teacherCredentialModal as any).email || "-"} • {(teacherCredentialModal as any).phone || "-"}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-2">
+                    <span className="text-slate-400">Username Login:</span>
+                    <strong className="text-amber-300 font-mono font-black">{teacherCredentialModal.username}</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Password Default:</span>
+                    <strong className="text-emerald-400 font-mono font-black">{teacherCredentialModal.password}</strong>
+                  </div>
+                </div>
+
+                {/* QR CODE PRESENSI DISPLAY */}
+                <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                    Kode QR Presensi Guru
+                  </span>
+                  <div className="w-36 h-36 mx-auto bg-white p-2.5 rounded-2xl shadow-inner flex items-center justify-center">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(teacherCredentialModal.qrCode)}`}
+                      alt="QR Presensi Guru"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <p className="text-[10px] font-mono text-emerald-400 font-bold">
+                    {teacherCredentialModal.qrCode}
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `Akun Portal Guru TK Smart Kids:\nNama: ${teacherCredentialModal.teacherName}\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\nLogin: ${window.location.origin}/login`
+                      );
+                      showMessage("Akun login guru berhasil disalin!", "success");
+                    }}
+                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span>Salin Akun Login Guru</span>
+                  </button>
+
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(
+                      `Halo Ibu/Bapak ${teacherCredentialModal.teacherName},\nBerikut akun login Portal Guru Smart Kids:\n\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\n\nSilakan login di: ${window.location.origin}/login`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30 text-center"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Kirim Akun via WhatsApp</span>
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
