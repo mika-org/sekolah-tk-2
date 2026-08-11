@@ -1,3 +1,4 @@
+```yaml
 name: Deploy
 
 on:
@@ -37,7 +38,13 @@ jobs:
 
             npm run build
 
-            pm2 restart sekolah-tk-2
+            if pm2 describe sekolah-tk-2 > /dev/null 2>&1; then
+              PORT=3002 pm2 restart sekolah-tk-2 --update-env
+            else
+              PORT=3002 pm2 start npm --name sekolah-tk-2 -- start
+            fi
+
+            pm2 save
 
       - name: Calculate Duration
         if: always()
@@ -85,6 +92,8 @@ jobs:
             🖥 *Server:*
             `${{ secrets.VPS_HOST }}`
 
+            🌐 *Application Port:* `3002`
+
             🕒 *Finished:* `${{ env.FINISHED }}`
             ⏱ *Duration:* `${{ env.DURATION }}`
 
@@ -115,6 +124,8 @@ jobs:
             🖥 *Server:*
             `${{ secrets.VPS_HOST }}`
 
+            🌐 *Application Port:* `3002`
+
             🕒 *Finished:* `${{ env.FINISHED }}`
             ⏱ *Duration:* `${{ env.DURATION }}`
 
@@ -122,3 +133,4 @@ jobs:
 
             👉 *Check GitHub Actions:*
             https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+```
