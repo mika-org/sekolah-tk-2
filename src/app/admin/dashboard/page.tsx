@@ -871,6 +871,7 @@ export default function AdminDashboardPage() {
       const url = isEdit ? `/api/programs/${editingProgram.id}` : "/api/programs";
       const method = isEdit ? "PUT" : "POST";
 
+      
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
