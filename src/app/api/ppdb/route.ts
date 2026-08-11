@@ -43,7 +43,10 @@ export async function GET(req: Request) {
     const registrations = await prisma.ppdbRegistration.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      include: { school: true },
+      include: {
+        school: true,
+        feeSelections: { orderBy: { createdAt: "asc" } },
+      },
     });
 
     return NextResponse.json({ success: true, data: registrations });
@@ -80,6 +83,81 @@ export async function POST(req: Request) {
     const randomDigits = Math.floor(1000 + Math.random() * 9000);
     const registrationNo = body.registrationNo || `PPDB-2026-${randomDigits}`;
 
+    const usesDynamicFeeSelection = Array.isArray(body.selectedFeeComponentIds);
+    const selectedFeeComponentIds: string[] = usesDynamicFeeSelection
+      ? Array.from(
+          new Set<string>(
+            (body.selectedFeeComponentIds as unknown[])
+              .map((id) => String(id || "").trim())
+              .filter(Boolean)
+          )
+        )
+      : [];
+
+    if (usesDynamicFeeSelection && selectedFeeComponentIds.length === 0) {
+      return NextResponse.json(
+        { success: false, error: "Pilih minimal satu komponen biaya PPDB" },
+        { status: 400 }
+      );
+    }
+
+    const selectedFeeComponents = usesDynamicFeeSelection
+      ? await prisma.feeComponent.findMany({
+          where: {
+            id: { in: selectedFeeComponentIds },
+            schoolId: targetSchoolId,
+            category: "PPDB",
+            isActive: true,
+          },
+          orderBy: { orderIndex: "asc" },
+        })
+      : [];
+
+    if (
+      usesDynamicFeeSelection &&
+      selectedFeeComponents.length !== selectedFeeComponentIds.length
+    ) {
+      return NextResponse.json(
+        { success: false, error: "Ada komponen PPDB yang tidak valid atau sudah tidak aktif" },
+        { status: 400 }
+      );
+    }
+
+    if (usesDynamicFeeSelection) {
+      const requiredComponents = await prisma.feeComponent.findMany({
+        where: {
+          schoolId: targetSchoolId,
+          category: "PPDB",
+          isActive: true,
+          isRequired: true,
+        },
+        select: { id: true, name: true },
+      });
+      const missingRequired = requiredComponents.filter(
+        (component) => !selectedFeeComponentIds.includes(component.id)
+      );
+      if (missingRequired.length > 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Komponen wajib belum dipilih: ${missingRequired
+              .map((component) => component.name)
+              .join(", ")}`,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    const selectedItemNames = usesDynamicFeeSelection
+      ? selectedFeeComponents.map((component) => component.name)
+      : body.selectedItems;
+    const ppdbTotalAmount = usesDynamicFeeSelection
+      ? selectedFeeComponents.reduce((sum, component) => sum + component.amount, 0)
+      : body.totalAmount
+        ? Number(body.totalAmount)
+        : 200000;
+
     const registration = await prisma.ppdbRegistration.create({
       data: {
         schoolId: targetSchoolId,
@@ -102,16 +180,38 @@ export async function POST(req: Request) {
         docKtpUrl: body.docKtpUrl || null,
         buktiBayarUrl: body.buktiBayarUrl || null,
         paymentMethod: body.paymentMethod || "bank",
+        selectedItems: selectedItemNames
+          ? typeof selectedItemNames === "string"
+            ? selectedItemNames
+            : JSON.stringify(selectedItemNames)
+          : null,
+        totalAmount: ppdbTotalAmount,
         status: "PENDING",
+        ...(usesDynamicFeeSelection && {
+          feeSelections: {
+            create: selectedFeeComponents.map((component) => ({
+              feeComponentId: component.id,
+              componentCode: component.code,
+              componentName: component.name,
+              amount: component.amount,
+            })),
+          },
+        }),
       },
-      include: { school: true },
+      include: {
+        school: true,
+        feeSelections: { orderBy: { createdAt: "asc" } },
+      },
     });
 
-    return NextResponse.json({
-      success: true,
-      data: registration,
-      message: "Pendaftaran PPDB berhasil dikirim",
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: registration,
+        message: "Pendaftaran PPDB berhasil dikirim",
+      },
+      { status: 201 }
+    );
   } catch (error: any) {
     console.error("Error creating PPDB registration:", error);
     return NextResponse.json(

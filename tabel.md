@@ -270,5 +270,13 @@ Setiap entitas memuat kolom `schoolId` (Foreign Key ke `School`):
 | `POST` | `/api/spp` | `ALL_ADMIN` | Menambahkan catatan SPP baru |
 | `PATCH` | `/api/spp/[id]` | `ALL_ADMIN` | Memperbarui status pembayaran SPP |
 | `DELETE` | `/api/spp/[id]` | `ALL_ADMIN` | Menghapus catatan SPP |
+| `GET` | `/api/bank-accounts` | `PUBLIC / ALL` | Mengambil daftar rekening bank (filter `schoolId` / `schoolCode`) |
+| `POST` | `/api/bank-accounts` | `ALL_ADMIN` | Menambahkan rekening bank baru |
+| `PUT` | `/api/bank-accounts` | `ALL_ADMIN` | Memperbarui detail / status aktif rekening bank |
+| `DELETE` | `/api/bank-accounts` | `ALL_ADMIN` | Menghapus rekening bank |
+| `GET` | `/api/additional-fees` | `ALL_ADMIN / ORTU` | Mengambil data tagihan biaya tambahan (terpisah dari SPP) |
+| `POST` | `/api/additional-fees` | `ALL_ADMIN` | Menambahkan tagihan biaya tambahan baru (single / batch kelas) |
+| `PATCH` | `/api/additional-fees` | `ALL_ADMIN` | Memperbarui status tagihan / bukti bayar biaya tambahan |
+| `DELETE` | `/api/additional-fees` | `ALL_ADMIN` | Menghapus tagihan biaya tambahan |
 
 

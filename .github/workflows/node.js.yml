@@ -36,10 +36,10 @@ jobs:
 
             npm run build
 
-            if pm2 describe sekolah-tk-2 > /dev/null 2>&1; then
-              PORT=3002 pm2 restart sekolah-tk-2 --update-env
+            if pm2 describe smart_kids > /dev/null 2>&1; then
+              PORT=3002 pm2 restart smart_kids --update-env
             else
-              PORT=3002 pm2 start npm --name sekolah-tk-2 -- start
+              PORT=3002 pm2 start npm --name smart_kids -- start
             fi
 
             pm2 save

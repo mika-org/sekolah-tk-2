@@ -49,6 +49,9 @@ model School {
   announcements     Announcement[]
   leaveRequests     LeaveRequest[]
   classRooms        ClassRoom[]
+  bankAccounts      BankAccount[]
+  additionalFees    AdditionalFee[]
+  feeComponents     FeeComponent[]
 
   @@map("sekolah")
 }
@@ -66,8 +69,8 @@ model ClassRoom {
   createdAt           DateTime @default(now()) @map("dibuat_pada")
   updatedAt           DateTime @updatedAt @map("diperbarui_pada")
 
-  teachers Teacher[]
-  students Student[]
+  teachers  Teacher[]
+  students  Student[]
   schedules Schedule[]
 
   @@map("kelas")
@@ -105,6 +108,7 @@ model SiteProfile {
   instagram     String   @default("smartkids") @map("instagram")
   facebook      String   @default("Smart Kids") @map("facebook")
   address       String?  @default("DeKeraton, Karawang") @map("alamat")
+  qrisImageUrl  String?  @default("/images/qris_default.png") @map("url_gambar_qris")
   updatedAt     DateTime @updatedAt @map("diperbarui_pada")
 
   @@map("profil_situs")
@@ -178,9 +182,13 @@ model PpdbRegistration {
   docKtpUrl      String?  @map("url_doc_ktp")
   buktiBayarUrl  String?  @map("url_bukti_bayar")
   paymentMethod  String   @default("bank") @map("metode_pembayaran")
+  selectedItems  String?  @map("item_terpilih")
+  totalAmount    Float?   @default(200000) @map("total_biaya")
   status         String   @default("PENDING") @map("status")
   createdAt      DateTime @default(now()) @map("dibuat_pada")
   updatedAt      DateTime @updatedAt @map("diperbarui_pada")
+
+  feeSelections PpdbFeeSelection[]
 
   @@map("pendaftaran_ppdb")
 }
@@ -238,39 +246,39 @@ model TeacherProgress {
   @@map("capaian_progresif_guru")
 }
 
-
 model Student {
-  id              String     @id @default(uuid())
-  schoolId        String     @map("id_sekolah")
-  school          School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  classId         String?    @map("id_kelas")
-  classRoom       ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
-  name            String     @map("nama")
-  nisn            String     @unique @map("nisn")
-  username        String?    @unique @map("nama_pengguna")
-  passwordHash    String?    @map("kata_sandi_hash")
-  className       String     @map("nama_kelas")
-  gender          String     @default("L") @map("jenis_kelamin")
-  qrCode          String?    @map("kode_qr")
-  avatarUrl       String     @default("https://i.pravatar.cc/150") @map("url_avatar")
-  birthPlaceDate  String     @map("tempat_tanggal_lahir")
-  parentName      String     @map("nama_orang_tua")
-  parentPhone     String     @map("telepon_orang_tua")
-  parentEmail     String?    @map("email_orang_tua")
-  address         String     @map("alamat")
-  attendanceRate  Float      @default(95.0) @map("persentase_kehadiran")
-  averageGrade    Float      @default(88.5) @map("rata_rata_nilai")
-  dailyGrade      Float      @default(85.0) @map("nilai_harian")
-  semesterGrade   Float      @default(90.0) @map("nilai_semester")
-  attendanceWeight Float     @default(20.0) @map("bobot_kehadiran")
-  dailyWeight     Float      @default(40.0) @map("bobot_harian")
-  semesterWeight  Float      @default(40.0) @map("bobot_semester")
-  createdAt       DateTime   @default(now()) @map("dibuat_pada")
-  updatedAt       DateTime   @updatedAt @map("diperbarui_pada")
+  id               String     @id @default(uuid())
+  schoolId         String     @map("id_sekolah")
+  school           School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId          String?    @map("id_kelas")
+  classRoom        ClassRoom? @relation(fields: [classId], references: [id], onDelete: SetNull)
+  name             String     @map("nama")
+  nisn             String     @unique @map("nisn")
+  username         String?    @unique @map("nama_pengguna")
+  passwordHash     String?    @map("kata_sandi_hash")
+  className        String     @map("nama_kelas")
+  gender           String     @default("L") @map("jenis_kelamin")
+  qrCode           String?    @map("kode_qr")
+  avatarUrl        String     @default("https://i.pravatar.cc/150") @map("url_avatar")
+  birthPlaceDate   String     @map("tempat_tanggal_lahir")
+  parentName       String     @map("nama_orang_tua")
+  parentPhone      String     @map("telepon_orang_tua")
+  parentEmail      String?    @map("email_orang_tua")
+  address          String     @map("alamat")
+  attendanceRate   Float      @default(95.0) @map("persentase_kehadiran")
+  averageGrade     Float      @default(88.5) @map("rata_rata_nilai")
+  dailyGrade       Float      @default(85.0) @map("nilai_harian")
+  semesterGrade    Float      @default(90.0) @map("nilai_semester")
+  attendanceWeight Float      @default(20.0) @map("bobot_kehadiran")
+  dailyWeight      Float      @default(40.0) @map("bobot_harian")
+  semesterWeight   Float      @default(40.0) @map("bobot_semester")
+  createdAt        DateTime   @default(now()) @map("dibuat_pada")
+  updatedAt        DateTime   @updatedAt @map("diperbarui_pada")
 
-  attendances     Attendance[]
-  sppRecords      SppRecord[]
-  dailyGrades     DailyGrade[]
+  attendances    Attendance[]
+  sppRecords     SppRecord[]
+  dailyGrades    DailyGrade[]
+  additionalFees AdditionalFee[]
 
   @@map("siswa")
 }
@@ -385,4 +393,84 @@ model SppRecord {
   createdAt     DateTime @default(now()) @map("dibuat_pada")
 
   @@map("catatan_spp")
+}
+
+model BankAccount {
+  id            String   @id @default(uuid())
+  schoolId      String?  @map("id_sekolah")
+  school        School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  bankName      String   @map("nama_bank")
+  accountNumber String   @map("nomor_rekening")
+  accountHolder String   @map("atas_nama")
+  logoUrl       String?  @map("url_logo_bank")
+  isActive      Boolean  @default(true) @map("aktif")
+  createdAt     DateTime @default(now()) @map("dibuat_pada")
+  updatedAt     DateTime @updatedAt @map("diperbarui_pada")
+
+  @@map("rekening_bank")
+}
+
+model FeeComponent {
+  id          String   @id @default(uuid())
+  schoolId    String   @map("id_sekolah")
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  code        String   @map("kode")
+  name        String   @map("nama")
+  category    String   @map("kategori") // PPDB, ADDITIONAL
+  description String?  @map("deskripsi")
+  amount      Float    @map("jumlah")
+  isRequired  Boolean  @default(false) @map("wajib")
+  isActive    Boolean  @default(true) @map("aktif")
+  orderIndex  Int      @default(0) @map("urutan")
+  createdAt   DateTime @default(now()) @map("dibuat_pada")
+  updatedAt   DateTime @updatedAt @map("diperbarui_pada")
+
+  ppdbSelections PpdbFeeSelection[]
+  additionalFees AdditionalFee[]
+
+  @@unique([schoolId, code])
+  @@index([schoolId, category, isActive])
+  @@map("komponen_biaya")
+}
+
+model PpdbFeeSelection {
+  id             String           @id @default(uuid())
+  registrationId String           @map("id_pendaftaran")
+  registration   PpdbRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  feeComponentId String?          @map("id_komponen_biaya")
+  feeComponent   FeeComponent?    @relation(fields: [feeComponentId], references: [id], onDelete: SetNull)
+  componentCode  String           @map("kode_komponen")
+  componentName  String           @map("nama_komponen")
+  amount         Float            @map("jumlah")
+  createdAt      DateTime         @default(now()) @map("dibuat_pada")
+
+  @@unique([registrationId, componentCode])
+  @@index([registrationId])
+  @@index([feeComponentId])
+  @@map("pilihan_biaya_ppdb")
+}
+
+model AdditionalFee {
+  id             String        @id @default(uuid())
+  schoolId       String?       @map("id_sekolah")
+  school         School?       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId      String?       @map("id_siswa")
+  student        Student?      @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  feeComponentId String?       @map("id_komponen_biaya")
+  feeComponent   FeeComponent? @relation(fields: [feeComponentId], references: [id], onDelete: SetNull)
+  studentName    String        @map("nama_siswa")
+  nisn           String?       @map("nisn")
+  className      String?       @map("nama_kelas")
+  feeName        String        @map("nama_biaya")
+  amount         Float         @map("jumlah")
+  status         String        @default("belum_lunas") @map("status")
+  paymentDate    String?       @map("tanggal_pembayaran")
+  dueDate        String?       @map("tenggat_waktu")
+  proofUrl       String?       @map("url_bukti_bayar")
+  paymentMethod  String?       @default("TRANSFER") @map("metode_pembayaran")
+  note           String?       @map("catatan")
+  createdAt      DateTime      @default(now()) @map("dibuat_pada")
+  updatedAt      DateTime      @updatedAt @map("diperbarui_pada")
+
+  @@map("biaya_tambahan")
 }

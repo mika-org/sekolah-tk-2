@@ -64,6 +64,8 @@ export default function AdminDashboardPage() {
     | "attendance"
     | "teacher-attendance"
     | "spp"
+    | "additional-fees"
+    | "payment-settings"
     | "announcements"
     | "leave-requests"
     | "schedules"
@@ -186,6 +188,20 @@ export default function AdminDashboardPage() {
     notes: "",
   });
   const [sendingAccount, setSendingAccount] = useState<boolean>(false);
+
+  // Additional Fees States
+  const [additionalFeesList, setAdditionalFeesList] = useState<any[]>([]);
+  const [additionalFeeSearch, setAdditionalFeeSearch] = useState<string>("");
+  const [additionalFeeStatusFilter, setAdditionalFeeStatusFilter] = useState<string>("ALL");
+  const [additionalFeeCategoryFilter, setAdditionalFeeCategoryFilter] = useState<string>("ALL");
+  const [editingAdditionalFee, setEditingAdditionalFee] = useState<any | null>(null);
+  const [feeComponentsList, setFeeComponentsList] = useState<any[]>([]);
+  const [editingFeeComponent, setEditingFeeComponent] = useState<any | null>(null);
+
+  // Bank Accounts & Payment Methods States
+  const [bankAccountsList, setBankAccountsList] = useState<any[]>([]);
+  const [editingBankAccount, setEditingBankAccount] = useState<any | null>(null);
+  const [uploadingQris, setUploadingQris] = useState<boolean>(false);
   const [selectedCredentialModal, setSelectedCredentialModal] = useState<{
     studentName: string;
     username: string;
@@ -493,7 +509,7 @@ export default function AdminDashboardPage() {
     try {
       const queryParam = selectedSchoolId && selectedSchoolId !== "ALL" ? `?schoolId=${selectedSchoolId}` : "";
 
-      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp, resTeachAtt, resClasses, resDailyGrades, resTeachProg] = await Promise.all([
+      const [resPpdb, resProg, resTeach, resGal, resTest, resProf, resStud, resSched, resAtt, resLeave, resAnn, resSpp, resTeachAtt, resClasses, resDailyGrades, resTeachProg, resAddFees, resBanks, resFeeComponents] = await Promise.all([
         fetch(`/api/ppdb${queryParam}`).then((r) => r.json()),
         fetch(`/api/programs${queryParam}`).then((r) => r.json()),
         fetch(`/api/teachers${queryParam}`).then((r) => r.json()),
@@ -510,6 +526,9 @@ export default function AdminDashboardPage() {
         fetch(`/api/classes${queryParam}`).then((r) => r.json()),
         fetch(`/api/daily-grades${queryParam}`).then((r) => r.json()),
         fetch(`/api/teacher-progress${queryParam}`).then((r) => r.json()),
+        fetch(`/api/additional-fees${queryParam}`).then((r) => r.json()),
+        fetch(`/api/bank-accounts${queryParam}`).then((r) => r.json()),
+        fetch(`/api/fee-components${queryParam}${queryParam ? "&" : "?"}includeInactive=true`).then((r) => r.json()),
       ]);
 
       if (resPpdb.success) setPpdbList(resPpdb.data || []);
@@ -528,6 +547,9 @@ export default function AdminDashboardPage() {
       if (resClasses.success) setClassesList(resClasses.data || []);
       if (resDailyGrades.success) setDailyGradesList(resDailyGrades.data || []);
       if (resTeachProg && resTeachProg.success) setTeacherProgressList(resTeachProg.data || []);
+      if (resAddFees && resAddFees.success) setAdditionalFeesList(resAddFees.data || []);
+      if (resBanks && resBanks.success) setBankAccountsList(resBanks.data || []);
+      if (resFeeComponents && resFeeComponents.success) setFeeComponentsList(resFeeComponents.data || []);
     } catch (err: any) {
       showMessage("Gagal memuat data", "error");
     } finally {
@@ -1528,6 +1550,198 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Fee component master handlers (soft-disable only; historical snapshots are retained).
+  const handleSaveFeeComponent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const isEdit = !!editingFeeComponent?.id;
+      const response = await fetch("/api/fee-components", {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingFeeComponent,
+          schoolId:
+            editingFeeComponent.schoolId ||
+            (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error);
+
+      showMessage(data.message || "Komponen biaya berhasil disimpan", "success");
+      setEditingFeeComponent(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message || "Gagal menyimpan komponen biaya", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Additional Fees Handlers
+  const handleSaveAdditionalFee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const isEdit = !!editingAdditionalFee?.id;
+      const url = "/api/additional-fees";
+      const method = isEdit ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingAdditionalFee,
+          schoolId: editingAdditionalFee.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(data.message || (isEdit ? "Biaya tambahan diperbarui" : "Tagihan biaya tambahan dibuat"), "success");
+      setEditingAdditionalFee(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAdditionalFee = async (id: string) => {
+    if (!confirm("Hapus tagihan biaya tambahan ini?")) return;
+    try {
+      const res = await fetch(`/api/additional-fees?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Tagihan biaya tambahan dihapus", "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  const handleUpdateAdditionalFeeStatus = async (id: string, status: string) => {
+    try {
+      const res = await fetch("/api/additional-fees", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          status,
+          paymentDate: status === "lunas" ? new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(`Status tagihan diperbarui ke ${status.replace("_", " ")}`, "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Bank Account & QRIS Handlers
+  const handleSaveBankAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const isEdit = !!editingBankAccount?.id;
+      const url = "/api/bank-accounts";
+      const method = isEdit ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingBankAccount,
+          schoolId: editingBankAccount.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(data.message || (isEdit ? "Rekening bank diperbarui" : "Rekening bank ditambahkan"), "success");
+      setEditingBankAccount(null);
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBankAccount = async (id: string) => {
+    if (!confirm("Hapus nomor rekening bank ini?")) return;
+    try {
+      const res = await fetch(`/api/bank-accounts?id=${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage("Rekening bank berhasil dihapus", "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  const handleToggleBankAccountStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch("/api/bank-accounts", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, isActive: !currentStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      showMessage(`Rekening bank ${!currentStatus ? "diaktifkan" : "dinonaktifkan"}`, "success");
+      loadDataForSelectedSchool();
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  const handleUploadQrisImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingQris(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "qris");
+
+      const resUpload = await fetch("/api/upload", { method: "POST", body: formData });
+      const dataUpload = await resUpload.json();
+      if (!resUpload.ok || !dataUpload.success) throw new Error(dataUpload.error || "Gagal mengunggah QRIS");
+
+      const newUrl = dataUpload.url;
+      const targetSchoolId = siteProfile.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id);
+
+      const resProf = await fetch("/api/site-profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...siteProfile,
+          schoolId: targetSchoolId,
+          qrisImageUrl: newUrl,
+        }),
+      });
+      const dataProf = await resProf.json();
+      if (!resProf.ok || !dataProf.success) throw new Error(dataProf.error);
+
+      setSiteProfile((prev: any) => ({ ...prev, qrisImageUrl: newUrl }));
+      showMessage("Gambar QRIS barcode berhasil diperbarui!", "success");
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    } finally {
+      setUploadingQris(false);
+    }
+  };
+
   // Filtered PPDB List & Pagination Calculations
   const filteredPpdb = ppdbList.filter((item) => {
     const matchesStatus =
@@ -1547,6 +1761,11 @@ export default function AdminDashboardPage() {
     (ppdbPage - 1) * ppdbItemsPerPage,
     ppdbPage * ppdbItemsPerPage
   );
+
+  const additionalFeeComponents = feeComponentsList.filter(
+    (component) => component.category === "ADDITIONAL" && component.isActive !== false
+  );
+  const defaultAdditionalFeeComponent = additionalFeeComponents[0];
 
   const activeSchoolName = schoolsList.find((s) => s.id === selectedSchoolId)?.name || "Semua Sekolah (Yayasan Level)";
 
@@ -1877,10 +2096,48 @@ export default function AdminDashboardPage() {
               >
                 <div className="flex items-center gap-3">
                   <CreditCard className="w-4 h-4 text-amber-400" />
-                  <span>SPP & Keuangan</span>
+                  <span>SPP Utama</span>
                 </div>
                 <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
                   {sppList.length}
+                </span>
+              </button>
+            )}
+
+            {admin?.role !== "GURU" && (
+              <button
+                onClick={() => setActiveTab("additional-fees")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "additional-fees"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Layers className="w-4 h-4 text-emerald-400" />
+                  <span>Biaya Tambahan</span>
+                </div>
+                <span className="bg-emerald-500/20 text-emerald-300 text-[11px] px-2.5 py-0.5 rounded-full font-black border border-emerald-500/30">
+                  {additionalFeesList.length}
+                </span>
+              </button>
+            )}
+
+            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+              <button
+                onClick={() => setActiveTab("payment-settings")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === "payment-settings"
+                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
+                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <QrCode className="w-4 h-4 text-cyan-400" />
+                  <span>Metode Pembayaran</span>
+                </div>
+                <span className="bg-slate-800 text-cyan-300 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
+                  {bankAccountsList.length}
                 </span>
               </button>
             )}
@@ -3611,6 +3868,37 @@ export default function AdminDashboardPage() {
                         <p>WhatsApp: {selectedPpdb.noWhatsapp}</p>
                         <p>Email: {selectedPpdb.email}</p>
                       </div>
+                    </div>
+
+                    {/* Snapshot biaya dipertahankan agar perubahan master tidak mengubah histori PPDB. */}
+                    <div className="bg-emerald-950/20 p-4 rounded-2xl border border-emerald-500/30 space-y-3 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider">
+                          Komponen Paket PPDB Terpilih
+                        </p>
+                        <span className="font-black text-emerald-300 text-sm">
+                          Rp {Number(selectedPpdb.totalAmount || 0).toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                      {selectedPpdb.feeSelections?.length ? (
+                        <div className="space-y-1.5">
+                          {selectedPpdb.feeSelections.map((selection: any) => (
+                            <div
+                              key={selection.id}
+                              className="flex items-center justify-between gap-3 border-b border-emerald-900/50 pb-1.5"
+                            >
+                              <span className="text-slate-300">{selection.componentName}</span>
+                              <span className="font-bold text-white">
+                                Rp {Number(selection.amount).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-slate-400">
+                          Data lama: {selectedPpdb.selectedItems || "Rincian item belum tersimpan"}
+                        </p>
+                      )}
                     </div>
 
                     {/* Dokumen Terunggah */}
@@ -5600,6 +5888,820 @@ export default function AdminDashboardPage() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: BIAYA TAMBAHAN (TERPISAH DARI SPP) */}
+          {activeTab === "additional-fees" && (
+            <div className="space-y-6 w-full">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-black text-white tracking-tight">Biaya Tambahan (Terpisah dari SPP)</h2>
+                    <span className="bg-emerald-500/20 text-emerald-300 text-xs font-extrabold px-3 py-1 rounded-full border border-emerald-500/30">
+                      Kelompok Biaya Khusus
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Kelola tagihan biaya kegiatan, edukasi, wisuda, dan tes tahap siswa yang terpisah dari tagihan bulanan SPP.
+                  </p>
+                </div>
+
+                {admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+                  <button
+                    onClick={() =>
+                      setEditingAdditionalFee({
+                        studentId: studentsList[0]?.id || "",
+                        studentName: studentsList[0]?.name || "",
+                        nisn: studentsList[0]?.nisn || "",
+                        className: studentsList[0]?.className || "TK A",
+                        feeComponentId: defaultAdditionalFeeComponent?.id || "",
+                        feeName: defaultAdditionalFeeComponent?.name || "",
+                        amount: defaultAdditionalFeeComponent?.amount || 0,
+                        status: "belum_lunas",
+                        dueDate: "30 Agustus 2026",
+                        isBatchForClass: false,
+                      })
+                    }
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Buat Tagihan Biaya Tambahan</span>
+                  </button>
+                )}
+              </div>
+
+              {/* MASTER KOMPONEN BIAYA: tersimpan per sekolah dan dapat diubah tanpa migrasi baru. */}
+              <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-5 space-y-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-white text-sm">Master Komponen Biaya</h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Harga PPDB dan biaya tambahan dibaca langsung dari database. Menonaktifkan item tidak mengubah histori tagihan.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEditingFeeComponent({
+                        name: "",
+                        code: "",
+                        category: "ADDITIONAL",
+                        description: "",
+                        amount: 0,
+                        isRequired: false,
+                        isActive: true,
+                        orderIndex: feeComponentsList.length * 10 + 10,
+                      })
+                    }
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Tambah Komponen
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {["PPDB", "ADDITIONAL"].map((category) => (
+                    <div key={category} className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-2">
+                      <p className="text-[10px] font-black tracking-wider text-emerald-400 uppercase">
+                        {category === "PPDB" ? "Paket PPDB" : "Biaya Tambahan"}
+                      </p>
+                      {feeComponentsList
+                        .filter((component) => component.category === category)
+                        .map((component) => (
+                          <button
+                            type="button"
+                            key={component.id}
+                            onClick={() => setEditingFeeComponent({ ...component })}
+                            className="w-full flex items-center justify-between gap-3 p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-left"
+                          >
+                            <div className="min-w-0">
+                              <p className={`text-xs font-bold truncate ${component.isActive ? "text-white" : "text-slate-500 line-through"}`}>
+                                {component.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 truncate">
+                                {component.school?.name || "Sekolah"} • {component.code}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-[11px] font-black text-emerald-400">
+                                Rp {Number(component.amount).toLocaleString("id-ID")}
+                              </span>
+                              <Edit className="w-3.5 h-3.5 text-slate-500" />
+                            </div>
+                          </button>
+                        ))}
+                    </div>
+                  ))}
+                </div>
+
+                {editingFeeComponent && (
+                  <form
+                    onSubmit={handleSaveFeeComponent}
+                    className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-4 space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-black text-white">
+                        {editingFeeComponent.id ? "Edit Komponen Biaya" : "Komponen Biaya Baru"}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setEditingFeeComponent(null)}
+                        className="p-1.5 bg-slate-800 text-slate-400 rounded-lg"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                      <input
+                        required
+                        value={editingFeeComponent.name || ""}
+                        onChange={(e) => setEditingFeeComponent({ ...editingFeeComponent, name: e.target.value })}
+                        placeholder="Nama komponen"
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                      <input
+                        required
+                        value={editingFeeComponent.code || ""}
+                        onChange={(e) => setEditingFeeComponent({ ...editingFeeComponent, code: e.target.value })}
+                        placeholder="Kode unik"
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                      <select
+                        value={editingFeeComponent.category || "ADDITIONAL"}
+                        onChange={(e) => setEditingFeeComponent({ ...editingFeeComponent, category: e.target.value })}
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                      >
+                        <option value="PPDB">Paket PPDB</option>
+                        <option value="ADDITIONAL">Biaya Tambahan</option>
+                      </select>
+                      <input
+                        type="number"
+                        min="0"
+                        required
+                        value={editingFeeComponent.amount ?? 0}
+                        onChange={(e) => setEditingFeeComponent({ ...editingFeeComponent, amount: Number(e.target.value) })}
+                        placeholder="Nominal"
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3 items-center">
+                      <input
+                        value={editingFeeComponent.description || ""}
+                        onChange={(e) => setEditingFeeComponent({ ...editingFeeComponent, description: e.target.value })}
+                        placeholder="Deskripsi komponen"
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                      <label className="flex items-center gap-2 text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={editingFeeComponent.isRequired === true}
+                          onChange={(e) => setEditingFeeComponent({ ...editingFeeComponent, isRequired: e.target.checked })}
+                        />
+                        Wajib
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={editingFeeComponent.isActive !== false}
+                          onChange={(e) => setEditingFeeComponent({ ...editingFeeComponent, isActive: e.target.checked })}
+                        />
+                        Aktif
+                      </label>
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold"
+                      >
+                        {saving ? "Menyimpan..." : "Simpan Master Komponen"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* QUICK SHORTCUT CARDS UNTUK 5 PAKET BIAYA TAMBAHAN */}
+              <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-5 space-y-3 shadow-xl">
+                <span className="text-[11px] font-black uppercase text-emerald-400 tracking-wider block">
+                  ⚡ Pintasan Cepat Paket Biaya Tambahan (Klik untuk Buat Tagihan):
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                  {additionalFeeComponents.map((pkg) => (
+                    <button
+                      key={pkg.id}
+                      onClick={() =>
+                        setEditingAdditionalFee({
+                          studentId: studentsList[0]?.id || "",
+                          studentName: studentsList[0]?.name || "",
+                          nisn: studentsList[0]?.nisn || "",
+                          className: studentsList[0]?.className || "TK A",
+                          feeComponentId: pkg.id,
+                          feeName: pkg.name,
+                          amount: pkg.amount,
+                          status: "belum_lunas",
+                          dueDate: "30 Agustus 2026",
+                          isBatchForClass: false,
+                        })
+                      }
+                      className="p-3 bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-emerald-500/50 rounded-2xl text-left transition-all text-xs group shadow-xs cursor-pointer"
+                    >
+                      <div className="flex items-center justify-between text-base mb-1">
+                        <span>💳</span>
+                        <Plus className="w-3.5 h-3.5 text-slate-500 group-hover:text-emerald-400" />
+                      </div>
+                      <div className="font-bold text-white group-hover:text-emerald-300 transition-colors line-clamp-1">
+                        {pkg.name}
+                      </div>
+                      <div className="text-[11px] font-extrabold text-emerald-400 mt-0.5">
+                        Rp {pkg.amount.toLocaleString("id-ID")}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* FORM CREATE / EDIT ADDITIONAL FEE MODAL */}
+              {editingAdditionalFee && (
+                <form
+                  onSubmit={handleSaveAdditionalFee}
+                  className="bg-slate-900/95 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full"
+                >
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <h3 className="font-bold text-white text-base">
+                      {editingAdditionalFee.id ? "Edit Tagihan Biaya Tambahan" : "Buat Tagihan Biaya Tambahan Baru"}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setEditingAdditionalFee(null)}
+                      className="p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded-xl"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Batch Choice */}
+                  {!editingAdditionalFee.id && (
+                    <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-2xl flex items-center gap-3 text-xs text-emerald-300 font-semibold">
+                      <input
+                        type="checkbox"
+                        id="batchCheck"
+                        checked={editingAdditionalFee.isBatchForClass || false}
+                        onChange={(e) =>
+                          setEditingAdditionalFee({ ...editingAdditionalFee, isBatchForClass: e.target.checked })
+                        }
+                        className="w-4 h-4 text-emerald-600 rounded border-slate-700"
+                      />
+                      <label htmlFor="batchCheck" className="cursor-pointer">
+                        Buat tagihan sekaligus untuk <strong>Seluruh Siswa dalam 1 Kelas</strong> (Batch Class)
+                      </label>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {!editingAdditionalFee.isBatchForClass ? (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Murid / Siswa</label>
+                        <SearchableSelect
+                          options={studentsList.map((s) => ({
+                            value: s.id,
+                            label: s.name,
+                            sublabel: `NISN: ${s.nisn} • ${s.className}`,
+                          }))}
+                          value={
+                            editingAdditionalFee.studentId ||
+                            studentsList.find((s) => s.name === editingAdditionalFee.studentName)?.id ||
+                            ""
+                          }
+                          onChange={(selectedId) => {
+                            const found = studentsList.find((s) => s.id === selectedId);
+                            if (found) {
+                              setEditingAdditionalFee({
+                                ...editingAdditionalFee,
+                                studentId: found.id,
+                                studentName: found.name,
+                                nisn: found.nisn,
+                                className: found.className,
+                              });
+                            }
+                          }}
+                          placeholder="Pilih nama siswa..."
+                        />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Kelas Sasaran</label>
+                        <SearchableSelect
+                          options={classesList.map((c) => ({
+                            value: c.name,
+                            label: c.name,
+                            sublabel: `Tingkat: ${c.gradeLevel}`,
+                          }))}
+                          value={editingAdditionalFee.className || "TK A"}
+                          onChange={(val) => setEditingAdditionalFee({ ...editingAdditionalFee, className: val })}
+                          placeholder="Pilih kelas..."
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Jenis / Nama Biaya</label>
+                      <SearchableSelect
+                        options={additionalFeeComponents.map((component) => ({
+                          value: component.id,
+                          label: `${component.name} (Rp${Number(component.amount).toLocaleString("id-ID")})`,
+                        }))}
+                        value={
+                          editingAdditionalFee.feeComponentId ||
+                          additionalFeeComponents.find(
+                            (component) => component.name === editingAdditionalFee.feeName
+                          )?.id ||
+                          ""
+                        }
+                        onChange={(val) => {
+                          const component = additionalFeeComponents.find(
+                            (item) => item.id === val
+                          );
+                          if (!component) return;
+                          setEditingAdditionalFee({
+                            ...editingAdditionalFee,
+                            feeComponentId: component.id,
+                            feeName: component.name,
+                            amount: component.amount,
+                          });
+                        }}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Nominal (Rp)</label>
+                      <input
+                        type="number"
+                        required
+                        value={editingAdditionalFee.amount}
+                        onChange={(e) =>
+                          setEditingAdditionalFee({ ...editingAdditionalFee, amount: Number(e.target.value) })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Status Tagihan</label>
+                      <SearchableSelect
+                        options={[
+                          { value: "belum_lunas", label: "Belum Lunas" },
+                          { value: "lunas", label: "Lunas (Sudah Dibayar)" },
+                          { value: "menunggu_konfirmasi", label: "Menunggu Konfirmasi" },
+                        ]}
+                        value={editingAdditionalFee.status || "belum_lunas"}
+                        onChange={(val) => setEditingAdditionalFee({ ...editingAdditionalFee, status: val })}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">Tenggat Waktu / Catatan</label>
+                      <input
+                        type="text"
+                        value={editingAdditionalFee.dueDate || ""}
+                        onChange={(e) => setEditingAdditionalFee({ ...editingAdditionalFee, dueDate: e.target.value })}
+                        placeholder="Contoh: 30 Agustus 2026"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingAdditionalFee(null)}
+                      className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                    >
+                      {saving ? "Memproses..." : "Simpan Tagihan Biaya Tambahan"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* SEARCH & CATEGORY FILTER BAR */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-3xl border border-slate-800 shadow-lg w-full">
+                <div className="relative flex-1 w-full">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <input
+                    type="text"
+                    value={additionalFeeSearch}
+                    onChange={(e) => setAdditionalFeeSearch(e.target.value)}
+                    placeholder="🔍 Cari nama siswa, NISN, atau jenis biaya tambahan..."
+                    className="w-full pl-10 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <SearchableSelect
+                    options={[
+                      { value: "ALL", label: "Semua Kategori Biaya" },
+                      ...additionalFeeComponents.map((component) => ({
+                        value: component.name,
+                        label: component.name,
+                      })),
+                    ]}
+                    value={additionalFeeCategoryFilter}
+                    onChange={(val) => setAdditionalFeeCategoryFilter(val)}
+                  />
+
+                  <SearchableSelect
+                    options={[
+                      { value: "ALL", label: "Semua Status" },
+                      { value: "lunas", label: "Lunas" },
+                      { value: "belum_lunas", label: "Belum Lunas" },
+                      { value: "menunggu_konfirmasi", label: "Menunggu Konfirmasi" },
+                    ]}
+                    value={additionalFeeStatusFilter}
+                    onChange={(val) => setAdditionalFeeStatusFilter(val)}
+                  />
+                </div>
+              </div>
+
+              {/* ADDITIONAL FEES CARDS GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                {additionalFeesList
+                  .filter((fee) => {
+                    const matchStatus =
+                      additionalFeeStatusFilter === "ALL" || fee.status === additionalFeeStatusFilter;
+                    const matchCat =
+                      additionalFeeCategoryFilter === "ALL" ||
+                      fee.feeName?.toLowerCase().includes(additionalFeeCategoryFilter.toLowerCase());
+                    const q = additionalFeeSearch.toLowerCase();
+                    const matchSearch =
+                      !q ||
+                      fee.studentName?.toLowerCase().includes(q) ||
+                      fee.feeName?.toLowerCase().includes(q) ||
+                      fee.nisn?.toLowerCase().includes(q) ||
+                      fee.className?.toLowerCase().includes(q);
+
+                    return matchStatus && matchCat && matchSearch;
+                  })
+                  .map((fee) => (
+                    <div
+                      key={fee.id}
+                      className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl ${
+                        fee.status === "lunas"
+                          ? "border-slate-800 hover:border-emerald-500/40"
+                          : fee.status === "menunggu_konfirmasi"
+                          ? "border-amber-500/50 bg-amber-950/20"
+                          : "border-red-500/30"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                            {fee.feeName}
+                          </span>
+                          <h4 className="font-extrabold text-white text-base mt-1.5">{fee.studentName}</h4>
+                          <p className="text-xs text-slate-400">
+                            NISN: <span className="font-mono text-emerald-300 font-bold">{fee.nisn || "-"}</span> • Kelas: {fee.className || "-"}
+                          </p>
+                        </div>
+                        <span
+                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-center shrink-0 ${
+                            fee.status === "lunas"
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              : fee.status === "menunggu_konfirmasi"
+                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                              : "bg-red-500/20 text-red-300 border border-red-500/30"
+                          }`}
+                        >
+                          {fee.status === "lunas" ? "✓ Lunas" : fee.status === "menunggu_konfirmasi" ? "Menunggu Konfirmasi" : "Belum Lunas"}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 space-y-1.5 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-400">Nominal Biaya:</span>
+                          <span className="font-extrabold text-emerald-400 text-sm">
+                            Rp {Number(fee.amount).toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        {fee.dueDate && (
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Tenggat Waktu:</span>
+                            <span className="font-bold text-slate-300">{fee.dueDate}</span>
+                          </div>
+                        )}
+                        {fee.paymentDate && (
+                          <div className="flex justify-between items-center text-[11px]">
+                            <span className="text-slate-400">Tgl Bayar:</span>
+                            <span className="font-bold text-emerald-400">{fee.paymentDate}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                        {fee.proofUrl ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPreview(fee.proofUrl, `Bukti Bayar ${fee.feeName}: ${fee.studentName}`)}
+                            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Lihat Bukti</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-500 italic">Belum ada bukti</span>
+                        )}
+
+                        <div className="flex items-center gap-1.5">
+                          {fee.status !== "lunas" && (
+                            <button
+                              onClick={() => handleUpdateAdditionalFeeStatus(fee.id, "lunas")}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+                            >
+                              Set Lunas
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setEditingAdditionalFee(fee)}
+                            className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-xl cursor-pointer"
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAdditionalFee(fee.id)}
+                            className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: METODE PEMBAYARAN (QRIS & DAFTAR REKENING BANK) */}
+          {activeTab === "payment-settings" && (
+            <div className="space-y-8 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                    <QrCode className="w-7 h-7 text-cyan-400" />
+                    <span>Pengaturan Metode Pembayaran</span>
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Kelola Gambar Barcode QRIS & Daftar Nomor Rekening Bank Cabang Sekolah.
+                  </p>
+                </div>
+                <button
+                  onClick={() =>
+                    setEditingBankAccount({
+                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                      bankName: "Bank Mandiri",
+                      accountNumber: "",
+                      accountHolder: "Smart Kids / YAPCHI Foundation",
+                      isActive: true,
+                    })
+                  }
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah No. Rekening Bank</span>
+                </button>
+              </div>
+
+              {/* SECTION 1: QRIS IMAGE UPLOAD CARD */}
+              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold border border-cyan-500/30">
+                      📱
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-white text-base">Gambar Barcode QRIS Pembayaran</h3>
+                      <p className="text-xs text-slate-400">Gambar barcode QRIS ini akan tampil otomatis di formulir PPDB dan portal bayar wali murid.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+                  <div className="md:col-span-4 flex flex-col items-center text-center space-y-3">
+                    <div className="relative w-48 h-48 bg-white rounded-2xl p-3 border-2 border-emerald-500 shadow-xl overflow-hidden group">
+                      <Image
+                        src={siteProfile.qrisImageUrl || "/images/qris_default.png"}
+                        alt="QRIS Barcode"
+                        fill
+                        className="object-contain p-2"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenPreview(siteProfile.qrisImageUrl || "/images/qris_default.png", "QRIS Barcode Pembayaran")}
+                      className="text-xs font-bold text-emerald-400 hover:underline flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Perbesar Gambar QRIS</span>
+                    </button>
+                  </div>
+
+                  <div className="md:col-span-8 space-y-4 bg-slate-950 p-6 rounded-2xl border border-slate-800">
+                    <h4 className="font-bold text-white text-sm">Unggah Gambar Barcode QRIS Baru</h4>
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                      Format file yang didukung: PNG, JPG, WEBP. Pastikan barcode terlihat jelas agar mudah di-scan menggunakan aplikasi m-Banking atau E-Wallet.
+                    </p>
+
+                    <label className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold cursor-pointer transition shadow-lg shadow-emerald-600/20">
+                      <Upload className="w-4 h-4" />
+                      <span>{uploadingQris ? "Mengunggah QRIS..." : "Pilih File Gambar QRIS"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        disabled={uploadingQris}
+                        onChange={handleUploadQrisImage}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: DAFTAR REKENING BANK */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-extrabold text-white text-lg flex items-center gap-2">
+                    <Building className="w-5 h-5 text-emerald-400" />
+                    <span>Daftar Nomor Rekening Bank</span>
+                  </h3>
+                  <span className="text-xs text-slate-400">
+                    Total: <strong className="text-white">{bankAccountsList.length}</strong> Rekening
+                  </span>
+                </div>
+
+                {editingBankAccount && (
+                  <form
+                    onSubmit={handleSaveBankAccount}
+                    className="bg-slate-900/95 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <h4 className="font-bold text-white text-base">
+                        {editingBankAccount.id ? "Edit Rekening Bank" : "Tambah Rekening Bank Baru"}
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setEditingBankAccount(null)}
+                        className="p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded-xl"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Nama Bank</label>
+                        <SearchableSelect
+                          options={[
+                            { value: "Bank Mandiri", label: "Bank Mandiri" },
+                            { value: "Bank BCA", label: "Bank BCA" },
+                            { value: "Bank BRI", label: "Bank BRI" },
+                            { value: "Bank BNI", label: "Bank BNI" },
+                            { value: "Bank BSI", label: "Bank BSI (Syariah)" },
+                            { value: "Bank CIMB Niaga", label: "Bank CIMB Niaga" },
+                          ]}
+                          value={editingBankAccount.bankName}
+                          onChange={(val) => setEditingBankAccount({ ...editingBankAccount, bankName: val })}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Nomor Rekening</label>
+                        <input
+                          type="text"
+                          required
+                          value={editingBankAccount.accountNumber}
+                          onChange={(e) => setEditingBankAccount({ ...editingBankAccount, accountNumber: e.target.value })}
+                          placeholder="131 00 1234567 8"
+                          className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs font-mono text-emerald-300 font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-400 mb-1">Atas Nama (A.N.)</label>
+                        <input
+                          type="text"
+                          required
+                          value={editingBankAccount.accountHolder}
+                          onChange={(e) => setEditingBankAccount({ ...editingBankAccount, accountHolder: e.target.value })}
+                          placeholder="Smart Kids / YAPCHI Foundation"
+                          className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingBankAccount.isActive}
+                          onChange={(e) => setEditingBankAccount({ ...editingBankAccount, isActive: e.target.checked })}
+                          className="w-4 h-4 text-emerald-600 rounded border-slate-700"
+                        />
+                        <span>Aktifkan Rekening Ini untuk Pembayaran PPDB & SPP</span>
+                      </label>
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditingBankAccount(null)}
+                          className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={saving}
+                          className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                        >
+                          {saving ? "Memproses..." : "Simpan Rekening Bank"}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                )}
+
+                {/* BANK ACCOUNTS GRID */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
+                  {bankAccountsList.map((acc) => (
+                    <div
+                      key={acc.id}
+                      className={`bg-slate-900/90 border rounded-3xl p-6 space-y-4 shadow-xl transition-all ${
+                        acc.isActive ? "border-slate-800 hover:border-emerald-500/40" : "border-slate-800/40 opacity-60"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <span className="font-extrabold text-white text-base">{acc.bankName}</span>
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            acc.isActive
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                              : "bg-slate-800 text-slate-500"
+                          }`}
+                        >
+                          {acc.isActive ? "Aktif" : "Non-Aktif"}
+                        </span>
+                      </div>
+
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-1">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                          No. Rekening
+                        </span>
+                        <span className="font-mono font-extrabold text-emerald-400 text-lg tracking-wider block">
+                          {acc.accountNumber}
+                        </span>
+                        <span className="text-xs text-slate-300 block font-medium">
+                          a.n. {acc.accountHolder}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2">
+                        <button
+                          onClick={() => handleToggleBankAccountStatus(acc.id, acc.isActive)}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                            acc.isActive
+                              ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                              : "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          }`}
+                        >
+                          {acc.isActive ? "Non-Aktifkan" : "Aktifkan"}
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingBankAccount(acc)}
+                            className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBankAccount(acc.id)}
+                            className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

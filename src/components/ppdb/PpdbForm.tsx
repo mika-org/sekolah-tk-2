@@ -20,6 +20,9 @@ import {
   ArrowLeft,
   Sparkles,
   X,
+  PackageCheck,
+  Download,
+  Building2,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 
@@ -27,6 +30,15 @@ interface PpdbFormProps {
   onBackToHome: () => void;
   selectedSchoolCode?: string;
   schools?: any[];
+}
+
+interface FeeComponent {
+  id: string;
+  code: string;
+  name: string;
+  amount: number;
+  description?: string | null;
+  isRequired: boolean;
 }
 
 export default function PpdbForm({
@@ -55,9 +67,22 @@ export default function PpdbForm({
 
   const [programsList, setProgramsList] = useState<any[]>([]);
 
-  // Fetch school programs
+  // Package definitions come from the database; selected values are stored per registration.
+  const [ppdbPackageItems, setPpdbPackageItems] = useState<FeeComponent[]>([]);
+  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
+  const [loadingFeeComponents, setLoadingFeeComponents] = useState(true);
+  const [feeComponentsError, setFeeComponentsError] = useState("");
+
+  // Bank accounts & QRIS state
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [selectedBankId, setSelectedBankId] = useState<string>("");
+  const [qrisImageUrl, setQrisImageUrl] = useState<string>("/images/qris_default.png");
+
+  // Fetch school programs, bank accounts, site profile
   useEffect(() => {
     if (!selectedSchoolCode) return;
+
+    // Fetch Programs
     fetch(`/api/programs?schoolCode=${selectedSchoolCode}`)
       .then((r) => {
         const contentType = r.headers.get("content-type");
@@ -72,7 +97,64 @@ export default function PpdbForm({
         }
       })
       .catch((err) => console.error("Error fetching programs for PPDB:", err));
+
+    // Fetch active PPDB fee components for this school.
+    fetch(`/api/fee-components?schoolCode=${selectedSchoolCode}&category=PPDB`)
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || "Gagal memuat komponen biaya PPDB");
+        }
+        return data;
+      })
+      .then((data) => {
+        const components = (data.data || []) as FeeComponent[];
+        setPpdbPackageItems(components);
+        setSelectedPackageIds(components.map((component) => component.id));
+        setFeeComponentsError("");
+      })
+      .catch((err) => {
+        console.error("Error fetching PPDB fee components:", err);
+        setPpdbPackageItems([]);
+        setSelectedPackageIds([]);
+        setFeeComponentsError(err.message || "Komponen biaya PPDB belum tersedia");
+      })
+      .finally(() => setLoadingFeeComponents(false));
+
+    // Fetch Bank Accounts
+    fetch(`/api/bank-accounts?schoolCode=${selectedSchoolCode}&publicOnly=true`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.data?.length) {
+          setBankAccounts(data.data);
+          setSelectedBankId(data.data[0].id);
+        }
+      })
+      .catch((err) => console.error("Error fetching bank accounts:", err));
+
+    // Fetch Site Profile (for QRIS image)
+    fetch(`/api/site-profile?schoolCode=${selectedSchoolCode}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.success && data.data?.qrisImageUrl) {
+          setQrisImageUrl(data.data.qrisImageUrl);
+        }
+      })
+      .catch((err) => console.error("Error fetching site profile:", err));
   }, [selectedSchoolCode]);
+
+  const togglePackageItem = (id: string) => {
+    const item = ppdbPackageItems.find((component) => component.id === id);
+    if (item?.isRequired) return;
+    setSelectedPackageIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const totalPpdbPackageAmount = selectedPackageIds.reduce((sum, id) => {
+    const item = ppdbPackageItems.find((component) => component.id === id);
+    return sum + (item ? Number(item.amount) : 0);
+  }, 0);
 
   // Selected file objects stored in local state (deferred batch upload)
   const [selectedFileObjects, setSelectedFileObjects] = useState<{
@@ -95,18 +177,15 @@ export default function PpdbForm({
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   // Image Modal State for document previews
-  const [previewModal, setPreviewModal] = useState<{ isOpen: boolean; src: string | null; title: string }>({
+  const [previewModal, setPreviewModal] = useState<{
+    isOpen: boolean;
+    src: string | null;
+    title: string;
+  }>({
     isOpen: false,
     src: null,
     title: "Pratinjau Berkas",
   });
-
-  const handlePreviewFile = (file: File | null, title: string) => {
-    if (file) {
-      const objectUrl = URL.createObjectURL(file);
-      setPreviewModal({ isOpen: true, src: objectUrl, title });
-    }
-  };
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -121,13 +200,26 @@ export default function PpdbForm({
     setSelectedFileObjects((prev) => ({ ...prev, [docKey]: file }));
   };
 
-  const handleCopyAccount = () => {
-    navigator.clipboard.writeText("1310012345678");
+  const handleCopyAccount = (accountNo: string) => {
+    navigator.clipboard.writeText(accountNo.replace(/\s+/g, ""));
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const selectedBank =
+    bankAccounts.find((b) => b.id === selectedBankId) ||
+    bankAccounts[0] || {
+      bankName: "Bank Mandiri",
+      accountNumber: "1310012345678",
+      accountHolder: "Smart Kids / YAPCHI Foundation",
+    };
+
   const handleFinish = async () => {
+    if (selectedPackageIds.length === 0) {
+      alert("Pilih minimal satu komponen biaya PPDB yang ingin dibayar.");
+      return;
+    }
+
     setSubmitting(true);
     const newRegNo = `PPDB-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     setRegId(newRegNo);
@@ -166,9 +258,9 @@ export default function PpdbForm({
       }
     }
 
-    // 2. Submit complete PPDB form data with uploaded file URLs
+    // 2. Submit complete PPDB form data with uploaded file URLs and chosen package items
     try {
-      await fetch("/api/ppdb", {
+      const response = await fetch("/api/ppdb", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -182,6 +274,7 @@ export default function PpdbForm({
           usiaAnak: formData.usiaAnak,
           program: formData.program,
           sppAmount: formData.sppAmount,
+          selectedFeeComponentIds: selectedPackageIds,
           namaOrtu: formData.namaOrtu,
           noWhatsapp: formData.noWhatsapp,
           email: formData.email,
@@ -194,16 +287,22 @@ export default function PpdbForm({
           paymentMethod,
         }),
       });
-    } catch (err) {
-      console.error("Error submitting PPDB:", err);
-    } finally {
-      setSubmitting(false);
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Gagal menyimpan pendaftaran PPDB");
+      }
+
       confetti({
         particleCount: 120,
         spread: 70,
         origin: { y: 0.6 },
       });
       setShowSuccessModal(true);
+    } catch (err: any) {
+      console.error("Error submitting PPDB:", err);
+      alert(err.message || "Gagal menyimpan pendaftaran PPDB. Silakan coba lagi.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -214,20 +313,20 @@ export default function PpdbForm({
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
           <div className="md:col-span-8 space-y-2">
             <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-              Form Pendaftaran
+              Form Pendaftaran PPDB
             </h1>
             <p className="text-sm font-semibold text-emerald-800">
-              {step === 1 && "Isi data berikut untuk mendaftarkan si kecil"}
-              {step === 2 && "Konfirmasi data sebelum dikirim"}
-              {step === 3 && "Lakukan pembayaran sebelum selesai"}
+              {step === 1 && "Isi data & pilih komponen paket biaya pendaftaran"}
+              {step === 2 && "Konfirmasi data dan rincian rincian biaya"}
+              {step === 3 && "Lakukan pembayaran paket pendaftaran"}
             </p>
             <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
               {step === 1 &&
-                "Langkah pertama menuju pengalaman belajar yang seru, berkualitas, dan penuh makna"}
+                "Lengkapi data siswa dan pilih komponen paket pendaftaran/seragam sesuai kebutuhan Anda."}
               {step === 2 &&
-                "Periksa kembali data anda. Pastikan semua informasi sudah benar sebelum menyelesaikan pendaftaran anda"}
+                "Periksa kembali data diri dan paket item pendaftaran yang Anda pilih sebelum melanjutkan."}
               {step === 3 &&
-                "Pilih metode pembayaran dan lakukan pembayaran sesuai instruksi yang tersedia"}
+                "Pilih metode pembayaran (Bank Transfer, QRIS, atau Tunai) lalu upload bukti transaksi."}
             </p>
           </div>
 
@@ -262,9 +361,9 @@ export default function PpdbForm({
             </div>
             <div className="hidden sm:block">
               <h4 className="font-bold text-xs sm:text-sm text-slate-800">
-                Isi Data
+                Data & Paket Biaya
               </h4>
-              <p className="text-[11px] text-slate-500">Lengkapi data pendaftaran</p>
+              <p className="text-[11px] text-slate-500">Pilih komponen & data anak</p>
             </div>
           </div>
 
@@ -283,7 +382,7 @@ export default function PpdbForm({
               <h4 className="font-bold text-xs sm:text-sm text-slate-800">
                 Konfirmasi
               </h4>
-              <p className="text-[11px] text-slate-500">Cek kembali data anda</p>
+              <p className="text-[11px] text-slate-500">Cek kembali data & rincian</p>
             </div>
           </div>
 
@@ -302,7 +401,7 @@ export default function PpdbForm({
               <h4 className="font-bold text-xs sm:text-sm text-slate-800">
                 Pembayaran
               </h4>
-              <p className="text-[11px] text-slate-500">Lakukan pembayaran</p>
+              <p className="text-[11px] text-slate-500">Transfer & upload bukti</p>
             </div>
           </div>
         </div>
@@ -312,7 +411,7 @@ export default function PpdbForm({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column (Step-specific form elements) */}
         <div className="lg:col-span-8 space-y-6">
-          {/* ==================== STEP 1: ISI DATA ==================== */}
+          {/* ==================== STEP 1: ISI DATA & PAKET BIAYA ==================== */}
           {step === 1 && (
             <div className="space-y-6">
               {/* Form Data Pendaftar Card */}
@@ -354,7 +453,9 @@ export default function PpdbForm({
                           { value: "Perempuan", label: "Perempuan" },
                         ]}
                         value={formData.jenisKelamin}
-                        onChange={(val) => setFormData((prev) => ({ ...prev, jenisKelamin: val }))}
+                        onChange={(val) =>
+                          setFormData((prev) => ({ ...prev, jenisKelamin: val }))
+                        }
                         variant="light"
                         placeholder="Pilih jenis kelamin..."
                       />
@@ -374,7 +475,9 @@ export default function PpdbForm({
                           { value: "Khonghucu", label: "Khonghucu" },
                         ]}
                         value={formData.agama}
-                        onChange={(val) => setFormData((prev) => ({ ...prev, agama: val }))}
+                        onChange={(val) =>
+                          setFormData((prev) => ({ ...prev, agama: val }))
+                        }
                         variant="light"
                         placeholder="Pilih agama..."
                       />
@@ -438,27 +541,55 @@ export default function PpdbForm({
                             ? programsList.map((p: any) => ({
                                 value: p.title,
                                 label: `${p.title} (${p.ageRange})`,
-                                sublabel: `SPP Rp ${Number(p.sppAmount || 200000).toLocaleString("id-ID")}/bulan`,
+                                sublabel: `SPP Rp ${Number(
+                                  p.sppAmount || 200000
+                                ).toLocaleString("id-ID")}/bulan`,
                                 sppAmount: Number(p.sppAmount || 200000),
                               }))
                             : [
-                                { value: "S3", label: "S3 (1 Minggu 3X Pertemuan)", sublabel: "SPP Rp 200.000/bulan", sppAmount: 200000 },
-                                { value: "S4", label: "S4 (1 Minggu 4X Pertemuan)", sublabel: "SPP Rp 250.000/bulan", sppAmount: 250000 },
-                                { value: "S5", label: "S5 (1 Minggu 5X Pertemuan)", sublabel: "SPP Rp 300.000/bulan", sppAmount: 300000 },
-                                { value: "BEST PROGRAM", label: "BEST PROGRAM (1 Minggu 3X - 1 Guru 1 Siswa)", sublabel: "SPP Rp 300.000/bulan", sppAmount: 300000 },
+                                {
+                                  value: "S3",
+                                  label: "S3 (1 Minggu 3X Pertemuan)",
+                                  sublabel: "SPP Rp 200.000/bulan",
+                                  sppAmount: 200000,
+                                },
+                                {
+                                  value: "S4",
+                                  label: "S4 (1 Minggu 4X Pertemuan)",
+                                  sublabel: "SPP Rp 250.000/bulan",
+                                  sppAmount: 250000,
+                                },
+                                {
+                                  value: "S5",
+                                  label: "S5 (1 Minggu 5X Pertemuan)",
+                                  sublabel: "SPP Rp 300.000/bulan",
+                                  sppAmount: 300000,
+                                },
+                                {
+                                  value: "BEST PROGRAM",
+                                  label: "BEST PROGRAM (1 Guru 1 Siswa)",
+                                  sublabel: "SPP Rp 300.000/bulan",
+                                  sppAmount: 300000,
+                                },
                               ]
                         }
                         value={formData.program}
                         onChange={(val) => {
-                          const availableOptions = programsList.length > 0
-                            ? programsList.map((p: any) => ({ value: p.title, sppAmount: Number(p.sppAmount || 200000) }))
-                            : [
-                                { value: "S3", sppAmount: 200000 },
-                                { value: "S4", sppAmount: 250000 },
-                                { value: "S5", sppAmount: 300000 },
-                                { value: "BEST PROGRAM", sppAmount: 300000 },
-                              ];
-                          const matched = availableOptions.find((opt) => opt.value === val);
+                          const availableOptions =
+                            programsList.length > 0
+                              ? programsList.map((p: any) => ({
+                                  value: p.title,
+                                  sppAmount: Number(p.sppAmount || 200000),
+                                }))
+                              : [
+                                  { value: "S3", sppAmount: 200000 },
+                                  { value: "S4", sppAmount: 250000 },
+                                  { value: "S5", sppAmount: 300000 },
+                                  { value: "BEST PROGRAM", sppAmount: 300000 },
+                                ];
+                          const matched = availableOptions.find(
+                            (opt) => opt.value === val
+                          );
                           setFormData((prev) => ({
                             ...prev,
                             program: val,
@@ -532,12 +663,104 @@ export default function PpdbForm({
                     </label>
                     <textarea
                       name="alamatRumah"
-                      rows={3}
+                      rows={2}
                       value={formData.alamatRumah}
                       onChange={handleInputChange}
                       placeholder="Masukan alamat rumah lengkap"
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition-all bg-slate-50/50"
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* ================= NEW FEATURE: PAKET BIAYA PPDB CHECKLIST ================= */}
+              <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                      <PackageCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-slate-900 text-lg">
+                        Paket Biaya Pendaftaran (PPDB)
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Pilih komponen item yang ingin Anda ambil (Opsional per item)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[11px] font-semibold text-slate-500 block">Subtotal Paket:</span>
+                    <span className="text-lg font-extrabold text-emerald-700">
+                      Rp {totalPpdbPackageAmount.toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+
+                {loadingFeeComponents && (
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-500">
+                    Memuat komponen biaya PPDB dari database...
+                  </div>
+                )}
+                {feeComponentsError && (
+                  <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+                    {feeComponentsError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {ppdbPackageItems.map((item) => {
+                    const isChecked = selectedPackageIds.includes(item.id);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => togglePackageItem(item.id)}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 relative ${
+                          isChecked
+                            ? "bg-emerald-50/50 border-emerald-500 shadow-xs"
+                            : "bg-slate-50/40 border-slate-200 hover:border-slate-300"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          disabled={item.isRequired}
+                          onChange={() => togglePackageItem(item.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          className="w-5 h-5 mt-0.5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 accent-emerald-600 shrink-0 cursor-pointer"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-bold text-slate-900 text-xs sm:text-sm">
+                              {item.name}
+                            </span>
+                            {item.isRequired && (
+                              <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full shrink-0">
+                                Utama / Wajib
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                            {item.description}
+                          </p>
+                          <span className="font-extrabold text-emerald-700 text-xs mt-1.5 block">
+                            Rp {Number(item.amount).toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-emerald-900 font-medium">
+                    <Info className="w-4 h-4 text-emerald-700 shrink-0" />
+                    <span>
+                      Item terhitung: <strong>{selectedPackageIds.length} dari {ppdbPackageItems.length} item</strong> terpilih.
+                    </span>
+                  </div>
+                  <div className="font-extrabold text-emerald-800 text-sm shrink-0">
+                    Total PPDB: Rp {totalPpdbPackageAmount.toLocaleString("id-ID")}
                   </div>
                 </div>
               </div>
@@ -561,7 +784,8 @@ export default function PpdbForm({
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => {
-                        if (e.target.files?.[0]) handleFileSelect("kk", e.target.files[0]);
+                        if (e.target.files?.[0])
+                          handleFileSelect("kk", e.target.files[0]);
                       }}
                     />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
@@ -573,10 +797,11 @@ export default function PpdbForm({
                     <span className="text-[10px] text-slate-500 block mt-0.5">
                       {selectedFileObjects.kk ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.kk.name}
+                          <CheckCircle2 className="w-3 h-3" />{" "}
+                          {selectedFileObjects.kk.name}
                         </span>
                       ) : (
-                        "Unggah Kartu Keluarga (PDF / Gambar)"
+                        "Unggah KK (PDF / Gambar)"
                       )}
                     </span>
                   </label>
@@ -588,7 +813,8 @@ export default function PpdbForm({
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => {
-                        if (e.target.files?.[0]) handleFileSelect("akta", e.target.files[0]);
+                        if (e.target.files?.[0])
+                          handleFileSelect("akta", e.target.files[0]);
                       }}
                     />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
@@ -600,10 +826,11 @@ export default function PpdbForm({
                     <span className="text-[10px] text-slate-500 block mt-0.5">
                       {selectedFileObjects.akta ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.akta.name}
+                          <CheckCircle2 className="w-3 h-3" />{" "}
+                          {selectedFileObjects.akta.name}
                         </span>
                       ) : (
-                        "Unggah Akta Kelahiran (PDF / Gambar)"
+                        "Unggah Akta (PDF / Gambar)"
                       )}
                     </span>
                   </label>
@@ -615,7 +842,8 @@ export default function PpdbForm({
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => {
-                        if (e.target.files?.[0]) handleFileSelect("foto", e.target.files[0]);
+                        if (e.target.files?.[0])
+                          handleFileSelect("foto", e.target.files[0]);
                       }}
                     />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
@@ -627,10 +855,11 @@ export default function PpdbForm({
                     <span className="text-[10px] text-slate-500 block mt-0.5">
                       {selectedFileObjects.foto ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.foto.name}
+                          <CheckCircle2 className="w-3 h-3" />{" "}
+                          {selectedFileObjects.foto.name}
                         </span>
                       ) : (
-                        "Unggah Foto Anak (Gambar / PDF)"
+                        "Unggah Foto Anak"
                       )}
                     </span>
                   </label>
@@ -642,22 +871,24 @@ export default function PpdbForm({
                       accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => {
-                        if (e.target.files?.[0]) handleFileSelect("ktp", e.target.files[0]);
+                        if (e.target.files?.[0])
+                          handleFileSelect("ktp", e.target.files[0]);
                       }}
                     />
                     <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
                       <Upload className="w-5 h-5" />
                     </div>
                     <span className="font-bold text-slate-800 text-xs block">
-                      KTP Orang Tua/Wali
+                      KTP Ortu
                     </span>
                     <span className="text-[10px] text-slate-500 block mt-0.5">
                       {selectedFileObjects.ktp ? (
                         <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> {selectedFileObjects.ktp.name}
+                          <CheckCircle2 className="w-3 h-3" />{" "}
+                          {selectedFileObjects.ktp.name}
                         </span>
                       ) : (
-                        "Unggah KTP (PDF / Gambar)"
+                        "Unggah KTP Ortu"
                       )}
                     </span>
                   </label>
@@ -689,7 +920,17 @@ export default function PpdbForm({
                   </button>
 
                   <button
-                    onClick={() => setStep(2)}
+                    onClick={() => {
+                      if (!formData.namaAnak || !formData.namaOrtu) {
+                        alert("Harap isi nama anak dan nama orang tua terlebih dahulu");
+                        return;
+                      }
+                      if (loadingFeeComponents || selectedPackageIds.length === 0) {
+                        alert("Pilih minimal satu komponen biaya PPDB terlebih dahulu");
+                        return;
+                      }
+                      setStep(2);
+                    }}
                     className="px-8 py-3 rounded-full bg-[#057a44] hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all"
                   >
                     Selanjutnya
@@ -699,7 +940,7 @@ export default function PpdbForm({
             </div>
           )}
 
-          {/* ==================== STEP 2: KONFIRMASI DATA ==================== */}
+          {/* ==================== STEP 2: KONFIRMASI DATA & PAKET BIAYA ==================== */}
           {step === 2 && (
             <div className="space-y-6">
               <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs space-y-6">
@@ -713,131 +954,76 @@ export default function PpdbForm({
                 </div>
 
                 {/* Grid summary details */}
-                <div className="space-y-3.5 text-xs text-slate-700">
+                <div className="space-y-3 text-xs text-slate-700">
                   <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
                       Nama Lengkap Anak
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
                     <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.namaAnak}
+                      {formData.namaAnak || "-"}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Jenis Kelamin
+                      Jenis Kelamin / Agama
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
                     <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.jenisKelamin}
+                      {formData.jenisKelamin || "-"} / {formData.agama || "-"}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Agama
+                      Tempat, Tgl Lahir / Usia
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
                     <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.agama}
+                      {formData.tempatLahir}, {formData.tanggalLahir} ({formData.usiaAnak})
                     </span>
                   </div>
 
                   <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Tempat Lahir
+                      Program & SPP Bulanan
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
-                    <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.tempatLahir}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
-                    <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Tanggal Lahir
-                    </span>
-                    <span className="col-span-1 text-slate-400 text-center">:</span>
-                    <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.tanggalLahir}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
-                    <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Usia Anak
-                    </span>
-                    <span className="col-span-1 text-slate-400 text-center">:</span>
-                    <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.usiaAnak}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
-                    <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Program & SPP
-                    </span>
-                    <span className="col-span-1 text-slate-400 text-center">:</span>
-                    <span className="col-span-6 sm:col-span-7 font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded inline-block">
+                    <span className="col-span-6 sm:col-span-7 font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded inline-block">
                       {formData.program || "S3"} (SPP Rp {formData.sppAmount.toLocaleString("id-ID")}/bulan)
                     </span>
                   </div>
 
                   <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Nama Orang Tua/Wali
+                      Nama Ortu & WA
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
                     <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.namaOrtu}
+                      {formData.namaOrtu} ({formData.noWhatsapp})
                     </span>
                   </div>
 
                   <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      No. Whatsapp
+                      Komponen Paket PPDB
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
                     <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.noWhatsapp}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
-                    <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Email
-                    </span>
-                    <span className="col-span-1 text-slate-400 text-center">:</span>
-                    <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900">
-                      {formData.email}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-12 gap-2 pb-2 border-b border-slate-50">
-                    <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Alamat Lengkap
-                    </span>
-                    <span className="col-span-1 text-slate-400 text-center">:</span>
-                    <span className="col-span-6 sm:col-span-7 font-semibold text-slate-900 leading-relaxed">
-                      {formData.alamatRumah}
+                      {selectedPackageIds
+                        .map((id) => ppdbPackageItems.find((item) => item.id === id)?.name)
+                        .join(", ")}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-12 gap-2">
                     <span className="col-span-5 sm:col-span-4 font-bold text-slate-800">
-                      Berkas Diterapkan
+                      Total Biaya PPDB
                     </span>
                     <span className="col-span-1 text-slate-400 text-center">:</span>
-                    <span className="col-span-6 sm:col-span-7 font-semibold text-emerald-800">
-                      {[
-                        selectedFileObjects.kk && `KK: ${selectedFileObjects.kk.name}`,
-                        selectedFileObjects.akta && `Akta: ${selectedFileObjects.akta.name}`,
-                        selectedFileObjects.foto && `Foto: ${selectedFileObjects.foto.name}`,
-                        selectedFileObjects.ktp && `KTP: ${selectedFileObjects.ktp.name}`,
-                      ]
-                        .filter(Boolean)
-                        .join(", ") || "Belum ada berkas terlampir"}
+                    <span className="col-span-6 sm:col-span-7 font-extrabold text-emerald-700 text-sm">
+                      Rp {totalPpdbPackageAmount.toLocaleString("id-ID")}
                     </span>
                   </div>
                 </div>
@@ -852,7 +1038,7 @@ export default function PpdbForm({
                       Perhatian
                     </h5>
                     <p className="text-amber-900/80">
-                      Pastikan semua data sudah benar. Data yang sudah dikirim tidak dapat diubah
+                      Pastikan semua data dan paket item yang dipilih sudah sesuai.
                     </p>
                   </div>
                 </div>
@@ -870,15 +1056,8 @@ export default function PpdbForm({
                     onClick={() => setStep(3)}
                     className="px-8 py-3 rounded-full bg-[#057a44] hover:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md transition-all"
                   >
-                    Selanjutnya
+                    Lanjut Pembayaran
                   </button>
-                </div>
-
-                <div className="text-center pt-2">
-                  <span className="text-[11px] text-slate-400 inline-flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    Data anda aman dan hanya digunakan untuk keperluan pendaftaran
-                  </span>
                 </div>
               </div>
             </div>
@@ -893,31 +1072,35 @@ export default function PpdbForm({
                     <CreditCard className="w-5 h-5" />
                   </div>
                   <h3 className="font-extrabold text-slate-900 text-lg">
-                    Detail Pembayaran
+                    Detail Pembayaran PPDB
                   </h3>
                 </div>
 
                 {/* Table of cost breakdown */}
                 <div className="space-y-2 text-xs text-slate-700 border-b border-slate-100 pb-4">
-                  <div className="flex justify-between items-center py-1">
-                    <span className="font-semibold text-slate-700">
-                      Biaya SPP Bulan Pertama ({formData.program || "S3"})
-                    </span>
-                    <span className="font-semibold text-slate-400">:</span>
-                    <span className="font-bold text-slate-900">
-                      Rp {formData.sppAmount.toLocaleString("id-ID")},00
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-sm">
-                    <span className="font-extrabold text-slate-900">Total Pembayaran</span>
-                    <span className="font-semibold text-slate-400">:</span>
-                    <span className="font-extrabold text-emerald-700 text-base">
-                      Rp {formData.sppAmount.toLocaleString("id-ID")},00
+                  <div className="font-bold text-slate-900 mb-1">Rincian Paket PPDB yang Dipilih:</div>
+                  {selectedPackageIds.map((id) => {
+                    const item = ppdbPackageItems.find((component) => component.id === id);
+                    if (!item) return null;
+                    return (
+                      <div key={id} className="flex justify-between items-center py-1 border-b border-slate-50 text-slate-600">
+                        <span>• {item.name}</span>
+                        <span className="font-semibold text-slate-900">
+                          Rp {Number(item.amount).toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex justify-between items-center pt-3 text-sm">
+                    <span className="font-extrabold text-slate-900">Total Pembayaran PPDB</span>
+                    <span className="font-extrabold text-emerald-700 text-lg">
+                      Rp {totalPpdbPackageAmount.toLocaleString("id-ID")}
                     </span>
                   </div>
                 </div>
 
-                {/* Payment Methods Selector (3 Cards) */}
+                {/* Payment Methods Selector */}
                 <div className="grid grid-cols-3 gap-3">
                   <button
                     onClick={() => setPaymentMethod("bank")}
@@ -940,7 +1123,7 @@ export default function PpdbForm({
                     }`}
                   >
                     <QrCode className="w-5 h-5 mx-auto mb-1.5 opacity-90" />
-                    <span>Qris/E-Wallet</span>
+                    <span>QRIS Image</span>
                   </button>
 
                   <button
@@ -957,61 +1140,156 @@ export default function PpdbForm({
                 </div>
 
                 {/* Active Payment Method Details */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  {/* Left Account Card */}
-                  <div className="md:col-span-7 bg-[#e8f1fd] rounded-2xl p-5 border border-blue-200 space-y-2">
-                    <span className="text-xs font-bold text-slate-600 block">
-                      Bank Mandiri
-                    </span>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-extrabold text-slate-900 text-lg sm:text-xl tracking-wider">
-                        131 00 1234567 8
-                      </span>
-                      <button
-                        onClick={handleCopyAccount}
-                        className="p-1.5 rounded-lg bg-white/80 hover:bg-white text-blue-700 transition-colors relative"
-                        title="Salin No. Rekening"
-                      >
-                        <Copy className="w-4 h-4" />
-                        {copied && (
-                          <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded shadow">
-                            Tersalin!
-                          </span>
-                        )}
-                      </button>
-                    </div>
-                    <span className="text-xs text-slate-600 block">
-                      a.n. Smart Kids
-                    </span>
-                  </div>
+                {paymentMethod === "bank" && (
+                  <div className="space-y-3">
+                    {/* Bank selector dropdown if multiple banks exist */}
+                    {bankAccounts.length > 1 && (
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-bold text-slate-700">Pilih Rekening Bank:</span>
+                        <select
+                          value={selectedBankId}
+                          onChange={(e) => setSelectedBankId(e.target.value)}
+                          className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+                        >
+                          {bankAccounts.map((b) => (
+                            <option key={b.id} value={b.id}>
+                              {b.bankName} - {b.accountNumber} ({b.accountHolder})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
-                  {/* Right Upload Bukti Dropzone */}
-                  <label className="md:col-span-5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center">
-                    <input
-                      type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) handleFileSelect("buktiBayar", e.target.files[0]);
-                      }}
-                    />
-                    <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-1.5">
-                      <Upload className="w-4 h-4" />
-                    </div>
-                    <span className="font-bold text-slate-800 text-xs block">
-                      Bukti Pembayaran / KTP
-                    </span>
-                    <span className="text-[10px] text-slate-500 block">
-                      {selectedFileObjects.buktiBayar ? (
-                        <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1 mt-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> {selectedFileObjects.buktiBayar.name}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                      {/* Left Bank Card */}
+                      <div className="md:col-span-7 bg-[#e8f1fd] rounded-2xl p-5 border border-blue-200 space-y-2 relative">
+                        <span className="text-xs font-extrabold text-blue-900 uppercase tracking-wider block">
+                          {selectedBank.bankName}
                         </span>
-                      ) : (
-                        "Unggah Bukti (PDF / Gambar)"
-                      )}
-                    </span>
-                  </label>
-                </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-extrabold text-slate-900 text-lg sm:text-xl tracking-wider">
+                            {selectedBank.accountNumber}
+                          </span>
+                          <button
+                            onClick={() => handleCopyAccount(selectedBank.accountNumber)}
+                            className="p-2 rounded-lg bg-white hover:bg-blue-50 text-blue-700 transition-colors relative shadow-xs"
+                            title="Salin No. Rekening"
+                          >
+                            <Copy className="w-4 h-4" />
+                            {copied && (
+                              <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] px-2 py-0.5 rounded shadow whitespace-nowrap">
+                                Tersalin!
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                        <span className="text-xs text-slate-700 block font-medium">
+                          a.n. {selectedBank.accountHolder}
+                        </span>
+                      </div>
+
+                      {/* Right Upload Bukti Dropzone */}
+                      <label className="md:col-span-5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center">
+                        <input
+                          type="file"
+                          accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files?.[0])
+                              handleFileSelect("buktiBayar", e.target.files[0]);
+                          }}
+                        />
+                        <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-1.5">
+                          <Upload className="w-4 h-4" />
+                        </div>
+                        <span className="font-bold text-slate-800 text-xs block">
+                          Upload Bukti Pembayaran
+                        </span>
+                        <span className="text-[10px] text-slate-500 block">
+                          {selectedFileObjects.buktiBayar ? (
+                            <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1 mt-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />{" "}
+                              {selectedFileObjects.buktiBayar.name}
+                            </span>
+                          ) : (
+                            "Unggah Bukti Transfer (PDF / Gambar)"
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* QRIS Tab */}
+                {paymentMethod === "qris" && (
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                    <div className="md:col-span-6 bg-slate-50 rounded-2xl p-4 border border-slate-200 text-center space-y-3">
+                      <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                        Scan QRIS Pembayaran
+                      </h4>
+                      <div className="relative w-48 h-48 mx-auto border-2 border-emerald-500 rounded-2xl overflow-hidden shadow-md bg-white p-2">
+                        <Image
+                          src={qrisImageUrl || "/images/qris_default.png"}
+                          alt="QRIS Barcode"
+                          fill
+                          className="object-contain p-2"
+                        />
+                      </div>
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() =>
+                            setPreviewModal({
+                              isOpen: true,
+                              src: qrisImageUrl || "/images/qris_default.png",
+                              title: "QRIS Barcode Pembayaran PPDB",
+                            })
+                          }
+                          className="text-xs font-bold text-emerald-700 hover:text-emerald-800 underline inline-flex items-center gap-1"
+                        >
+                          <QrCode className="w-3.5 h-3.5" /> Perbesar QRIS
+                        </button>
+                      </div>
+                    </div>
+
+                    <label className="md:col-span-6 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-48">
+                      <input
+                        type="file"
+                        accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files?.[0])
+                            handleFileSelect("buktiBayar", e.target.files[0]);
+                        }}
+                      />
+                      <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mb-2">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <span className="font-bold text-slate-800 text-xs block">
+                        Upload Tangkapan Layar QRIS
+                      </span>
+                      <span className="text-[11px] text-slate-500 block mt-1">
+                        {selectedFileObjects.buktiBayar ? (
+                          <span className="text-emerald-700 font-semibold flex items-center justify-center gap-1">
+                            <CheckCircle2 className="w-4 h-4" />{" "}
+                            {selectedFileObjects.buktiBayar.name}
+                          </span>
+                        ) : (
+                          "Upload bukti transaksi QRIS Anda di sini"
+                        )}
+                      </span>
+                    </label>
+                  </div>
+                )}
+
+                {/* Tunai Tab */}
+                {paymentMethod === "tunai" && (
+                  <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200 text-amber-900 text-xs space-y-1">
+                    <h5 className="font-bold">Pembayaran Tunai di Lokasi Sekolah</h5>
+                    <p>
+                      Silakan lakukan pembayaran langsung ke bagian tata usaha / keuangan sekolah saat menyerahkan kelengkapan berkas fisik.
+                    </p>
+                  </div>
+                )}
 
                 {/* Perhatian Transfer Note */}
                 <div className="bg-[#fff8e7] rounded-2xl p-4 border border-amber-200 flex items-start gap-3 text-xs">
@@ -1020,10 +1298,10 @@ export default function PpdbForm({
                   </div>
                   <div>
                     <h5 className="font-extrabold text-amber-950 mb-0.5">
-                      Perhatian
+                      Catatan Pembayaran
                     </h5>
                     <p className="text-amber-900/80">
-                      Tulis berita transfer: PPDB Smart Kids - Nama anak. Contoh: &quot;PPDB Smart Kids - {formData.namaAnak}&quot;
+                      Sebutkan berita transfer: PPDB Smart Kids - {formData.namaAnak || "Nama Anak"}.
                     </p>
                   </div>
                 </div>
@@ -1084,7 +1362,8 @@ export default function PpdbForm({
                 Pendaftaran Berhasil! 🎉
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Terima kasih telah mendaftarkan <strong className="text-emerald-800">{formData.namaAnak}</strong> di Smart Kids. Tim kami akan segera melakukan verifikasi dan menghubungi Anda via WhatsApp.
+                Terima kasih telah mendaftarkan{" "}
+                <strong className="text-emerald-800">{formData.namaAnak}</strong> di Smart Kids. Tim kami akan segera melakukan verifikasi dan menghubungi Anda via WhatsApp.
               </p>
             </div>
 
@@ -1093,7 +1372,10 @@ export default function PpdbForm({
                 <strong>No. Registrasi:</strong> {regId}
               </p>
               <p>
-                <strong>Program:</strong> {formData.program}
+                <strong>Program:</strong> {formData.program || "S3"}
+              </p>
+              <p>
+                <strong>Total PPDB:</strong> Rp {totalPpdbPackageAmount.toLocaleString("id-ID")}
               </p>
               <p>
                 <strong>Orang Tua:</strong> {formData.namaOrtu} ({formData.noWhatsapp})

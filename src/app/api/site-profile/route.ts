@@ -75,6 +75,7 @@ export async function PUT(req: Request) {
         instagram: body.instagram,
         facebook: body.facebook,
         address: body.address,
+        ...(body.qrisImageUrl !== undefined && { qrisImageUrl: body.qrisImageUrl }),
       },
       create: {
         schoolId,
@@ -88,6 +89,7 @@ export async function PUT(req: Request) {
         instagram: body.instagram,
         facebook: body.facebook,
         address: body.address,
+        qrisImageUrl: body.qrisImageUrl || "/images/qris_default.png",
       },
     });
 
