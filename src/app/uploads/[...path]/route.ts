@@ -6,10 +6,10 @@ type RouteContext = { params: Promise<{ path: string[] }> };
 
 export async function GET(request: Request, { params }: RouteContext) {
   const { path } = await params;
-  return serveUpload(request, path, "storage");
+  return serveUpload(request, path, "uploads");
 }
 
 export async function HEAD(request: Request, { params }: RouteContext) {
   const { path } = await params;
-  return serveUpload(request, path, "storage");
+  return serveUpload(request, path, "uploads");
 }

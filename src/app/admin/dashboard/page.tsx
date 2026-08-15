@@ -6,6 +6,12 @@ import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
 import Image from "next/image";
 import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  IMAGE_UPLOAD_ACCEPT,
+  type UploadCategory,
+  validateUploadFile,
+} from "@/lib/upload-config";
+import {
   Users,
   BookOpen,
   Image as ImageIcon,
@@ -712,10 +718,13 @@ export default function AdminDashboardPage() {
     router.push("/admin/login");
   };
 
-  const uploadFile = async (file: File, folder: "uploads" | "profile" | "ppdb"): Promise<string> => {
+  const uploadFile = async (file: File, category: UploadCategory): Promise<string> => {
+    const validationError = validateUploadFile(file, category);
+    if (validationError) throw new Error(validationError);
+
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("folder", folder);
+    formData.append("category", category);
 
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -913,18 +922,8 @@ export default function AdminDashboardPage() {
     if (!file || !editingProgram) return;
     try {
       setSaving(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "uploads");
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "Gagal mengunggah icon");
-
-      setEditingProgram((prev: any) => ({ ...prev, iconUrl: data.url }));
+      const url = await uploadFile(file, "programs");
+      setEditingProgram((prev: any) => ({ ...prev, iconUrl: url }));
       showMessage("Icon program berhasil diunggah!", "success");
     } catch (err: any) {
       showMessage(err.message || "Gagal mengunggah icon program", "error");
@@ -1231,7 +1230,7 @@ export default function AdminDashboardPage() {
     if (!file) return;
     try {
       setLeaveUploading(true);
-      const url = await uploadFile(file, "profile" as any);
+      const url = await uploadFile(file, "leave");
       setEditingLeaveRequest((prev: any) => ({ ...prev, attachment: url }));
       showMessage("Lampiran berhasil diunggah!", "success");
     } catch (err: any) {
@@ -1335,7 +1334,7 @@ export default function AdminDashboardPage() {
     if (!file) return;
     try {
       setSppPaymentModal((prev) => ({ ...prev, uploading: true }));
-      const url = await uploadFile(file, "spp" as any);
+      const url = await uploadFile(file, "spp");
       setSppPaymentModal((prev) => ({ ...prev, proofUrl: url, uploading: false }));
       showMessage("Foto bukti transfer berhasil diunggah!", "success");
     } catch (err: any) {
@@ -1441,7 +1440,7 @@ export default function AdminDashboardPage() {
           schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
           title: newGalleryTitle || "Kegiatan Belajar",
           imageUrl: newGalleryImage,
-          folder: "uploads",
+          folder: "gallery",
         }),
       });
       const data = await res.json();
@@ -1711,15 +1710,7 @@ export default function AdminDashboardPage() {
     if (!file) return;
     setUploadingQris(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "qris");
-
-      const resUpload = await fetch("/api/upload", { method: "POST", body: formData });
-      const dataUpload = await resUpload.json();
-      if (!resUpload.ok || !dataUpload.success) throw new Error(dataUpload.error || "Gagal mengunggah QRIS");
-
-      const newUrl = dataUpload.url;
+      const newUrl = await uploadFile(file, "qris");
       const targetSchoolId = siteProfile.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id);
 
       const resProf = await fetch("/api/site-profile", {
@@ -4133,7 +4124,7 @@ export default function AdminDashboardPage() {
                           <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
                           <input
                             type="file"
-                            accept="image/*"
+                            accept={IMAGE_UPLOAD_ACCEPT}
                             onChange={handleUploadProgramIcon}
                             className="hidden"
                           />
@@ -4383,13 +4374,13 @@ export default function AdminDashboardPage() {
                           <span>Upload</span>
                           <input
                             type="file"
-                            accept="image/*"
+                            accept={IMAGE_UPLOAD_ACCEPT}
                             className="hidden"
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
                                 try {
-                                  const url = await uploadFile(file, "profile");
+                                  const url = await uploadFile(file, "profiles");
                                   setEditingTeacher({ ...editingTeacher, photoUrl: url });
                                   showMessage("Foto guru diunggah!", "success");
                                 } catch (err: any) {
@@ -5501,7 +5492,7 @@ export default function AdminDashboardPage() {
                           </span>
                           <input
                             type="file"
-                            accept="image/*,.pdf"
+                            accept={DOCUMENT_UPLOAD_ACCEPT}
                             onChange={handleUploadSppProof}
                             className="hidden"
                           />
@@ -6526,7 +6517,7 @@ export default function AdminDashboardPage() {
                       <span>{uploadingQris ? "Mengunggah QRIS..." : "Pilih File Gambar QRIS"}</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept={IMAGE_UPLOAD_ACCEPT}
                         className="hidden"
                         disabled={uploadingQris}
                         onChange={handleUploadQrisImage}
@@ -6944,7 +6935,7 @@ export default function AdminDashboardPage() {
                         </span>
                         <input
                           type="file"
-                          accept="image/*,.pdf"
+                          accept={DOCUMENT_UPLOAD_ACCEPT}
                           onChange={handleUploadLeaveAttachment}
                           className="hidden"
                         />
@@ -7295,7 +7286,7 @@ export default function AdminDashboardPage() {
                   Kelola Galeri Foto
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Unggah gambar dokumentasi kegiatan sekolah. (Folder storage: uploads/)
+                  Unggah gambar dokumentasi kegiatan sekolah. File disimpan per tanggal di uploads/gallery/.
                 </p>
               </div>
 
@@ -7319,16 +7310,16 @@ export default function AdminDashboardPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
-                      Pilih File Gambar (uploads/)
+                      Pilih File Gambar (maksimal 1 MB)
                     </label>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_UPLOAD_ACCEPT}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
                           try {
-                            const url = await uploadFile(file, "uploads");
+                            const url = await uploadFile(file, "gallery");
                             setNewGalleryImage(url);
                             showMessage("Gambar berhasil diunggah!", "success");
                           } catch (err: any) {

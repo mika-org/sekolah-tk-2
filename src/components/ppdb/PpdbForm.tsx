@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  MAX_UPLOAD_SIZE_LABEL,
+  validateUploadFile,
+} from "@/lib/upload-config";
 import Sidebar from "./Sidebar";
 import {
   User,
@@ -197,6 +202,11 @@ export default function PpdbForm({
   };
 
   const handleFileSelect = (docKey: string, file: File) => {
+    const validationError = validateUploadFile(file, "ppdb");
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
     setSelectedFileObjects((prev) => ({ ...prev, [docKey]: file }));
   };
 
@@ -239,7 +249,7 @@ export default function PpdbForm({
         try {
           const formDataUpload = new FormData();
           formDataUpload.append("file", fileObj);
-          formDataUpload.append("folder", "ppdb");
+          formDataUpload.append("category", "ppdb");
 
           const res = await fetch("/api/upload", {
             method: "POST",
@@ -776,12 +786,16 @@ export default function PpdbForm({
                   </h3>
                 </div>
 
+                <p className="text-xs text-slate-500">
+                  Format JPG, PNG, WEBP, atau PDF. Maksimal {MAX_UPLOAD_SIZE_LABEL} per file.
+                </p>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Dropzone 1: Kartu Keluarga */}
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -810,7 +824,7 @@ export default function PpdbForm({
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -839,7 +853,7 @@ export default function PpdbForm({
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -868,7 +882,7 @@ export default function PpdbForm({
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -1192,7 +1206,7 @@ export default function PpdbForm({
                       <label className="md:col-span-5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center">
                         <input
                           type="file"
-                          accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                          accept={DOCUMENT_UPLOAD_ACCEPT}
                           className="hidden"
                           onChange={(e) => {
                             if (e.target.files?.[0])
@@ -1254,7 +1268,7 @@ export default function PpdbForm({
                     <label className="md:col-span-6 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-48">
                       <input
                         type="file"
-                        accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                        accept={DOCUMENT_UPLOAD_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           if (e.target.files?.[0])

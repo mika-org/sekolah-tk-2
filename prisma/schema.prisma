@@ -136,7 +136,7 @@ model GalleryItem {
   school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   title      String   @map("judul")
   imageUrl   String   @map("url_gambar")
-  folder     String   @default("uploads") @map("folder")
+  folder     String   @default("gallery") @map("folder")
   orderIndex Int      @default(0) @map("urutan")
   createdAt  DateTime @default(now()) @map("dibuat_pada")
 

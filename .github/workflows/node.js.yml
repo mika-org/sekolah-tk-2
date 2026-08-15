@@ -32,7 +32,21 @@ jobs:
 
             git pull origin main
 
+            STORAGE_ROOT=/var/www/storage-sekolah
+            mkdir -p "$STORAGE_ROOT/uploads"
+            if [ ! -w "$STORAGE_ROOT/uploads" ]; then
+              echo "Storage is not writable by $(id -un). Run: sudo chown -R $(id -un):www-data $STORAGE_ROOT"
+              exit 1
+            fi
+
+            # Preserve legacy tracked uploads without overwriting newer VPS files.
+            if [ -d public/storage ]; then
+              cp -an public/storage/. "$STORAGE_ROOT/"
+            fi
+
             npm ci
+
+            npx prisma migrate deploy
 
             npm run build
 
@@ -43,6 +57,20 @@ jobs:
             fi
 
             pm2 save
+
+            HEALTHY=false
+            for attempt in $(seq 1 10); do
+              if curl --fail --silent --show-error http://127.0.0.1:3002/api/health > /dev/null; then
+                HEALTHY=true
+                break
+              fi
+              sleep 2
+            done
+
+            if [ "$HEALTHY" != "true" ]; then
+              echo "SmartKids health check failed: verify DATABASE_URL and storage permissions."
+              exit 1
+            fi
 
       - name: Calculate Duration
         if: always()

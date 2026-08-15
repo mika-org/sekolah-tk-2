@@ -85,7 +85,7 @@ export async function GET() {
       {
         title: "S5",
         ageRange: "1 Minggu 5X Pertemuan",
-        iconUrl: "/images/program_prekinder.png",
+        iconUrl: "/images/program_pre_kindergarten.png",
         features: JSON.stringify(["5x Pertemuan / Minggu", "SPP Perbulan Rp 300.000"]),
         sppAmount: 300000,
         orderIndex: 3,
@@ -93,7 +93,7 @@ export async function GET() {
       {
         title: "BEST PROGRAM",
         ageRange: "1 Minggu 3X Pertemuan (1 Guru 1 Siswa)",
-        iconUrl: "/images/program_special.png",
+        iconUrl: "/images/program_kindergarten.png",
         features: JSON.stringify(["3x Pertemuan / Minggu", "Private 1 Guru 1 Siswa", "SPP Perbulan Rp 300.000"]),
         sppAmount: 300000,
         orderIndex: 4,

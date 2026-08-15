@@ -1,86 +1,74 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { prisma } from "@/lib/prisma";
+import {
+  MAX_UPLOAD_SIZE_BYTES,
+  normalizeUploadCategory,
+} from "@/lib/upload-config";
+import { storeUpload, UploadError } from "@/lib/upload-storage";
+
+export const runtime = "nodejs";
+
+const MAX_MULTIPART_OVERHEAD_BYTES = 128 * 1024;
 
 export async function POST(req: Request) {
   try {
+    const contentLength = Number(req.headers.get("content-length") || 0);
+    if (contentLength > MAX_UPLOAD_SIZE_BYTES + MAX_MULTIPART_OVERHEAD_BYTES) {
+      throw new UploadError("Ukuran file maksimal 1 MB.", 413);
+    }
+
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const folderInput = (formData.get("folder") as string) || "uploads";
-
-    // Validate folder target: keep uploads scoped to known application buckets.
-    const allowedFolders = ["uploads", "profile", "ppdb", "spp", "payments", "qris"];
-    const folder = allowedFolders.includes(folderInput.toLowerCase())
-      ? folderInput.toLowerCase()
-      : "uploads";
-
-    if (!file) {
-      return NextResponse.json(
-        { success: false, error: "Tidak ada file yang diunggah" },
-        { status: 400 }
-      );
+    const fileEntry = formData.get("file");
+    if (!(fileEntry instanceof File)) {
+      throw new UploadError("Tidak ada file yang diunggah.", 400);
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const category = normalizeUploadCategory(
+      formData.get("category") || formData.get("folder"),
+    );
+    const storedFile = await storeUpload(fileEntry, category);
 
-    // Sanitize filename and create unique timestamp prefix
-    const originalName = file.name || "file";
-    const sanitizedName = originalName.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const uniqueFileName = `${Date.now()}_${sanitizedName}`;
-
-    // Target base storage directory (Static resolution)
-    const baseStorageDir = process.env.STORAGE_PATH || "/var/www/storage-sekolah";
-    let uploadDir = path.resolve(/*turbopackIgnore: true*/ baseStorageDir, folder);
-    let targetFilePath = path.resolve(/*turbopackIgnore: true*/ uploadDir, uniqueFileName);
-
-    try {
-      await mkdir(uploadDir, { recursive: true, mode: 0o777 });
-      await writeFile(/*turbopackIgnore: true*/ targetFilePath, buffer, { mode: 0o666 });
-    } catch {
-      // Fallback for local dev environments where /var/www/storage-sekolah is unavailable
-      uploadDir = path.resolve(/*turbopackIgnore: true*/ process.cwd(), "public", "storage", folder);
-      await mkdir(uploadDir, { recursive: true, mode: 0o777 });
-      targetFilePath = path.resolve(/*turbopackIgnore: true*/ uploadDir, uniqueFileName);
-      await writeFile(/*turbopackIgnore: true*/ targetFilePath, buffer, { mode: 0o666 });
-    }
-
-    // Storage URL resolution
-    const relativePath = `/storage/${folder}/${uniqueFileName}`;
-    const storageBaseUrl = process.env.NEXT_PUBLIC_STORAGE_URL;
-    const fileUrl = storageBaseUrl
-      ? `${storageBaseUrl.replace(/\/$/, "")}/${folder}/${uniqueFileName}`
-      : relativePath;
-
-    // Record upload log in PostgreSQL (non-blocking log attempt)
     try {
       await prisma.uploadLog.create({
         data: {
-          fileName: uniqueFileName,
-          fileFolder: folder,
-          fileUrl: fileUrl,
-          fileSize: file.size,
-          mimeType: file.type || "application/octet-stream",
+          fileName: storedFile.fileName,
+          fileFolder: storedFile.fileFolder,
+          fileUrl: storedFile.fileUrl,
+          fileSize: storedFile.storedSize,
+          mimeType: storedFile.mimeType,
         },
       });
-    } catch (logErr: any) {
-      console.warn("Upload DB log warning (non-fatal):", logErr?.message || logErr);
+    } catch (error) {
+      console.warn("Upload DB log warning (non-fatal):", error);
     }
 
-    return NextResponse.json({
-      success: true,
-      fileName: uniqueFileName,
-      folder: folder,
-      url: fileUrl,
-      fileUrl: fileUrl,
-      localUrl: relativePath,
-    });
-  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: true,
+        fileName: storedFile.fileName,
+        folder: storedFile.fileFolder,
+        url: storedFile.fileUrl,
+        fileUrl: storedFile.fileUrl,
+        localUrl: storedFile.localUrl,
+        mimeType: storedFile.mimeType,
+        originalSize: storedFile.originalSize,
+        storedSize: storedFile.storedSize,
+        compressed: storedFile.compressed,
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    if (error instanceof UploadError) {
+      return NextResponse.json(
+        { success: false, error: error.message },
+        { status: error.status },
+      );
+    }
+
     console.error("Upload error:", error);
     return NextResponse.json(
-      { success: false, error: error.message || "Gagal mengunggah file" },
-      { status: 500 }
+      { success: false, error: "Gagal mengunggah file." },
+      { status: 500 },
     );
   }
 }
