@@ -162,6 +162,7 @@ export default function AdminDashboardPage() {
     schoolName: string;
     username: string;
     password: string;
+    passwordAvailable: boolean;
     qrCode: string;
   }>({
     isOpen: false,
@@ -173,6 +174,7 @@ export default function AdminDashboardPage() {
     schoolName: "",
     username: "",
     password: "",
+    passwordAvailable: false,
     qrCode: "",
   });
   const [dailyGradesList, setDailyGradesList] = useState<any[]>([]);
@@ -988,6 +990,7 @@ export default function AdminDashboardPage() {
       schoolName: "",
       username: "",
       password: "",
+      passwordAvailable: false,
       qrCode: "",
     });
 
@@ -1007,6 +1010,37 @@ export default function AdminDashboardPage() {
     } catch (err: any) {
       showMessage("Gagal memuat akun guru", "error");
       setTeacherCredentialModal((prev) => ({ ...prev, isOpen: false }));
+    }
+  };
+
+  const handleResetTeacherPassword = async () => {
+    if (!teacherCredentialModal.teacherId) return;
+    if (!confirm("Reset password guru dan buat password sementara baru?")) return;
+
+    setTeacherCredentialModal((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch(
+        `/api/teachers/${teacherCredentialModal.teacherId}/credentials`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      setTeacherCredentialModal((prev) => ({
+        ...prev,
+        loading: false,
+        username: data.data.username,
+        password: data.data.password,
+        passwordAvailable: true,
+      }));
+      showMessage("Password guru berhasil di-reset dengan bcrypt", "success");
+    } catch (err: any) {
+      showMessage(err.message || "Gagal mereset password guru", "error");
+      setTeacherCredentialModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -8167,8 +8201,12 @@ export default function AdminDashboardPage() {
                     <strong className="text-amber-300 font-mono font-black">{teacherCredentialModal.username}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Password Default:</span>
-                    <strong className="text-emerald-400 font-mono font-black">{teacherCredentialModal.password}</strong>
+                    <span className="text-slate-400">Password:</span>
+                    <strong className="text-emerald-400 font-mono font-black text-right">
+                      {teacherCredentialModal.passwordAvailable
+                        ? teacherCredentialModal.password
+                        : "Tersimpan aman (bcrypt)"}
+                    </strong>
                   </div>
                 </div>
 
@@ -8191,29 +8229,41 @@ export default function AdminDashboardPage() {
 
                 <div className="flex flex-col gap-2 pt-2">
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        `Akun Portal Guru TK Smart Kids:\nNama: ${teacherCredentialModal.teacherName}\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\nLogin: ${window.location.origin}/login`
-                      );
-                      showMessage("Akun login guru berhasil disalin!", "success");
-                    }}
-                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    onClick={handleResetTeacherPassword}
+                    className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
-                    <Copy className="w-4 h-4" />
-                    <span>Salin Akun Login Guru</span>
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Reset & Buat Password Baru</span>
                   </button>
 
-                  <a
-                    href={`https://wa.me/?text=${encodeURIComponent(
-                      `Halo Ibu/Bapak ${teacherCredentialModal.teacherName},\nBerikut akun login Portal Guru Smart Kids:\n\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\n\nSilakan login di: ${window.location.origin}/login`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30 text-center"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Kirim Akun via WhatsApp</span>
-                  </a>
+                  {teacherCredentialModal.passwordAvailable && (
+                    <>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `Akun Portal Guru TK Smart Kids:\nNama: ${teacherCredentialModal.teacherName}\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\nLogin: ${window.location.origin}/login`
+                          );
+                          showMessage("Akun login guru berhasil disalin!", "success");
+                        }}
+                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>Salin Akun Login Guru</span>
+                      </button>
+
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(
+                          `Halo Ibu/Bapak ${teacherCredentialModal.teacherName},\nBerikut akun login Portal Guru Smart Kids:\n\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\n\nSilakan login di: ${window.location.origin}/login`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30 text-center"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>Kirim Akun via WhatsApp</span>
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
             )}

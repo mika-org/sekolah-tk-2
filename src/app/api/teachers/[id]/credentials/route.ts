@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import {
+  canManagePasswords,
+  generateTemporaryPassword,
+  hashPassword,
+  isBcryptHash,
+} from "@/lib/password";
 
 export async function GET(
   req: Request,
@@ -8,8 +14,8 @@ export async function GET(
 ) {
   try {
     const admin = await getAdminFromCookies();
-    if (!admin) {
-      return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 401 });
+    if (!admin || !canManagePasswords(admin.role)) {
+      return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 403 });
     }
 
     const { id } = await params;
@@ -28,35 +34,42 @@ export async function GET(
 
     const teacher = teacherList[0];
     const cleanUsername = `guru_${teacher.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
-    const defaultPassword = `guru123`;
-
-    let adminUser: any[] = await prisma.$queryRawUnsafe(
-      `SELECT id, "nama_pengguna" as username, "kata_sandi_hash" as "password" FROM "pengguna_admin" WHERE "nama" = $1 OR "nama_pengguna" = $2 LIMIT 1`,
+    const adminUser: any[] = await prisma.$queryRawUnsafe(
+      `SELECT id, "nama_pengguna" as username, "kata_sandi_hash" as "passwordHash" FROM "pengguna_admin" WHERE "peran" = 'GURU' AND ("nama" = $1 OR "nama_pengguna" = $2) LIMIT 1`,
       teacher.name,
       cleanUsername
     );
 
-    let credentials;
+    let username = cleanUsername;
+    let generatedPassword = "";
 
     if (adminUser.length === 0) {
-      // Auto create AdminUser account for teacher
+      generatedPassword = generateTemporaryPassword("Guru");
+      const passwordHash = await hashPassword(generatedPassword);
       await prisma.$executeRawUnsafe(
         `INSERT INTO "pengguna_admin" ("id", "id_sekolah", "nama", "nama_pengguna", "kata_sandi_hash", "peran", "kelas_ditugaskan", "email", "telepon", "dibuat_pada", "diperbarui_pada") 
          VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 'GURU', $5, $6, $7, NOW(), NOW())`,
         teacher.schoolId,
         teacher.name,
         cleanUsername,
-        defaultPassword,
+        passwordHash,
         teacher.assignedClass || null,
         teacher.email || null,
         teacher.phone || null
       );
-      credentials = { username: cleanUsername, password: defaultPassword };
     } else {
-      credentials = {
-        username: adminUser[0].username,
-        password: adminUser[0].password || defaultPassword,
-      };
+      username = adminUser[0].username;
+
+      // Repair an account created by an older deployment that stored plaintext.
+      if (!isBcryptHash(adminUser[0].passwordHash)) {
+        generatedPassword = generateTemporaryPassword("Guru");
+        const passwordHash = await hashPassword(generatedPassword);
+        await prisma.$executeRawUnsafe(
+          `UPDATE "pengguna_admin" SET "kata_sandi_hash" = $1, "diperbarui_pada" = NOW() WHERE "id" = $2`,
+          passwordHash,
+          adminUser[0].id
+        );
+      }
     }
 
     return NextResponse.json({
@@ -69,8 +82,9 @@ export async function GET(
         email: teacher.email || "-",
         phone: teacher.phone || "-",
         schoolName: teacher.schoolName || "TK Smart Kids",
-        username: credentials.username,
-        password: credentials.password,
+        username,
+        password: generatedPassword,
+        passwordAvailable: generatedPassword.length > 0,
         qrCode: teacher.qrCode || `TEACHER:${teacher.id}`,
       },
     });
@@ -85,13 +99,26 @@ export async function POST(
 ) {
   try {
     const admin = await getAdminFromCookies();
-    if (!admin) {
-      return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 401 });
+    if (!admin || !canManagePasswords(admin.role)) {
+      return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 403 });
     }
 
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
-    const newPassword = body?.newPassword || `guru${Math.floor(100 + Math.random() * 900)}`;
+    const requestedPassword =
+      typeof body?.newPassword === "string" ? body.newPassword : "";
+    const newPassword = requestedPassword.trim()
+      ? requestedPassword
+      : generateTemporaryPassword("Guru");
+
+    if (newPassword.length < 8) {
+      return NextResponse.json(
+        { success: false, error: "Password minimal 8 karakter" },
+        { status: 400 }
+      );
+    }
+
+    const passwordHash = await hashPassword(newPassword);
 
     const teacherList: any[] = await prisma.$queryRawUnsafe(
       `SELECT g.id, g.nama as name, g.id_sekolah as "schoolId", g.kelas_ditugaskan as "assignedClass", g.email, g.telepon as phone FROM "guru" g WHERE g.id = $1 LIMIT 1`,
@@ -105,8 +132,8 @@ export async function POST(
     const teacher = teacherList[0];
     const cleanUsername = `guru_${teacher.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
 
-    let adminUser: any[] = await prisma.$queryRawUnsafe(
-      `SELECT id FROM "pengguna_admin" WHERE "nama" = $1 OR "nama_pengguna" = $2 LIMIT 1`,
+    const adminUser: any[] = await prisma.$queryRawUnsafe(
+      `SELECT id, "nama_pengguna" as username FROM "pengguna_admin" WHERE "peran" = 'GURU' AND ("nama" = $1 OR "nama_pengguna" = $2) LIMIT 1`,
       teacher.name,
       cleanUsername
     );
@@ -114,7 +141,7 @@ export async function POST(
     if (adminUser.length > 0) {
       await prisma.$executeRawUnsafe(
         `UPDATE "pengguna_admin" SET "kata_sandi_hash" = $1, "email" = $2, "telepon" = $3, "diperbarui_pada" = NOW() WHERE "id" = $4`,
-        newPassword,
+        passwordHash,
         teacher.email || null,
         teacher.phone || null,
         adminUser[0].id
@@ -126,7 +153,7 @@ export async function POST(
         teacher.schoolId,
         teacher.name,
         cleanUsername,
-        newPassword,
+        passwordHash,
         teacher.assignedClass || null,
         teacher.email || null,
         teacher.phone || null
@@ -137,8 +164,9 @@ export async function POST(
       success: true,
       message: "Akun login guru berhasil diperbarui/di-reset!",
       data: {
-        username: cleanUsername,
+        username: adminUser[0]?.username || cleanUsername,
         password: newPassword,
+        passwordAvailable: true,
       },
     });
   } catch (error: any) {

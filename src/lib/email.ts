@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 
 export async function sendCredentialEmail(
   email: string,
@@ -17,18 +17,6 @@ export async function sendCredentialEmail(
 
     if (!host || !user || !pass) {
       console.warn("SMTP credentials not configured. Simulating email send to:", email);
-      console.log(`
-        === EMAIL SENT TO ORANG TUA (SIMULATION) ===
-        To: ${email}
-        Subject: Selamat! Ananda ${studentName} Diterima di Smart Kids
-        
-        Selamat, Ananda telah diterima di Smart Kids.
-        Berikut akun untuk login.
-        Username: ${username}
-        Password: ${passwordStr}
-        Silakan login melalui: ${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login
-        ============================================
-      `);
       return { success: true, simulated: true };
     }
 
@@ -114,9 +102,8 @@ export async function createStudentAccountAndSendEmail(ppdb: {
     }
 
     // 2. Generate random plain password and hash with bcrypt
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
-    const passwordStr = `Sk${randomNum}`;
-    const passwordHash = await bcrypt.hash(passwordStr, 10);
+    const passwordStr = generateTemporaryPassword();
+    const passwordHash = await hashPassword(passwordStr);
 
     const birthPlaceDate =
       ppdb.tempatLahir && ppdb.tanggalLahir

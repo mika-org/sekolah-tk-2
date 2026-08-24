@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { isBcryptHash, verifyPassword } from "../src/lib/password";
 
 const prisma = new PrismaClient();
 
@@ -14,9 +14,9 @@ async function main() {
   }
 
   console.log("Found admin:", admin.username);
-  console.log("Hash in DB:", admin.passwordHash);
+  console.log("Stored as bcrypt:", isBcryptHash(admin.passwordHash));
 
-  const match = await bcrypt.compare("admin123", admin.passwordHash);
+  const match = await verifyPassword("admin123", admin.passwordHash);
   console.log("Does 'admin123' match?", match);
 }
 

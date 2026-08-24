@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { signAdminToken } from "@/lib/auth";
+import { hashPassword, verifyPassword } from "@/lib/password";
 
 export async function POST(req: Request) {
   try {
@@ -17,9 +17,9 @@ export async function POST(req: Request) {
     const rawPassword = body?.password ?? "";
 
     const usernameStr = String(rawUsername).trim();
-    const passwordStr = String(rawPassword).trim();
+    const passwordStr = String(rawPassword);
 
-    if (!usernameStr || !passwordStr) {
+    if (!usernameStr || !passwordStr.trim()) {
       return NextResponse.json(
         { success: false, error: "Username/Email dan password wajib diisi" },
         { status: 400 }
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     // Auto-seed if database empty
     const checkCount: any[] = await prisma.$queryRawUnsafe(`SELECT COUNT(*)::int as cnt FROM "pengguna_admin"`);
     if (checkCount.length > 0 && checkCount[0].cnt === 0) {
-      const defaultHash = await bcrypt.hash("password123", 10);
+      const defaultHash = await hashPassword("password123");
       const schoolRes: any[] = await prisma.$queryRawUnsafe(
         `INSERT INTO "sekolah" ("id", "kode", "nama", "jenjang", "alamat", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, 'sadjati', 'Smart Kids Sadjati', 'TK', 'Sadjati', NOW(), NOW()) RETURNING id`
       );
@@ -51,10 +51,6 @@ export async function POST(req: Request) {
        WHERE LOWER(u."nama_pengguna") = $1 
           OR LOWER(u."email") = $1 
           OR u."telepon" = $2 
-          OR LOWER(u."nama_pengguna") LIKE ($1 || '%')
-          OR ($1 IN ('admin', 'super_admin', 'superadmin') AND u."peran" IN ('SUPER_ADMIN', 'ADMIN_CABANG'))
-          OR ($1 = 'guru' AND u."peran" = 'GURU')
-          OR ($1 IN ('ortu', 'parent', 'orang_tua') AND u."peran" = 'ORANG_TUA')
        ORDER BY u."dibuat_pada" ASC LIMIT 1`,
       lowerInput,
       usernameStr
@@ -62,21 +58,7 @@ export async function POST(req: Request) {
 
     if (admins.length > 0) {
       const admin = admins[0];
-      let isMatch = false;
-      if (admin.passwordHash) {
-        try {
-          isMatch = await bcrypt.compare(passwordStr, admin.passwordHash);
-        } catch (_) {}
-        if (!isMatch) {
-          isMatch = admin.passwordHash === passwordStr;
-        }
-      }
-      if (!isMatch) {
-        const demoPasswords = ["admin", "admin123", "password123", "guru", "ortu", "123456", lowerInput];
-        if (demoPasswords.includes(passwordStr.toLowerCase())) {
-          isMatch = true;
-        }
-      }
+      const isMatch = await verifyPassword(passwordStr, admin.passwordHash);
 
       if (!isMatch) {
         return NextResponse.json(
@@ -170,8 +152,6 @@ export async function POST(req: Request) {
        WHERE LOWER(st."nama_pengguna") = $1 
           OR st."nisn" = $2 
           OR st."telepon_orang_tua" = $2
-          OR LOWER(st."nama_pengguna") LIKE ($1 || '%')
-          OR ($1 IN ('ortu', 'parent', 'siswa', 'orang_tua'))
        ORDER BY st."dibuat_pada" ASC LIMIT 1`,
       lowerInput,
       usernameStr
@@ -179,21 +159,7 @@ export async function POST(req: Request) {
 
     if (students.length > 0) {
       const student = students[0];
-      let isMatch = false;
-      if (student.passwordHash) {
-        try {
-          isMatch = await bcrypt.compare(passwordStr, student.passwordHash);
-        } catch (_) {}
-        if (!isMatch) {
-          isMatch = student.passwordHash === passwordStr;
-        }
-      }
-      if (!isMatch) {
-        const demoPasswords = ["admin", "admin123", "password123", "guru", "ortu", "123456", lowerInput];
-        if (demoPasswords.includes(passwordStr.toLowerCase())) {
-          isMatch = true;
-        }
-      }
+      const isMatch = await verifyPassword(passwordStr, student.passwordHash);
 
       if (isMatch) {
         const token = signAdminToken({
@@ -224,64 +190,6 @@ export async function POST(req: Request) {
             address: student.address || "Sadjati, Karawang",
             email: student.email || null,
             phone: student.parentPhone || null,
-          },
-        });
-
-        response.cookies.set({
-          name: "admin_token",
-          value: token,
-          httpOnly: true,
-          path: "/",
-          sameSite: "lax",
-          maxAge: 7 * 24 * 60 * 60,
-        });
-
-        return response;
-      }
-    }
-
-    // 3. Fallback: Search in guru table by name, qrCode, or guru alias
-    const teachers: any[] = await prisma.$queryRawUnsafe(
-      `SELECT g.id, g."id_sekolah" as "schoolId", g."id_kelas" as "classId", g."nama" as name, g."jabatan" as role, g."kelas_ditugaskan" as "assignedClass", g."kode_qr" as "qrCode", g."url_foto" as "avatarUrl", g."bio" as bio, g."pendidikan" as education, s.nama as "schoolName", s.kode as "schoolCode" 
-       FROM "guru" g 
-       LEFT JOIN "sekolah" s ON g."id_sekolah" = s.id 
-       WHERE LOWER(g."nama") = $1 
-          OR LOWER(g."kode_qr") = $1 
-          OR LOWER(g."nama") LIKE ($1 || '%')
-          OR ($1 = 'guru')
-       ORDER BY g."urutan" ASC LIMIT 1`,
-      lowerInput
-    );
-
-    if (teachers.length > 0) {
-      const teacher = teachers[0];
-      const demoPasswords = ["admin", "admin123", "password123", "guru", "123456", lowerInput];
-      if (demoPasswords.includes(passwordStr.toLowerCase()) || passwordStr === teacher.id) {
-        const token = signAdminToken({
-          id: teacher.id,
-          username: "guru",
-          name: teacher.name,
-          role: "GURU",
-          schoolId: teacher.schoolId,
-        });
-
-        const response = NextResponse.json({
-          success: true,
-          message: "Login guru berhasil",
-          admin: {
-            id: teacher.id,
-            username: "guru",
-            name: teacher.name,
-            role: "GURU",
-            schoolId: teacher.schoolId,
-            classId: teacher.classId || null,
-            schoolName: teacher.schoolName || "Smart Kids Sadjati",
-            schoolCode: teacher.schoolCode || "sadjati",
-            assignedClass: teacher.assignedClass,
-            nip: teacher.id,
-            avatarUrl: teacher.avatarUrl || "https://i.pravatar.cc/150?img=5",
-            bio: teacher.bio || null,
-            education: teacher.education || null,
           },
         });
 

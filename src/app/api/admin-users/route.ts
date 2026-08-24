@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { hashPassword } from "@/lib/password";
 
 const isSuperAdmin = (role?: string) => {
   if (!role) return false;
@@ -61,10 +61,18 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { username, password, name, role, schoolId, classId, assignedClass } = body;
+    const passwordStr = typeof password === "string" ? password : "";
 
-    if (!username || !password || !name) {
+    if (!username || !passwordStr || !name) {
       return NextResponse.json(
         { success: false, error: "Username, password, dan nama wajib diisi" },
+        { status: 400 }
+      );
+    }
+
+    if (passwordStr.length < 8) {
+      return NextResponse.json(
+        { success: false, error: "Password minimal 8 karakter" },
         { status: 400 }
       );
     }
@@ -81,7 +89,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(passwordStr);
     const validRole = role || "BELUM_MASUK";
 
     const res: any[] = await prisma.$queryRawUnsafe(

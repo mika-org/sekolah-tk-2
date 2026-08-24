@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
 import { sendCredentialEmail } from "@/lib/email";
-import bcrypt from "bcryptjs";
+import {
+  canManagePasswords,
+  generateTemporaryPassword,
+  hashPassword,
+} from "@/lib/password";
 
 export async function POST(
   req: Request,
@@ -10,10 +14,10 @@ export async function POST(
 ) {
   try {
     const admin = await getAdminFromCookies();
-    if (!admin) {
+    if (!admin || !canManagePasswords(admin.role)) {
       return NextResponse.json(
         { success: false, error: "Akses ditolak" },
-        { status: 401 }
+        { status: 403 }
       );
     }
 
@@ -40,20 +44,13 @@ export async function POST(
       }
     }
 
-    // 2. Generate initial password ONLY if passwordHash does not exist yet
-    let passwordStr = "";
-    let passwordHash = student.passwordHash;
-    const isNewPassword = !passwordHash;
+    // Password lama tidak dapat dibaca kembali dari bcrypt. Setiap pengiriman
+    // kredensial membuat password sementara baru agar nilainya dapat dibagikan
+    // sekali saja kepada orang tua.
+    const passwordStr = generateTemporaryPassword();
+    const passwordHash = await hashPassword(passwordStr);
 
-    if (isNewPassword) {
-      const randomNum = Math.floor(100000 + Math.random() * 900000);
-      passwordStr = `Sk${randomNum}`;
-      passwordHash = await bcrypt.hash(passwordStr, 10);
-    } else {
-      passwordStr = "(Password Anda tidak berubah)";
-    }
-
-    // 3. Update student record with username and passwordHash (only updating hash if it was missing)
+    // 3. Update student record with the freshly generated bcrypt hash.
     const updatedStudent = await prisma.student.update({
       where: { id },
       data: {
@@ -67,7 +64,7 @@ export async function POST(
       where: { username },
       update: {
         schoolId: student.schoolId,
-        ...(isNewPassword && { passwordHash: passwordHash as string }),
+        passwordHash,
         name: `Wali ${student.name}`,
         phone: student.parentPhone,
         email: student.parentEmail,
@@ -76,7 +73,7 @@ export async function POST(
       create: {
         schoolId: student.schoolId,
         username,
-        passwordHash: passwordHash || (await bcrypt.hash("Sk123456", 10)),
+        passwordHash,
         name: `Wali ${student.name}`,
         phone: student.parentPhone,
         email: student.parentEmail,
@@ -111,7 +108,10 @@ export async function POST(
       success: true,
       message: `Akun ortu untuk ${student.name} berhasil dibuat/diperbarui!`,
       data: {
-        student: updatedStudent,
+        student: {
+          id: updatedStudent.id,
+          name: updatedStudent.name,
+        },
         username,
         password: passwordStr,
         parentEmail: student.parentEmail,

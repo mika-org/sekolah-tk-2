@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/password";
 
 export async function GET() {
   try {
-    const passwordHash = await bcrypt.hash("password123", 10);
+    const passwordHash = await hashPassword("password123");
 
     // 0. Ensure required DB columns exist
     try {
