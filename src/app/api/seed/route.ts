@@ -330,6 +330,27 @@ export async function GET() {
       );
     }
 
+    // Teacher accounts
+    const teacherSeedAccounts = [
+      { username: "guru_afifah", name: "Miss Afifah", schoolId: schoolSadjatiId },
+      { username: "guru_lia", name: "Miss Lia", schoolId: schoolSadjatiId },
+      { username: "guru_ulin", name: "Miss Ulin", schoolId: schoolSadjatiId },
+      { username: "guru_sinta", name: "Miss Sinta", schoolId: schoolBclId },
+      { username: "guru_alif", name: "Miss Alif", schoolId: schoolBclId },
+    ];
+
+    for (const tAcc of teacherSeedAccounts) {
+      if (!rawAdmins.some((a) => a.nama_pengguna === tAcc.username)) {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "pengguna_admin" ("id", "id_sekolah", "nama_pengguna", "kata_sandi_hash", "nama", "peran", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 'GURU', NOW(), NOW())`,
+          tAcc.schoolId,
+          tAcc.username,
+          passwordHash,
+          tAcc.name
+        );
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: "Database seeded successfully with Homeroom Teachers (Miss Afifah, Miss Ulin, Miss Lia for Sadjati & Miss Sintia, Miss Alif, Miss Maya for BCL) and student class distribution.",

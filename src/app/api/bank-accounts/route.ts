@@ -18,7 +18,9 @@ export async function GET(req: Request) {
     if (schoolId && schoolId !== "ALL") {
       where.OR = [{ schoolId: schoolId }, { schoolId: null }];
     } else if (schoolCode && schoolCode !== "ALL") {
-      const sch = await prisma.school.findUnique({ where: { code: schoolCode } });
+      const sch = await prisma.school.findFirst({
+        where: { code: { equals: schoolCode, mode: "insensitive" } },
+      });
       if (sch) {
         where.OR = [{ schoolId: sch.id }, { schoolId: null }];
       }
@@ -96,7 +98,7 @@ export async function PUT(req: Request) {
     }
 
     const body = await req.json();
-    const { id, bankName, accountNumber, accountHolder, logoUrl, isActive } = body;
+    const { id, bankName, accountNumber, accountHolder, logoUrl, isActive, schoolId } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -113,6 +115,7 @@ export async function PUT(req: Request) {
         ...(accountHolder !== undefined && { accountHolder }),
         ...(logoUrl !== undefined && { logoUrl }),
         ...(isActive !== undefined && { isActive: Boolean(isActive) }),
+        ...(schoolId !== undefined && { schoolId: schoolId === "ALL" ? null : schoolId }),
       },
     });
 
