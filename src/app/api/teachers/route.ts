@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 
 export async function GET(req: Request) {
   try {
@@ -126,7 +127,8 @@ export async function POST(req: Request) {
 
     // Auto-generate AdminUser login account for new teacher
     const autoUsername = `guru_${name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
-    const autoPassword = `guru123`;
+    const autoPassword = generateTemporaryPassword("Guru");
+    const autoPasswordHash = await hashPassword(autoPassword);
     try {
       const existingUser: any[] = await prisma.$queryRawUnsafe(
         `SELECT id FROM "pengguna_admin" WHERE "nama" = $1 OR "nama_pengguna" = $2 LIMIT 1`,
@@ -142,7 +144,7 @@ export async function POST(req: Request) {
           classId || null,
           name,
           autoUsername,
-          autoPassword,
+          autoPasswordHash,
           assignedClass || null,
           email || null,
           phone || null

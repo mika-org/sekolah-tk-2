@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/password";
 
 export async function GET() {
   try {
-    const passwordHash = await bcrypt.hash("password123", 10);
+    const passwordHash = await hashPassword("password123");
 
     // 0. Ensure required DB columns exist
     try {
@@ -85,7 +85,7 @@ export async function GET() {
       {
         title: "S5",
         ageRange: "1 Minggu 5X Pertemuan",
-        iconUrl: "/images/program_prekinder.png",
+        iconUrl: "/images/program_pre_kindergarten.png",
         features: JSON.stringify(["5x Pertemuan / Minggu", "SPP Perbulan Rp 300.000"]),
         sppAmount: 300000,
         orderIndex: 3,
@@ -93,7 +93,7 @@ export async function GET() {
       {
         title: "BEST PROGRAM",
         ageRange: "1 Minggu 3X Pertemuan (1 Guru 1 Siswa)",
-        iconUrl: "/images/program_special.png",
+        iconUrl: "/images/program_kindergarten.png",
         features: JSON.stringify(["3x Pertemuan / Minggu", "Private 1 Guru 1 Siswa", "SPP Perbulan Rp 300.000"]),
         sppAmount: 300000,
         orderIndex: 4,
@@ -328,6 +328,27 @@ export async function GET() {
         schoolBclId,
         passwordHash
       );
+    }
+
+    // Teacher accounts
+    const teacherSeedAccounts = [
+      { username: "guru_afifah", name: "Miss Afifah", schoolId: schoolSadjatiId },
+      { username: "guru_lia", name: "Miss Lia", schoolId: schoolSadjatiId },
+      { username: "guru_ulin", name: "Miss Ulin", schoolId: schoolSadjatiId },
+      { username: "guru_sinta", name: "Miss Sinta", schoolId: schoolBclId },
+      { username: "guru_alif", name: "Miss Alif", schoolId: schoolBclId },
+    ];
+
+    for (const tAcc of teacherSeedAccounts) {
+      if (!rawAdmins.some((a) => a.nama_pengguna === tAcc.username)) {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO "pengguna_admin" ("id", "id_sekolah", "nama_pengguna", "kata_sandi_hash", "nama", "peran", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, 'GURU', NOW(), NOW())`,
+          tAcc.schoolId,
+          tAcc.username,
+          passwordHash,
+          tAcc.name
+        );
+      }
     }
 
     return NextResponse.json({

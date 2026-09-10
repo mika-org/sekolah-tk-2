@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { hashPassword } from "@/lib/password";
 
 const isSuperAdmin = (role?: string) => {
   if (!role) return false;
@@ -40,8 +40,14 @@ export async function PUT(
 
     const existingUser = existingUsers[0];
     let newPasswordHash: string | null = null;
-    if (password && password.trim() !== "") {
-      newPasswordHash = await bcrypt.hash(password, 10);
+    if (typeof password === "string" && password.trim() !== "") {
+      if (password.length < 8) {
+        return NextResponse.json(
+          { success: false, error: "Password minimal 8 karakter" },
+          { status: 400 }
+        );
+      }
+      newPasswordHash = await hashPassword(password);
     }
 
     const targetRole = role || existingUser.peran;

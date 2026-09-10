@@ -32,7 +32,21 @@ jobs:
 
             git pull origin main
 
+            STORAGE_ROOT=/var/www/storage-sekolah
+            mkdir -p "$STORAGE_ROOT/uploads"
+            if [ ! -w "$STORAGE_ROOT/uploads" ]; then
+              echo "Storage is not writable by $(id -un). Run: sudo chown -R $(id -un):www-data $STORAGE_ROOT"
+              exit 1
+            fi
+
+            # Preserve legacy tracked uploads without overwriting newer VPS files.
+            if [ -d public/storage ]; then
+              cp -an public/storage/. "$STORAGE_ROOT/"
+            fi
+
             npm ci
+
+            npx prisma migrate deploy
 
             npm run build
 

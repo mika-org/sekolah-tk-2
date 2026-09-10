@@ -4,6 +4,11 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  MAX_UPLOAD_SIZE_LABEL,
+  validateUploadFile,
+} from "@/lib/upload-config";
 import Sidebar from "./Sidebar";
 import {
   User,
@@ -48,6 +53,33 @@ export default function PpdbForm({
 }: PpdbFormProps) {
   const [step, setStep] = useState<number>(1);
 
+  // Dynamic school/branch selection state
+  const [currentSchoolCode, setCurrentSchoolCode] = useState<string>(
+    selectedSchoolCode || (schools && schools.length > 0 ? schools[0].code : "sadjati")
+  );
+  const [availableSchools, setAvailableSchools] = useState<any[]>(schools || []);
+
+  useEffect(() => {
+    if (selectedSchoolCode) {
+      setCurrentSchoolCode(selectedSchoolCode);
+    }
+  }, [selectedSchoolCode]);
+
+  useEffect(() => {
+    if (schools && schools.length > 0) {
+      setAvailableSchools(schools);
+    } else {
+      fetch("/api/schools")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.success && Array.isArray(d.data) && d.data.length > 0) {
+            setAvailableSchools(d.data);
+          }
+        })
+        .catch((err) => console.error("Error loading schools in PpdbForm:", err));
+    }
+  }, [schools]);
+
   // Form State initialized as empty
   const [formData, setFormData] = useState({
     namaAnak: "",
@@ -77,13 +109,15 @@ export default function PpdbForm({
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [selectedBankId, setSelectedBankId] = useState<string>("");
   const [qrisImageUrl, setQrisImageUrl] = useState<string>("/images/qris_default.png");
+  const [siteProfile, setSiteProfile] = useState<any>(null);
 
   // Fetch school programs, bank accounts, site profile
   useEffect(() => {
-    if (!selectedSchoolCode) return;
+    if (!currentSchoolCode) return;
+    setLoadingFeeComponents(true);
 
     // Fetch Programs
-    fetch(`/api/programs?schoolCode=${selectedSchoolCode}`)
+    fetch(`/api/programs?schoolCode=${currentSchoolCode}`)
       .then((r) => {
         const contentType = r.headers.get("content-type");
         if (r.ok && contentType && contentType.includes("application/json")) {
@@ -99,7 +133,7 @@ export default function PpdbForm({
       .catch((err) => console.error("Error fetching programs for PPDB:", err));
 
     // Fetch active PPDB fee components for this school.
-    fetch(`/api/fee-components?schoolCode=${selectedSchoolCode}&category=PPDB`)
+    fetch(`/api/fee-components?schoolCode=${currentSchoolCode}&category=PPDB`)
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok || !data.success) {
@@ -122,26 +156,31 @@ export default function PpdbForm({
       .finally(() => setLoadingFeeComponents(false));
 
     // Fetch Bank Accounts
-    fetch(`/api/bank-accounts?schoolCode=${selectedSchoolCode}&publicOnly=true`)
+    fetch(`/api/bank-accounts?schoolCode=${currentSchoolCode}&publicOnly=true`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.success && data.data?.length) {
+        if (data.success && Array.isArray(data.data)) {
           setBankAccounts(data.data);
-          setSelectedBankId(data.data[0].id);
+          if (data.data.length > 0) {
+            setSelectedBankId(data.data[0].id);
+          }
         }
       })
       .catch((err) => console.error("Error fetching bank accounts:", err));
 
-    // Fetch Site Profile (for QRIS image)
-    fetch(`/api/site-profile?schoolCode=${selectedSchoolCode}`)
+    // Fetch Site Profile (for QRIS image & Sidebar)
+    fetch(`/api/site-profile?schoolCode=${currentSchoolCode}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.success && data.data?.qrisImageUrl) {
-          setQrisImageUrl(data.data.qrisImageUrl);
+        if (data.success && data.data) {
+          setSiteProfile(data.data);
+          if (data.data.qrisImageUrl) {
+            setQrisImageUrl(data.data.qrisImageUrl);
+          }
         }
       })
       .catch((err) => console.error("Error fetching site profile:", err));
-  }, [selectedSchoolCode]);
+  }, [currentSchoolCode]);
 
   const togglePackageItem = (id: string) => {
     const item = ppdbPackageItems.find((component) => component.id === id);
@@ -196,13 +235,10 @@ export default function PpdbForm({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-
   const handleFileSelect = (docKey: string, file: File) => {
-    if (file.size > MAX_FILE_SIZE) {
-      alert(
-        `Ukuran file "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 10MB. Silakan pilih berkas yang berukuran lebih kecil.`
-      );
+    const validationError = validateUploadFile(file, "ppdb");
+    if (validationError) {
+      alert(validationError);
       return;
     }
     setSelectedFileObjects((prev) => ({ ...prev, [docKey]: file }));
@@ -247,7 +283,7 @@ export default function PpdbForm({
         try {
           const formDataUpload = new FormData();
           formDataUpload.append("file", fileObj);
-          formDataUpload.append("folder", "ppdb");
+          formDataUpload.append("category", "ppdb");
 
           const res = await fetch("/api/upload", {
             method: "POST",
@@ -272,7 +308,7 @@ export default function PpdbForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          schoolCode: selectedSchoolCode,
+          schoolCode: currentSchoolCode,
           registrationNo: newRegNo,
           namaAnak: formData.namaAnak,
           jenisKelamin: formData.jenisKelamin,
@@ -434,6 +470,68 @@ export default function PpdbForm({
                 </div>
 
                 <div className="space-y-4 text-xs">
+                  {/* PILIHAN CABANG / UNIT SEKOLAH */}
+                  <div className="bg-emerald-50/60 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                      <label className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center gap-2">
+                        <Building2 className="w-4 h-4 text-emerald-600" />
+                        <span>Pilih Cabang / Unit Belajar Sekolah</span>
+                        <span className="text-rose-500 font-bold">*</span>
+                      </label>
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200 self-start sm:self-auto">
+                        Unit Terpilih: {availableSchools.find((s) => s.code === currentSchoolCode)?.name || "Smart Kids Sadjati"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Silakan tentukan cabang sekolah terdekat untuk kegiatan belajar ananda:
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {(availableSchools.length > 0
+                        ? availableSchools
+                        : [
+                            { code: "sadjati", name: "Smart Kids Sadjati", address: "Sadjati" },
+                            { code: "bumi-cipta-laras", name: "Smart Kids BCL", address: "Bumi Cipta Laras" },
+                          ]
+                      ).map((school: any) => {
+                        const isSelected = school.code === currentSchoolCode;
+                        return (
+                          <button
+                            key={school.code || school.id}
+                            type="button"
+                            onClick={() => {
+                              setCurrentSchoolCode(school.code);
+                              setFormData((prev) => ({ ...prev, program: "" }));
+                            }}
+                            className={`p-3.5 rounded-xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                              isSelected
+                                ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20 ring-2 ring-emerald-500/20"
+                                : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40"
+                            }`}
+                          >
+                            <div
+                              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm ${
+                                isSelected ? "bg-white/20 text-white" : "bg-emerald-100 text-emerald-700"
+                              }`}
+                            >
+                              🏫
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className={`font-extrabold text-xs sm:text-sm truncate ${isSelected ? "text-white" : "text-slate-900"}`}>
+                                {school.name}
+                              </h4>
+                              <p className={`text-[10px] truncate ${isSelected ? "text-emerald-100" : "text-slate-500"}`}>
+                                {school.address || "Cabang TK Smart Kids"}
+                              </p>
+                            </div>
+                            {isSelected && (
+                              <CheckCircle2 className="w-5 h-5 text-white shrink-0" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Nama Anak */}
                   <div>
                     <label className="block font-bold text-slate-700 mb-1.5">
@@ -650,15 +748,16 @@ export default function PpdbForm({
                     </div>
 
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1.5">
-                        Email
+                      <label className="block font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span>Email Orang Tua</span>
+                        <span className="text-slate-400 font-normal text-[10px]">(Opsional)</span>
                       </label>
                       <input
                         type="email"
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
-                        placeholder="masukan email"
+                        placeholder="Contoh: orangtua@gmail.com (opsional)"
                         className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-600 transition-all bg-slate-50/50"
                       />
                     </div>
@@ -784,12 +883,16 @@ export default function PpdbForm({
                   </h3>
                 </div>
 
+                <p className="text-xs text-slate-500">
+                  Format JPG, PNG, WEBP, atau PDF. Maksimal {MAX_UPLOAD_SIZE_LABEL} per file.
+                </p>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   {/* Dropzone 1: Kartu Keluarga */}
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -818,7 +921,7 @@ export default function PpdbForm({
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -847,7 +950,7 @@ export default function PpdbForm({
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -876,7 +979,7 @@ export default function PpdbForm({
                   <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-30">
                     <input
                       type="file"
-                      accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         if (e.target.files?.[0])
@@ -1200,7 +1303,7 @@ export default function PpdbForm({
                       <label className="md:col-span-5 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-4 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center">
                         <input
                           type="file"
-                          accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                          accept={DOCUMENT_UPLOAD_ACCEPT}
                           className="hidden"
                           onChange={(e) => {
                             if (e.target.files?.[0])
@@ -1262,7 +1365,7 @@ export default function PpdbForm({
                     <label className="md:col-span-6 border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-2xl p-6 text-center cursor-pointer hover:bg-emerald-50/30 transition-all flex flex-col items-center justify-center min-h-48">
                       <input
                         type="file"
-                        accept="image/*,.pdf,application/pdf,.jpg,.jpeg,.png,.webp"
+                        accept={DOCUMENT_UPLOAD_ACCEPT}
                         className="hidden"
                         onChange={(e) => {
                           if (e.target.files?.[0])
@@ -1346,7 +1449,7 @@ export default function PpdbForm({
 
         {/* Right Column: Shared Sidebar */}
         <div className="lg:col-span-4">
-          <Sidebar />
+          <Sidebar siteProfile={siteProfile} selectedSchoolCode={currentSchoolCode} />
         </div>
       </div>
 

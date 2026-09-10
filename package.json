@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:3200": "next dev -p 3200",
     "build": "prisma generate && next build --webpack",
     "start": "next start -p 3002",
     "lint": "eslint",
@@ -13,7 +14,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.4.0",
-    "bcryptjs": "^3.0.3",
+    "bcrypt": "^6.0.0",
     "canvas-confetti": "^1.9.4",
     "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",
@@ -21,11 +22,12 @@
     "next": "16.2.10",
     "nodemailer": "^6.9.16",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "sharp": "^0.35.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/bcryptjs": "^2.4.6",
+    "@types/bcrypt": "^6.0.0",
     "@types/canvas-confetti": "^1.9.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20",

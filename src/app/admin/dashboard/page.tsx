@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
 import Image from "next/image";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  IMAGE_UPLOAD_ACCEPT,
+  type UploadCategory,
+  validateUploadFile,
+} from "@/lib/upload-config";
 import {
   Users,
   BookOpen,
@@ -47,6 +53,10 @@ import {
   Check,
   X,
   UserCheck,
+  Download,
+  Printer,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -63,6 +73,7 @@ export default function AdminDashboardPage() {
     | "students"
     | "attendance"
     | "teacher-attendance"
+    | "teacher-progress"
     | "spp"
     | "additional-fees"
     | "payment-settings"
@@ -107,6 +118,7 @@ export default function AdminDashboardPage() {
   // Data States & Pagination
   const [ppdbList, setPpdbList] = useState<any[]>([]);
   const [ppdbStatusFilter, setPpdbStatusFilter] = useState("ALL");
+  const [ppdbSchoolFilter, setPpdbSchoolFilter] = useState("ALL");
   const [ppdbSearch, setPpdbSearch] = useState("");
   const [selectedPpdb, setSelectedPpdb] = useState<any | null>(null);
   const [ppdbPage, setPpdbPage] = useState(1);
@@ -146,6 +158,38 @@ export default function AdminDashboardPage() {
     evaluatedStudentsCount: 15,
     notes: "",
   });
+
+  // Modal Detail History Pusat Progresif Fitur Sistem
+  const [progressiveHistoryModal, setProgressiveHistoryModal] = useState<{
+    isOpen: boolean;
+    selectedTeacherId: string;
+    selectedSchoolId: string;
+    startDate: string;
+    endDate: string;
+    activeSubTab: "summary" | "attendance_logs" | "monthly_records";
+    searchQuery: string;
+  }>({
+    isOpen: false,
+    selectedTeacherId: "ALL",
+    selectedSchoolId: "ALL",
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
+    endDate: new Date().toISOString().split("T")[0],
+    activeSubTab: "summary",
+    searchQuery: "",
+  });
+
+  const [copiedBankNo, setCopiedBankNo] = useState<boolean>(false);
+  const handleCopyBankAccount = (accountNo: string) => {
+    navigator.clipboard.writeText(accountNo.replace(/\s+/g, ""));
+    setCopiedBankNo(true);
+    setTimeout(() => setCopiedBankNo(false), 2500);
+  };
+
+  const [collapsedSidebarGroups, setCollapsedSidebarGroups] = useState<Record<string, boolean>>({});
+  const toggleSidebarGroup = (groupKey: string) => {
+    setCollapsedSidebarGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
+  };
+
   const [teacherCredentialModal, setTeacherCredentialModal] = useState<{
     isOpen: boolean;
     loading: boolean;
@@ -156,6 +200,7 @@ export default function AdminDashboardPage() {
     schoolName: string;
     username: string;
     password: string;
+    passwordAvailable: boolean;
     qrCode: string;
   }>({
     isOpen: false,
@@ -167,6 +212,7 @@ export default function AdminDashboardPage() {
     schoolName: "",
     username: "",
     password: "",
+    passwordAvailable: false,
     qrCode: "",
   });
   const [dailyGradesList, setDailyGradesList] = useState<any[]>([]);
@@ -276,6 +322,76 @@ export default function AdminDashboardPage() {
   const [addStudentToClassModal, setAddStudentToClassModal] = useState<boolean>(false);
   const [selectedStudentToAdd, setSelectedStudentToAdd] = useState<string>("");
 
+  // Helper & Memos untuk Hak Akses & Data Akun Orang Tua (ORTU / ORANG_TUA)
+  const isParent = admin?.role === "ORTU" || admin?.role === "ORANG_TUA";
+
+  const parentChildren = useMemo(() => {
+    if (!isParent || !admin) return [];
+    const adminId = admin.id;
+    const adminUsername = (admin.username || "").trim().toLowerCase();
+    const adminPhone = (admin.phone || (admin as any).parentPhone || "").replace(/\D/g, "");
+    const adminEmail = (admin.email || (admin as any).parentEmail || "").trim().toLowerCase();
+    const adminName = (admin.name || "").trim().toLowerCase();
+    const cleanAdminName = adminName.replace(/^wali\s+/i, "").trim();
+
+    return studentsList.filter((s) => {
+      if (adminId && s.id === adminId) return true;
+      const sUsername = (s.username || "").trim().toLowerCase();
+      const sNisn = (s.nisn || "").trim().toLowerCase();
+      if (adminUsername && (sUsername === adminUsername || sNisn === adminUsername)) return true;
+
+      const sPhone = (s.parentPhone || "").replace(/\D/g, "");
+      if (adminPhone && sPhone && (adminPhone === sPhone || adminPhone.endsWith(sPhone) || sPhone.endsWith(adminPhone))) {
+        return true;
+      }
+
+      const sEmail = (s.parentEmail || "").trim().toLowerCase();
+      if (adminEmail && sEmail && adminEmail === sEmail) return true;
+
+      const sParentName = (s.parentName || "").trim().toLowerCase();
+      if (sParentName && adminName) {
+        if (sParentName === adminName || sParentName.includes(adminName) || adminName.includes(sParentName)) {
+          return true;
+        }
+      }
+
+      const sName = (s.name || "").trim().toLowerCase();
+      if (cleanAdminName && sName) {
+        if (sName === cleanAdminName || sName.includes(cleanAdminName) || cleanAdminName.includes(sName)) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  }, [isParent, admin, studentsList]);
+
+  const parentChildrenIds = useMemo(() => parentChildren.map((c) => c.id), [parentChildren]);
+  const parentChildrenNames = useMemo(() => parentChildren.map((c) => c.name.toLowerCase()), [parentChildren]);
+
+  const myAttendanceList = useMemo(() => {
+    if (!isParent) return attendanceList;
+    return attendanceList.filter((att) => {
+      const sName = (att.studentName || "").toLowerCase();
+      return (
+        (att.studentId && parentChildrenIds.includes(att.studentId)) ||
+        parentChildrenNames.some((n) => sName.includes(n) || n.includes(sName))
+      );
+    });
+  }, [isParent, attendanceList, parentChildrenIds, parentChildrenNames]);
+
+  const mySppList = useMemo(() => {
+    if (!isParent) return sppList;
+    return sppList.filter((spp) => {
+      const sName = (spp.studentName || "").toLowerCase();
+      return (
+        (spp.studentId && parentChildrenIds.includes(spp.studentId)) ||
+        parentChildren.some((c) => c.nisn === spp.nisn) ||
+        parentChildrenNames.some((n) => sName.includes(n) || n.includes(sName))
+      );
+    });
+  }, [isParent, sppList, parentChildren, parentChildrenIds, parentChildrenNames]);
+
   const handlePlotStudent = async (studentId: string, targetClassId: string | null, action?: "REMOVE") => {
     try {
       const res = await fetch("/api/classes/plot-student", {
@@ -327,6 +443,10 @@ export default function AdminDashboardPage() {
     instagram: "",
     facebook: "",
     address: "",
+    helpTitle: "Butuh Bantuan?",
+    helpSubtitle: "Tim kami siap membantu anda setiap hari!",
+    helpHours: "Senin - Sabtu | 08.00 - 17.00 WIB",
+    importantNotice: "Pastikan data yang dimasukan pada form pendaftaran sudah sesuai",
   });
 
   // QR Code Camera scanner integration using html5-qrcode
@@ -712,15 +832,13 @@ export default function AdminDashboardPage() {
     router.push("/admin/login");
   };
 
-  const uploadFile = async (file: File, folder: "uploads" | "profile" | "ppdb" | "spp" | "payments" | "qris"): Promise<string> => {
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    if (file.size > MAX_FILE_SIZE) {
-      throw new Error(`Ukuran berkas "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 10MB`);
-    }
+  const uploadFile = async (file: File, category: UploadCategory): Promise<string> => {
+    const validationError = validateUploadFile(file, category);
+    if (validationError) throw new Error(validationError);
 
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("folder", folder);
+    formData.append("category", category);
 
     const res = await fetch("/api/upload", {
       method: "POST",
@@ -923,18 +1041,8 @@ export default function AdminDashboardPage() {
     }
     try {
       setSaving(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "uploads");
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || "Gagal mengunggah icon");
-
-      setEditingProgram((prev: any) => ({ ...prev, iconUrl: data.url }));
+      const url = await uploadFile(file, "programs");
+      setEditingProgram((prev: any) => ({ ...prev, iconUrl: url }));
       showMessage("Icon program berhasil diunggah!", "success");
     } catch (err: any) {
       showMessage(err.message || "Gagal mengunggah icon program", "error");
@@ -999,6 +1107,7 @@ export default function AdminDashboardPage() {
       schoolName: "",
       username: "",
       password: "",
+      passwordAvailable: false,
       qrCode: "",
     });
 
@@ -1018,6 +1127,37 @@ export default function AdminDashboardPage() {
     } catch (err: any) {
       showMessage("Gagal memuat akun guru", "error");
       setTeacherCredentialModal((prev) => ({ ...prev, isOpen: false }));
+    }
+  };
+
+  const handleResetTeacherPassword = async () => {
+    if (!teacherCredentialModal.teacherId) return;
+    if (!confirm("Reset password guru dan buat password sementara baru?")) return;
+
+    setTeacherCredentialModal((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await fetch(
+        `/api/teachers/${teacherCredentialModal.teacherId}/credentials`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error);
+
+      setTeacherCredentialModal((prev) => ({
+        ...prev,
+        loading: false,
+        username: data.data.username,
+        password: data.data.password,
+        passwordAvailable: true,
+      }));
+      showMessage("Password guru berhasil di-reset dengan bcrypt", "success");
+    } catch (err: any) {
+      showMessage(err.message || "Gagal mereset password guru", "error");
+      setTeacherCredentialModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -1241,7 +1381,7 @@ export default function AdminDashboardPage() {
     if (!file) return;
     try {
       setLeaveUploading(true);
-      const url = await uploadFile(file, "profile" as any);
+      const url = await uploadFile(file, "leave");
       setEditingLeaveRequest((prev: any) => ({ ...prev, attachment: url }));
       showMessage("Lampiran berhasil diunggah!", "success");
     } catch (err: any) {
@@ -1350,7 +1490,7 @@ export default function AdminDashboardPage() {
     }
     try {
       setSppPaymentModal((prev) => ({ ...prev, uploading: true }));
-      const url = await uploadFile(file, "spp" as any);
+      const url = await uploadFile(file, "spp");
       setSppPaymentModal((prev) => ({ ...prev, proofUrl: url, uploading: false }));
       showMessage("Foto bukti transfer berhasil diunggah!", "success");
     } catch (err: any) {
@@ -1378,7 +1518,14 @@ export default function AdminDashboardPage() {
           month: sppPaymentModal.month,
           amount: Number(sppPaymentModal.amount),
           status: "menunggu_konfirmasi",
-          paymentMethod: sppPaymentModal.paymentMethod,
+          paymentMethod: (() => {
+            if (sppPaymentModal.paymentMethod?.startsWith("BANK_")) {
+              const bankId = sppPaymentModal.paymentMethod.replace("BANK_", "");
+              const b = bankAccountsList.find((item) => item.id === bankId);
+              return b ? `TRANSFER_${b.bankName.toUpperCase().replace(/\s+/g, "_")}` : sppPaymentModal.paymentMethod;
+            }
+            return sppPaymentModal.paymentMethod;
+          })(),
           proofUrl: sppPaymentModal.proofUrl || null,
           note: sppPaymentModal.note || null,
         }),
@@ -1456,7 +1603,7 @@ export default function AdminDashboardPage() {
           schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
           title: newGalleryTitle || "Kegiatan Belajar",
           imageUrl: newGalleryImage,
-          folder: "uploads",
+          folder: "gallery",
         }),
       });
       const data = await res.json();
@@ -1731,15 +1878,7 @@ export default function AdminDashboardPage() {
     }
     setUploadingQris(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "qris");
-
-      const resUpload = await fetch("/api/upload", { method: "POST", body: formData });
-      const dataUpload = await resUpload.json();
-      if (!resUpload.ok || !dataUpload.success) throw new Error(dataUpload.error || "Gagal mengunggah QRIS");
-
-      const newUrl = dataUpload.url;
+      const newUrl = await uploadFile(file, "qris");
       const targetSchoolId = siteProfile.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id);
 
       const resProf = await fetch("/api/site-profile", {
@@ -1767,6 +1906,11 @@ export default function AdminDashboardPage() {
   const filteredPpdb = ppdbList.filter((item) => {
     const matchesStatus =
       ppdbStatusFilter === "ALL" || item.status === ppdbStatusFilter;
+    const matchesSchool =
+      ppdbSchoolFilter === "ALL" ||
+      item.schoolId === ppdbSchoolFilter ||
+      item.school?.id === ppdbSchoolFilter ||
+      item.school?.code === ppdbSchoolFilter;
     const q = ppdbSearch.toLowerCase();
     const matchesSearch =
       !q ||
@@ -1774,7 +1918,7 @@ export default function AdminDashboardPage() {
       item.namaOrtu?.toLowerCase().includes(q) ||
       item.registrationNo?.toLowerCase().includes(q) ||
       item.noWhatsapp?.toLowerCase().includes(q);
-    return matchesStatus && matchesSearch;
+    return matchesStatus && matchesSchool && matchesSearch;
   });
 
   const totalPpdbPages = Math.ceil(filteredPpdb.length / ppdbItemsPerPage) || 1;
@@ -1800,6 +1944,209 @@ export default function AdminDashboardPage() {
       </div>
     );
   }
+
+  // Define Role-Based Structured Sidebar Menu Groups & Sub-menus
+  const getSidebarMenuGroups = () => {
+    const role = admin?.role;
+
+    if (role === "ORTU" || role === "ORANG_TUA") {
+      return [
+        {
+          id: "portal_ortu",
+          title: "Portal Wali Murid",
+          items: [
+            { id: "overview", label: "Beranda Ananda", icon: Building, iconColor: "text-emerald-400" },
+          ],
+        },
+        {
+          id: "akademik_ananda",
+          title: "Perkembangan & Kehadiran",
+          items: [
+            { id: "attendance", label: "Presensi Kehadiran", icon: CheckCircle, iconColor: "text-emerald-400", badge: myAttendanceList.length },
+            { id: "schedules", label: "Jadwal Belajar KBM", icon: Clock, iconColor: "text-cyan-400", badge: schedulesList.length },
+          ],
+        },
+        {
+          id: "keuangan_ortu",
+          title: "Keuangan & Tagihan SPP",
+          items: [
+            { id: "spp", label: "Pembayaran SPP", icon: CreditCard, iconColor: "text-amber-400", badge: mySppList.length },
+          ],
+        },
+        {
+          id: "info_sekolah_ortu",
+          title: "Pusat Informasi",
+          items: [
+            { id: "announcements", label: "Pengumuman Sekolah", icon: Bell, iconColor: "text-purple-400", badge: announcementsList.length },
+          ],
+        },
+      ];
+    }
+
+    if (role === "GURU") {
+      return [
+        {
+          id: "dashboard_guru",
+          title: "Dashboard Guru",
+          items: [
+            { id: "overview", label: "Ringkasan & Stats", icon: Building, iconColor: "text-emerald-400" },
+          ],
+        },
+        {
+          id: "kbm_kelas",
+          title: "Kegiatan Belajar & Kelas",
+          items: [
+            { id: "attendance", label: "Presensi Siswa", icon: CheckCircle, iconColor: "text-emerald-400", badge: attendanceList.length },
+            { id: "schedules", label: "Jadwal Mengajar KBM", icon: Clock, iconColor: "text-cyan-400", badge: schedulesList.length },
+            { id: "classes", label: "Master Kelas & Siswa", icon: Layers, iconColor: "text-emerald-400", badge: classesList.length },
+          ],
+        },
+        {
+          id: "kepegawaian_guru",
+          title: "Kepegawaian & Presensi",
+          items: [
+            { id: "teacher-attendance", label: "Presensi Mengajar Guru", icon: UserCheck, iconColor: "text-purple-400", badge: teacherAttendanceList.length },
+            { id: "leave-requests", label: "Pengajuan Izin & Cuti", icon: FileCheck, iconColor: "text-rose-400", badge: leaveRequestsList.length },
+          ],
+        },
+        {
+          id: "informasi_guru",
+          title: "Informasi Sekolah",
+          items: [
+            { id: "announcements", label: "Pengumuman Sekolah", icon: Bell, iconColor: "text-purple-400", badge: announcementsList.length },
+          ],
+        },
+      ];
+    }
+
+    // Default: Admin (SUPER_ADMIN, ADMIN_PUSAT, ADMIN_CABANG / ADMIN_SEKOLAH)
+    const groups: Array<{
+      id: string;
+      title: string;
+      items: Array<{
+        id: any;
+        label: string;
+        icon: any;
+        iconColor?: string;
+        badge?: number;
+      }>;
+    }> = [
+      {
+        id: "dashboard_stats",
+        title: "Dashboard & Stats",
+        items: [
+          { id: "overview", label: "Ringkasan & Stats", icon: Building, iconColor: "text-emerald-400" },
+        ],
+      },
+      {
+        id: "akademik_kesiswaan",
+        title: "Akademik & Kesiswaan",
+        items: [
+          { id: "ppdb", label: "Pendaftaran PPDB", icon: Users, iconColor: "text-emerald-400", badge: ppdbList.length },
+          { id: "students", label: "Kelola Data Siswa", icon: GraduationCap, iconColor: "text-blue-400", badge: studentsList.length },
+          { id: "classes", label: "Master Kelas & Plotting", icon: Layers, iconColor: "text-emerald-400", badge: classesList.length },
+          { id: "schedules", label: "Jadwal KBM", icon: Clock, iconColor: "text-cyan-400", badge: schedulesList.length },
+          { id: "attendance", label: "Presensi Siswa", icon: CheckCircle, iconColor: "text-emerald-400", badge: attendanceList.length },
+        ],
+      },
+      {
+        id: "kepegawaian_guru",
+        title: "Kepegawaian & Guru",
+        items: [
+          { id: "teachers", label: "Kelola Guru & Pengajar", icon: Award, iconColor: "text-emerald-400", badge: teachersList.length },
+          { id: "teacher-attendance", label: "Presensi Guru", icon: UserCheck, iconColor: "text-purple-400", badge: teacherAttendanceList.length },
+          { id: "teacher-progress", label: "Pusat Progresif Fitur", icon: TrendingUp, iconColor: "text-indigo-400", badge: teacherProgressList.length },
+          { id: "leave-requests", label: "Izin & Cuti Guru", icon: FileCheck, iconColor: "text-rose-400", badge: leaveRequestsList.length },
+        ],
+      },
+      {
+        id: "keuangan_pembayaran",
+        title: "Keuangan & Pembayaran",
+        items: [
+          { id: "spp", label: "SPP Siswa", icon: CreditCard, iconColor: "text-amber-400", badge: sppList.length },
+          { id: "additional-fees", label: "Biaya Tambahan", icon: Layers, iconColor: "text-emerald-400", badge: additionalFeesList.length },
+          { id: "payment-settings", label: "Metode Pembayaran", icon: QrCode, iconColor: "text-cyan-400", badge: bankAccountsList.length },
+        ],
+      },
+      {
+        id: "konten_publikasi",
+        title: "Profil Web & Publikasi",
+        items: [
+          { id: "announcements", label: "Pengumuman", icon: Bell, iconColor: "text-purple-400", badge: announcementsList.length },
+          { id: "programs", label: "Kelola Program Belajar", icon: BookOpen, iconColor: "text-emerald-400", badge: programsList.length },
+          { id: "gallery", label: "Kelola Galeri", icon: ImageIcon, iconColor: "text-emerald-400", badge: galleryList.length },
+          { id: "testimonials", label: "Kelola Testimoni", icon: MessageSquare, iconColor: "text-emerald-400", badge: testimonialsList.length },
+          { id: "profile", label: "Pengaturan Website", icon: Settings, iconColor: "text-slate-400" },
+        ],
+      },
+    ];
+
+    if (role === "ADMIN_PUSAT" || role === "SUPER_ADMIN") {
+      groups.push({
+        id: "pengaturan_sistem",
+        title: "Pengaturan Sistem",
+        items: [
+          { id: "schools", label: "Kelola Sekolah / Cabang", icon: SchoolIcon, iconColor: "text-emerald-400", badge: schoolsList.length },
+          { id: "users", label: "User Admin & Akses", icon: ShieldCheck, iconColor: "text-purple-400", badge: adminUsersList.length },
+        ],
+      });
+    }
+
+    return groups;
+  };
+
+  const sidebarMenuGroups = getSidebarMenuGroups();
+
+  const handleExportProgressiveCSV = () => {
+    const headers = ["Tanggal / Periode", "Cabang Sekolah", "Nama Guru", "Kelas / Jabatan", "Program Belajar", "Kehadiran / Jam", "Rasio SPP", "Estimasi Hasil (Rp)"];
+    const rows: string[][] = [];
+
+    teachersList.forEach((teacher) => {
+      if (progressiveHistoryModal.selectedTeacherId !== "ALL" && teacher.id !== progressiveHistoryModal.selectedTeacherId) return;
+      if (progressiveHistoryModal.selectedSchoolId !== "ALL" && teacher.schoolId !== progressiveHistoryModal.selectedSchoolId) return;
+
+      const schoolName = schoolsList.find((s) => s.id === teacher.schoolId)?.name || teacher.schoolName || "Smart Kids Sadjati";
+      const assignedCls = classesList.find(
+        (c) => c.homeroomTeacherId === teacher.id || c.id === teacher.classId
+      );
+      const plottedClass = assignedCls?.name || teacher.assignedClass || teacher.role;
+
+      const schoolProgs = programsList.filter((p) => !p.schoolId || p.schoolId === teacher.schoolId);
+      const sppAmounts = schoolProgs.map((p) => Number(p.sppAmount || 200000)).filter((a) => a > 0);
+      const minSpp = sppAmounts.length > 0 ? Math.min(...sppAmounts) : 200000;
+      const matchedProgram = schoolProgs[0] || programsList[0];
+      const teacherSpp = Number(matchedProgram?.sppAmount || minSpp);
+      const sppRatio = Math.max(Math.round((teacherSpp / Math.max(minSpp, 1)) * 100) / 100, 1.0);
+
+      const teacherAtts = teacherAttendanceList.filter(
+        (att) => att.teacherId === teacher.id && att.status === "hadir"
+      );
+      const hadirDays = teacherAtts.length || 12;
+      const hoursTaught = hadirDays * 3;
+      const monthlyResult = Math.round(hadirDays * 50000 * sppRatio);
+
+      rows.push([
+        `"Bulan Berjalan (${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })})"`,
+        `"${schoolName}"`,
+        `"${teacher.name}"`,
+        `"${plottedClass}"`,
+        `"${matchedProgram?.title || '-'}"`,
+        `"${hadirDays} Hari (${hoursTaught} Jam)"`,
+        `"${sppRatio.toFixed(2)}x"`,
+        monthlyResult.toString(),
+      ]);
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Laporan_Pusat_Progresif_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showMessage("Data riwayat pusat progresif berhasil diunduh ke format CSV!", "success");
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
@@ -1919,354 +2266,79 @@ export default function AdminDashboardPage() {
 
       {/* MAIN BODY LAYOUT */}
       <div className="flex-1 flex overflow-hidden">
-        {/* SIDEBAR NAVIGATION */}
-        <aside className="w-64 bg-slate-900/60 border-r border-slate-800/80 p-4 space-y-2 shrink-0 hidden md:block backdrop-blur-md">
-          <div className="px-3 py-2 text-[10px] font-black uppercase text-slate-400 tracking-wider">
-            Menu Utama CMS
+        {/* SIDEBAR NAVIGATION (ROLE-BASED & GROUPED) */}
+        <aside className="w-68 bg-slate-900/70 border-r border-slate-800/80 p-3.5 space-y-4 shrink-0 hidden md:block backdrop-blur-md overflow-y-auto max-h-[calc(100vh-73px)] scrollbar-thin">
+          {/* User Role Badge in Sidebar */}
+          <div className="px-3.5 py-2.5 bg-slate-950/80 border border-slate-800/80 rounded-2xl flex items-center justify-between shadow-inner">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              {admin?.role === "GURU"
+                ? "Portal Pengajar"
+                : admin?.role === "ORTU" || admin?.role === "ORANG_TUA"
+                ? "Portal Wali Murid"
+                : "Menu Administrasi"}
+            </span>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              {admin?.role || "ADMIN"}
+            </span>
           </div>
-          <nav className="space-y-1.5">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "overview"
-                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <Building className="w-4 h-4" />
-              <span>Ringkasan & Stats</span>
-            </button>
 
-            {(admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN") && (
-              <button
-                onClick={() => setActiveTab("schools")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "schools"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <SchoolIcon className="w-4 h-4 text-emerald-400" />
-                  <span>Kelola Sekolah</span>
+          <nav className="space-y-4 pb-12">
+            {sidebarMenuGroups.map((group) => {
+              const isCollapsed = collapsedSidebarGroups[group.id];
+              return (
+                <div key={group.id} className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSidebarGroup(group.id)}
+                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-[11px] font-black tracking-wider uppercase text-slate-400 hover:text-slate-200 transition-colors group cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                      <span>{group.title}</span>
+                    </span>
+                    <span className="text-slate-500 group-hover:text-slate-300">
+                      {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </span>
+                  </button>
+
+                  {!isCollapsed && (
+                    <div className="space-y-1">
+                      {group.items.map((item) => {
+                        const isActive = activeTab === item.id;
+                        const IconComponent = item.icon;
+                        return (
+                          <button
+                            key={item.id}
+                            onClick={() => setActiveTab(item.id)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              isActive
+                                ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30 font-extrabold"
+                                : "text-slate-400 hover:bg-slate-800/70 hover:text-slate-200"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <IconComponent className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : item.iconColor || "text-slate-400"}`} />
+                              <span className="truncate">{item.label}</span>
+                            </div>
+                            {item.badge !== undefined && (
+                              <span
+                                className={`text-[10px] px-2 py-0.5 rounded-full font-bold border shrink-0 ${
+                                  isActive
+                                    ? "bg-white/20 text-white border-white/30"
+                                    : "bg-slate-800 text-slate-400 border-slate-700"
+                                }`}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <span className="bg-emerald-500/20 text-emerald-300 text-[11px] px-2 py-0.5 rounded-full font-black border border-emerald-500/30">
-                  {schoolsList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("classes")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "classes"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Layers className="w-4 h-4 text-emerald-400" />
-                  <span>Master Kelas & Plotting</span>
-                </div>
-                <span className="bg-emerald-500/20 text-emerald-300 text-[11px] px-2 py-0.5 rounded-full font-black border border-emerald-500/30">
-                  {classesList.length}
-                </span>
-              </button>
-            )}
-
-            {(admin?.role === "ADMIN_PUSAT" || admin?.role === "SUPER_ADMIN") && (
-              <button
-                onClick={() => setActiveTab("users")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "users"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="w-4 h-4 text-purple-400" />
-                  <span>Pengaturan User Admin</span>
-                </div>
-                <span className="bg-purple-500/20 text-purple-300 text-[11px] px-2 py-0.5 rounded-full font-black border border-purple-500/30">
-                  {adminUsersList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("ppdb")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "ppdb"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Users className="w-4 h-4" />
-                  <span>Pendaftaran PPDB</span>
-                </div>
-                <span className="bg-slate-800 text-emerald-400 text-[11px] px-2.5 py-0.5 rounded-full font-bold border border-slate-700">
-                  {ppdbList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("programs")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "programs"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <BookOpen className="w-4 h-4" />
-                  <span>Kelola Program</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {programsList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("teachers")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "teachers"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Award className="w-4 h-4 text-emerald-400" />
-                  <span>Kelola Guru & Pengajar</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {teachersList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("students")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "students"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <GraduationCap className="w-4 h-4 text-blue-400" />
-                  <span>Kelola Data Siswa</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {studentsList.length}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setActiveTab("attendance")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "attendance"
-                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <CheckCircle className="w-4 h-4 text-emerald-400" />
-                <span>Presensi Siswa</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {attendanceList.length}
-              </span>
-            </button>
-
-            {admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("teacher-attendance")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "teacher-attendance"
-                    ? "bg-linear-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <UserCheck className="w-4 h-4 text-purple-400" />
-                  <span>Presensi Guru</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {teacherAttendanceList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && (
-              <button
-                onClick={() => setActiveTab("spp")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "spp"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-4 h-4 text-amber-400" />
-                  <span>SPP Utama</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {sppList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && (
-              <button
-                onClick={() => setActiveTab("additional-fees")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "additional-fees"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Layers className="w-4 h-4 text-emerald-400" />
-                  <span>Biaya Tambahan</span>
-                </div>
-                <span className="bg-emerald-500/20 text-emerald-300 text-[11px] px-2.5 py-0.5 rounded-full font-black border border-emerald-500/30">
-                  {additionalFeesList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-              <button
-                onClick={() => setActiveTab("payment-settings")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "payment-settings"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <QrCode className="w-4 h-4 text-cyan-400" />
-                  <span>Metode Pembayaran</span>
-                </div>
-                <span className="bg-slate-800 text-cyan-300 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {bankAccountsList.length}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setActiveTab("announcements")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "announcements"
-                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Bell className="w-4 h-4 text-purple-400" />
-                <span>Pengumuman</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {announcementsList.length}
-              </span>
-            </button>
-
-            {admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("leave-requests")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "leave-requests"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <FileCheck className="w-4 h-4 text-rose-400" />
-                  <span>Izin & Cuti Guru</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {leaveRequestsList.length}
-                </span>
-              </button>
-            )}
-
-            <button
-              onClick={() => setActiveTab("schedules")}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === "schedules"
-                  ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Clock className="w-4 h-4 text-cyan-400" />
-                <span>Jadwal KBM</span>
-              </div>
-              <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                {schedulesList.length}
-              </span>
-            </button>
-
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("gallery")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "gallery"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <ImageIcon className="w-4 h-4" />
-                  <span>Kelola Galeri</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {galleryList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("testimonials")}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "testimonials"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <MessageSquare className="w-4 h-4" />
-                  <span>Kelola Testimoni</span>
-                </div>
-                <span className="bg-slate-800 text-slate-400 text-[11px] px-2.5 py-0.5 rounded-full border border-slate-700">
-                  {testimonialsList.length}
-                </span>
-              </button>
-            )}
-
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && (
-              <button
-                onClick={() => setActiveTab("profile")}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all ${
-                  activeTab === "profile"
-                    ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30"
-                    : "text-slate-400 hover:bg-slate-800/80 hover:text-slate-200"
-                }`}
-              >
-                <Settings className="w-4 h-4" />
-                <span>Pengaturan Website</span>
-              </button>
-            )}
+              );
+            })}
           </nav>
         </aside>
 
@@ -2274,74 +2346,29 @@ export default function AdminDashboardPage() {
         <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full space-y-8">
           {/* MOBILE HORIZONTAL NAVIGATION TABS */}
           <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-3 mb-2 scrollbar-none">
-            <button
-              onClick={() => setActiveTab("overview")}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                activeTab === "overview" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
-              }`}
-            >
-              Ringkasan
-            </button>
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-              <button
-                onClick={() => setActiveTab("ppdb")}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  activeTab === "ppdb" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
-                }`}
-              >
-                PPDB
-              </button>
-            )}
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-              <button
-                onClick={() => setActiveTab("programs")}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  activeTab === "programs" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
-                }`}
-              >
-                Program
-              </button>
-            )}
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-              <button
-                onClick={() => setActiveTab("teachers")}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  activeTab === "teachers" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
-                }`}
-              >
-                Guru
-              </button>
-            )}
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-              <button
-                onClick={() => setActiveTab("gallery")}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  activeTab === "gallery" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
-                }`}
-              >
-                Galeri
-              </button>
-            )}
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-              <button
-                onClick={() => setActiveTab("testimonials")}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  activeTab === "testimonials" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
-                }`}
-              >
-                Testimoni
-              </button>
-            )}
-            {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-              <button
-                onClick={() => setActiveTab("profile")}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition ${
-                  activeTab === "profile" ? "bg-emerald-600 text-white" : "bg-slate-900 text-slate-400 border border-slate-800"
-                }`}
-              >
-                Pengaturan
-              </button>
-            )}
+            {sidebarMenuGroups.flatMap((g) => g.items).map((item) => {
+              const isActive = activeTab === item.id;
+              const IconComp = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap shrink-0 transition flex items-center gap-1.5 cursor-pointer ${
+                    isActive
+                      ? "bg-linear-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30 font-extrabold"
+                      : "bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200"
+                  }`}
+                >
+                  <IconComp className="w-3.5 h-3.5 shrink-0" />
+                  <span>{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                      {item.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
           {/* TAB 1: OVERVIEW */}
@@ -2359,181 +2386,288 @@ export default function AdminDashboardPage() {
                   <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                     {admin?.role === "GURU"
                       ? `Portal Pembelajaran & Presensi - ${activeSchoolName}`
-                      : admin?.role === "ORTU"
+                      : isParent
                       ? `Portal Informasi Wali Murid - ${activeSchoolName}`
                       : `Dashboard Pengelolaan ${activeSchoolName}`}
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-300 max-w-3xl leading-relaxed">
                     {admin?.role === "GURU"
                       ? "Kelola presensi harian siswa, jadwal kegiatan belajar mengajar, pengumuman kelas, serta permohonan izin/cuti mengajar."
-                      : admin?.role === "ORTU"
+                      : isParent
                       ? "Pantau catatan kehadiran ananda, jadwal belajar harian, pengumuman sekolah, serta informasi status pembayaran SPP."
                       : "Kelola data pendaftaran PPDB, program pembelajaran, presensi murid, data pengajar, serta pengumuman sekolah secara terpadu."}
                   </p>
                 </div>
               </div>
 
-              {/* SPECIAL PARENT STUDENT DETAILS CARD (Khusus Wali Murid / Ortu) */}
-              {(() => {
-                if (admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA") return null;
-
-                const parentStudent = studentsList.find(
-                  (s) =>
-                    (s.parentPhone && admin?.phone && s.parentPhone === admin.phone) ||
-                    (s.username && admin?.username && s.username === admin.username) ||
-                    (s.parentName && admin?.name && s.parentName.toLowerCase().includes(admin.name.toLowerCase()))
-                ) || studentsList[0];
-
-                if (!parentStudent) return null;
-
-                return (
-                  <div className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xl border border-emerald-500/30 shrink-0">
-                          👶
-                        </div>
-                        <div>
-                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                            Ringkasan Siswa Terdaftar
-                          </span>
-                          <h3 className="text-xl font-black text-white mt-1">{parentStudent.name}</h3>
+              {/* KHUSUS PORTAL ORANG TUA: STAT CARDS & DAFTAR ANANDA */}
+              {isParent && (
+                <div className="space-y-8 w-full">
+                  {/* PARENT QUICK STATS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full">
+                    <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Total Ananda</span>
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                          <Users className="w-5 h-5" />
                         </div>
                       </div>
-
-                      <button
-                        onClick={() => setEditingStudent(parentStudent)}
-                        className="px-4 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
-                      >
-                        <Edit className="w-4 h-4 text-emerald-400" />
-                        <span>Edit Data Siswa & Ortu</span>
-                      </button>
+                      <p className="text-3xl font-black text-white tracking-tight">{parentChildren.length} Anak</p>
+                      <p className="text-[11px] text-emerald-400 mt-1 font-medium">Terdaftar di {activeSchoolName}</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      {/* SUB CARD 1: INFORMASI SISWA */}
-                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
-                        <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
-                          <GraduationCap className="w-4 h-4" />
-                          <span>Informasi Murid / Siswa</span>
-                        </h4>
-                        <div className="space-y-2 text-xs divide-y divide-slate-800/60">
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">Nama Lengkap:</span>
-                            <span className="font-bold text-white">{parentStudent.name}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">NISN / No Induk:</span>
-                            <span className="font-mono font-bold text-emerald-300">{parentStudent.nisn}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">Master Kelas:</span>
-                            <span className="font-bold text-emerald-400">{parentStudent.className}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">Jenis Kelamin:</span>
-                            <span className="font-bold text-slate-200">{parentStudent.gender === "L" ? "Laki-laki (L)" : "Perempuan (P)"}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">Tempat, Tgl Lahir:</span>
-                            <span className="font-medium text-slate-300">{parentStudent.birthPlaceDate || "-"}</span>
-                          </div>
+                    <div className="bg-slate-900/80 border border-slate-800/90 hover:border-cyan-500/40 rounded-3xl p-6 transition-all shadow-xl">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Presensi Kehadiran</span>
+                        <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+                          <CheckCircle className="w-5 h-5" />
                         </div>
                       </div>
+                      <p className="text-3xl font-black text-white tracking-tight">{myAttendanceList.length} Record</p>
+                      <p className="text-[11px] text-cyan-400 mt-1 font-medium">Riwayat absensi ananda</p>
+                    </div>
 
-                      {/* SUB CARD 2: INFORMASI ORANG TUA / WALI */}
-                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
-                        <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider flex items-center gap-2">
-                          <Users className="w-4 h-4" />
-                          <span>Informasi Orang Tua / Wali</span>
-                        </h4>
-                        <div className="space-y-2 text-xs divide-y divide-slate-800/60">
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">Nama Orang Tua:</span>
-                            <span className="font-bold text-white">{parentStudent.parentName || admin?.name || "-"}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">No. WhatsApp / HP:</span>
-                            <span className="font-mono font-bold text-emerald-300">{parentStudent.parentPhone || admin?.phone || "-"}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">Email Orang Tua:</span>
-                            <span className="font-medium text-slate-300">{parentStudent.parentEmail || admin?.email || "-"}</span>
-                          </div>
-                          <div className="flex justify-between py-1.5 text-slate-300">
-                            <span className="text-slate-400">Alamat Rumah:</span>
-                            <span className="font-medium text-slate-300">{parentStudent.address || "-"}</span>
-                          </div>
+                    <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">SPP Terbayar (Lunas)</span>
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                          <CreditCard className="w-5 h-5" />
                         </div>
                       </div>
+                      <p className="text-3xl font-black text-emerald-400 tracking-tight">
+                        {mySppList.filter((s) => s.status === "lunas").length} Bulan
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1">Pembayaran SPP terverifikasi</p>
+                    </div>
 
-                      {/* SUB CARD 3: STATUS KEUANGAN & SPP */}
-                      <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3 flex flex-col justify-between">
-                        <div className="space-y-3">
-                          <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
-                            <CreditCard className="w-4 h-4" />
-                            <span>SPP & Catatan Keuangan</span>
-                          </h4>
-                          
-                          {(() => {
-                            const childSpp = sppList.filter(
-                              (s) =>
-                                s.studentId === parentStudent.id ||
-                                (s.studentName && s.studentName.toLowerCase().includes(parentStudent.name.toLowerCase()))
-                            );
-                            const lunasCount = childSpp.filter((s) => s.status === "lunas").length;
-                            const pendingCount = childSpp.filter((s) => s.status === "menunggu_konfirmasi").length;
-
-                            return (
-                              <div className="space-y-2 text-xs">
-                                <div className="flex justify-between items-center py-1">
-                                  <span className="text-slate-400">Total Record SPP:</span>
-                                  <span className="font-bold text-white">{childSpp.length} Bulan</span>
-                                </div>
-                                <div className="flex justify-between items-center py-1">
-                                  <span className="text-slate-400">Status Terakhir:</span>
-                                  <span className="font-bold text-emerald-400">
-                                    {lunasCount} Lunas • {pendingCount > 0 ? `${pendingCount} Menunggu` : "0 Pending"}
-                                  </span>
-                                </div>
-                                <p className="text-[11px] text-slate-400 leading-tight pt-1">
-                                  Upload bukti pembayaran untuk konfirmasi transaksi SPP ananda.
-                                </p>
-                              </div>
-                            );
-                          })()}
+                    <div className="bg-slate-900/80 border border-slate-800/90 hover:border-amber-500/40 rounded-3xl p-6 transition-all shadow-xl">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Tagihan & Menunggu</span>
+                        <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20">
+                          <Clock className="w-5 h-5" />
                         </div>
-
-                        <button
-                          onClick={() => {
-                            setActiveTab("spp");
-                            setSppPaymentModal({
-                              isOpen: true,
-                              studentId: parentStudent.id,
-                              studentName: parentStudent.name,
-                              nisn: parentStudent.nisn,
-                              className: parentStudent.className,
-                              month: "Juli 2026",
-                              amount: 350000,
-                              paymentMethod: "TRANSFER_BCA",
-                              proofUrl: "",
-                              note: "",
-                              uploading: false,
-                            });
-                          }}
-                          className="w-full py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
-                        >
-                          <Upload className="w-4 h-4 text-amber-400" />
-                          <span>Bayar & Upload Bukti SPP</span>
-                        </button>
                       </div>
+                      <p className="text-3xl font-black text-amber-400 tracking-tight">
+                        {mySppList.filter((s) => s.status === "menunggu_konfirmasi" || s.status === "belum_bayar" || s.status === "belum_lunas").length} Record
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-1">Perlu upload/verifikasi bukti</p>
                     </div>
                   </div>
-                );
-              })()}
 
-              {/* STAT CARDS FULL WIDTH GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 w-full">
+                  {/* LIST ANANDA TERDAFTAR (DAFTAR ANAK NYA SAJA) */}
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <h3 className="text-xl font-extrabold text-white flex items-center gap-2">
+                          <span>👶</span>
+                          <span>Daftar Ananda Terdaftar ({parentChildren.length} Siswa)</span>
+                        </h3>
+                        <p className="text-xs text-slate-400">Informasi profil anak, kelas, dan status administrasi SPP ananda</p>
+                      </div>
+                    </div>
+
+                    {parentChildren.length === 0 ? (
+                      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 text-center space-y-3">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto text-xl font-bold">
+                          ℹ️
+                        </div>
+                        <h4 className="text-white font-bold text-base">Belum Ada Data Siswa Tertaut</h4>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto">
+                          Akun Anda ({admin?.name}) belum terhubung dengan data ananda di sistem. Silakan hubungi bagian tata usaha / admin sekolah untuk sinkronisasi.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {parentChildren.map((parentStudent) => {
+                          const childSpp = sppList.filter(
+                            (s) =>
+                              s.studentId === parentStudent.id ||
+                              (s.nisn && s.nisn === parentStudent.nisn) ||
+                              (s.studentName && s.studentName.toLowerCase().includes(parentStudent.name.toLowerCase()))
+                          );
+                          const lunasCount = childSpp.filter((s) => s.status === "lunas").length;
+                          const pendingCount = childSpp.filter((s) => s.status === "menunggu_konfirmasi").length;
+
+                          return (
+                            <div key={parentStudent.id} className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                                <div className="flex items-center gap-3.5">
+                                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-xl border border-emerald-500/30 shrink-0">
+                                    👶
+                                  </div>
+                                  <div>
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                                      Siswa Terdaftar • {parentStudent.className}
+                                    </span>
+                                    <h3 className="text-xl font-black text-white mt-1">{parentStudent.name}</h3>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => setEditingStudent(parentStudent)}
+                                  className="px-4 py-2.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+                                >
+                                  <Edit className="w-4 h-4 text-emerald-400" />
+                                  <span>Edit Data Siswa & Ortu</span>
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {/* SUB CARD 1: INFORMASI SISWA */}
+                                <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                                  <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-2">
+                                    <GraduationCap className="w-4 h-4" />
+                                    <span>Informasi Murid / Siswa</span>
+                                  </h4>
+                                  <div className="space-y-2 text-xs divide-y divide-slate-800/60">
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">Nama Lengkap:</span>
+                                      <span className="font-bold text-white">{parentStudent.name}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">NISN / No Induk:</span>
+                                      <span className="font-mono font-bold text-emerald-300">{parentStudent.nisn}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">Master Kelas:</span>
+                                      <span className="font-bold text-emerald-400">{parentStudent.className}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">Jenis Kelamin:</span>
+                                      <span className="font-bold text-slate-200">{parentStudent.gender === "L" ? "Laki-laki (L)" : "Perempuan (P)"}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">Tempat, Tgl Lahir:</span>
+                                      <span className="font-medium text-slate-300">{parentStudent.birthPlaceDate || "-"}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* SUB CARD 2: INFORMASI ORANG TUA / WALI */}
+                                <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3">
+                                  <h4 className="text-xs font-black uppercase text-purple-400 tracking-wider flex items-center gap-2">
+                                    <Users className="w-4 h-4" />
+                                    <span>Informasi Orang Tua / Wali</span>
+                                  </h4>
+                                  <div className="space-y-2 text-xs divide-y divide-slate-800/60">
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">Nama Orang Tua:</span>
+                                      <span className="font-bold text-white">{parentStudent.parentName || admin?.name || "-"}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">No. WhatsApp / HP:</span>
+                                      <span className="font-mono font-bold text-emerald-300">{parentStudent.parentPhone || admin?.phone || "-"}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">Email Orang Tua:</span>
+                                      <span className="font-medium text-slate-300">{parentStudent.parentEmail || admin?.email || "-"}</span>
+                                    </div>
+                                    <div className="flex justify-between py-1.5 text-slate-300">
+                                      <span className="text-slate-400">Alamat Rumah:</span>
+                                      <span className="font-medium text-slate-300">{parentStudent.address || "-"}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* SUB CARD 3: STATUS KEUANGAN & SPP */}
+                                <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 space-y-3 flex flex-col justify-between">
+                                  <div className="space-y-3">
+                                    <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
+                                      <CreditCard className="w-4 h-4" />
+                                      <span>SPP & Catatan Keuangan</span>
+                                    </h4>
+
+                                    <div className="space-y-2 text-xs">
+                                      <div className="flex justify-between items-center py-1">
+                                        <span className="text-slate-400">Total Record SPP:</span>
+                                        <span className="font-bold text-white">{childSpp.length} Bulan</span>
+                                      </div>
+                                      <div className="flex justify-between items-center py-1">
+                                        <span className="text-slate-400">Status Terakhir:</span>
+                                        <span className="font-bold text-emerald-400">
+                                          {lunasCount} Lunas • {pendingCount > 0 ? `${pendingCount} Menunggu` : "0 Pending"}
+                                        </span>
+                                      </div>
+                                      <p className="text-[11px] text-slate-400 leading-tight pt-1">
+                                        Upload bukti transfer untuk verifikasi pembayaran SPP ananda.
+                                      </p>
+                                    </div>
+                                  </div>
+
+                                  <button
+                                    onClick={() => {
+                                      setActiveTab("spp");
+                                      setSppPaymentModal({
+                                        isOpen: true,
+                                        studentId: parentStudent.id,
+                                        studentName: parentStudent.name,
+                                        nisn: parentStudent.nisn,
+                                        className: parentStudent.className,
+                                        month: "Juli 2026",
+                                        amount: 200000,
+                                        paymentMethod: "TRANSFER_BCA",
+                                        proofUrl: "",
+                                        note: "",
+                                        uploading: false,
+                                      });
+                                    }}
+                                    className="w-full py-2.5 bg-amber-600/20 hover:bg-amber-600/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+                                  >
+                                    <Upload className="w-4 h-4 text-amber-400" />
+                                    <span>Bayar SPP Ananda ({parentStudent.name.split(" ")[0]})</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* PENGUMUMAN RESMI SEKOLAH UNTUK WALI MURID */}
+                    {announcementsList.length > 0 && (
+                      <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-6 sm:p-8 space-y-4 shadow-xl">
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold border border-purple-500/30">
+                              <Bell className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h3 className="font-extrabold text-white text-base">Pengumuman Resmi Sekolah</h3>
+                              <p className="text-[11px] text-slate-400">Informasi dan agenda penting dari sekolah untuk wali murid</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => setActiveTab("announcements")}
+                            className="text-xs font-bold text-purple-400 hover:text-purple-300 flex items-center gap-1 transition cursor-pointer"
+                          >
+                            <span>Lihat Semua</span>
+                            <ArrowUpRight className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {announcementsList.slice(0, 2).map((ann) => (
+                            <div key={ann.id} className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-2">
+                              <span className="text-[10px] font-black uppercase text-purple-400 bg-purple-500/10 px-2.5 py-0.5 rounded-full border border-purple-500/20">
+                                {ann.targetRole || "Wali Murid"}
+                              </span>
+                              <h4 className="font-bold text-white text-sm">{ann.title}</h4>
+                              <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed">{ann.content}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SEKSI KHUSUS ADMIN & GURU (STAT CARDS, PUSAT PROGRESIF, PPDB TERBARU) */}
+              {!isParent && (
+                <>
+                  {/* STAT CARDS FULL WIDTH GRID */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 w-full">
                 <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-400">Cabang Sekolah</span>
@@ -2613,9 +2747,33 @@ export default function AdminDashboardPage() {
                         <p className="text-xs text-slate-400">Analisis progresif skema SPP & alokasi jam program belajar</p>
                       </div>
                     </div>
-                    <span className="text-[11px] font-black uppercase text-indigo-400 bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-full">
-                      Realtime Metrics
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleExportProgressiveCSV}
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all border border-slate-700 cursor-pointer"
+                        title="Unduh Data CSV"
+                      >
+                        <Download className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="hidden sm:inline">CSV</span>
+                      </button>
+                      <button
+                        onClick={() =>
+                          setProgressiveHistoryModal((prev) => ({
+                            ...prev,
+                            isOpen: true,
+                            selectedTeacherId: "ALL",
+                            activeSubTab: "summary",
+                          }))
+                        }
+                        className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-indigo-600/30 cursor-pointer"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Detail History & Analisis Lengkap</span>
+                      </button>
+                      <span className="hidden xl:inline text-[11px] font-black uppercase text-indigo-400 bg-indigo-500/20 border border-indigo-500/30 px-3 py-1 rounded-full">
+                        Realtime Metrics
+                      </span>
+                    </div>
                   </div>
 
                   {/* CAPAIAN RAIHAN MENGAJAR GURU PER BULAN (AUTOMATIC TRACKING FROM PRESENSI) */}
@@ -2751,6 +2909,21 @@ export default function AdminDashboardPage() {
                                     <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
                                       <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${pct}%` }} />
                                     </div>
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setProgressiveHistoryModal((prev) => ({
+                                          ...prev,
+                                          isOpen: true,
+                                          selectedTeacherId: teacher.id,
+                                          activeSubTab: "attendance_logs",
+                                        }))
+                                      }
+                                      className="w-full mt-2 py-1.5 px-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-[10px] font-bold border border-slate-800/80 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                    >
+                                      <Eye className="w-3 h-3 text-indigo-400" />
+                                      <span>Riwayat & Log Guru Ini</span>
+                                    </button>
                                   </div>
                                 </div>
                               );
@@ -2876,6 +3049,8 @@ export default function AdminDashboardPage() {
                   </table>
                 </div>
               </div>
+            </>
+          )}
             </div>
           )}
 
@@ -3736,6 +3911,22 @@ export default function AdminDashboardPage() {
                     />
                   </div>
 
+                  {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT") && (
+                    <div className="min-w-44">
+                      <SearchableSelect
+                        options={[
+                          { value: "ALL", label: "🏫 Semua Cabang" },
+                          ...schoolsList.map((s) => ({ value: s.id, label: s.name })),
+                        ]}
+                        value={ppdbSchoolFilter}
+                        onChange={(val) => {
+                          setPpdbSchoolFilter(val);
+                          setPpdbPage(1);
+                        }}
+                      />
+                    </div>
+                  )}
+
                   <div className="relative flex-1 sm:w-72">
                     <Search className="w-4 h-4 absolute left-3.5 top-3 text-slate-400" />
                     <input
@@ -3886,8 +4077,8 @@ export default function AdminDashboardPage() {
                       <div className="bg-slate-950 p-4 rounded-2xl space-y-1.5 border border-slate-800">
                         <p className="font-bold text-blue-400 uppercase text-[10px] tracking-wider">Data Orang Tua</p>
                         <p className="text-sm font-bold text-white">{selectedPpdb.namaOrtu}</p>
-                        <p>WhatsApp: {selectedPpdb.noWhatsapp}</p>
-                        <p>Email: {selectedPpdb.email}</p>
+                        <p>WhatsApp: {selectedPpdb.noWhatsapp || "-"}</p>
+                        <p>Email: {selectedPpdb.email || <span className="text-slate-500 italic">Tidak diisi (opsional)</span>}</p>
                       </div>
                     </div>
 
@@ -4153,7 +4344,7 @@ export default function AdminDashboardPage() {
                           <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
                           <input
                             type="file"
-                            accept="image/*"
+                            accept={IMAGE_UPLOAD_ACCEPT}
                             onChange={handleUploadProgramIcon}
                             className="hidden"
                           />
@@ -4403,13 +4594,13 @@ export default function AdminDashboardPage() {
                           <span>Upload</span>
                           <input
                             type="file"
-                            accept="image/*"
+                            accept={IMAGE_UPLOAD_ACCEPT}
                             className="hidden"
                             onChange={async (e) => {
                               const file = e.target.files?.[0];
                               if (file) {
                                 try {
-                                  const url = await uploadFile(file, "profile");
+                                  const url = await uploadFile(file, "profiles");
                                   setEditingTeacher({ ...editingTeacher, photoUrl: url });
                                   showMessage("Foto guru diunggah!", "success");
                                 } catch (err: any) {
@@ -5098,31 +5289,37 @@ export default function AdminDashboardPage() {
             <div className="space-y-6 w-full">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Presensi Siswa Harian</h2>
-                  <p className="text-xs text-slate-400">Catatan kehadiran murid (Hadir, Sakit, Izin, Alfa).</p>
+                  <h2 className="text-2xl font-black text-white tracking-tight">
+                    {isParent ? "Riwayat Presensi Ananda" : "Presensi Siswa Harian"}
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    {isParent
+                      ? "Catatan dan riwayat kehadiran harian ananda di sekolah."
+                      : "Catatan kehadiran murid (Hadir, Sakit, Izin, Alfa)."}
+                  </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-                  {/* Scan QR Murid Button */}
-                  <button
-                    onClick={() => setQrModal({ isOpen: true, type: "STUDENT", inputCode: "", scanning: false, result: null, error: null })}
-                    className="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
-                  >
-                    <QrCode className="w-4 h-4 text-emerald-300" />
-                    <span>Scan QR Murid</span>
-                  </button>
-
-                  {/* Absensi Kolektif Wali Kelas (Khusus Guru) */}
-                  {admin?.role === "GURU" && admin?.assignedClass && (
+                {!isParent && (
+                  <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                    {/* Scan QR Murid Button */}
                     <button
-                      onClick={() => handleBatchAttendanceWaliKelas(admin.assignedClass)}
-                      className="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
+                      onClick={() => setQrModal({ isOpen: true, type: "STUDENT", inputCode: "", scanning: false, result: null, error: null })}
+                      className="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
                     >
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Absensi Kolektif {admin.assignedClass}</span>
+                      <QrCode className="w-4 h-4 text-emerald-300" />
+                      <span>Scan QR Murid</span>
                     </button>
-                  )}
 
-                  {admin?.role !== "ORTU" && (
+                    {/* Absensi Kolektif Wali Kelas (Khusus Guru) */}
+                    {admin?.role === "GURU" && admin?.assignedClass && (
+                      <button
+                        onClick={() => handleBatchAttendanceWaliKelas(admin.assignedClass)}
+                        className="bg-teal-600 hover:bg-teal-500 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>Absensi Kolektif {admin.assignedClass}</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() =>
                         setEditingAttendance({
@@ -5140,8 +5337,8 @@ export default function AdminDashboardPage() {
                       <Plus className="w-4 h-4" />
                       <span>Input Manual</span>
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {editingAttendance && (
@@ -5206,8 +5403,9 @@ export default function AdminDashboardPage() {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {attendanceList
+                {(isParent ? myAttendanceList : attendanceList)
                   .filter((att) => {
+                    if (isParent) return true;
                     const teacherName = att.student?.classRoom?.homeroomTeacherName || "";
                     const teacherId = att.student?.classRoom?.homeroomTeacherId || "";
                     const matchHomeroom =
@@ -5215,19 +5413,7 @@ export default function AdminDashboardPage() {
                       teacherId === selectedHomeroomFilter ||
                       teacherName === selectedHomeroomFilter;
 
-                    if (!matchHomeroom) return false;
-
-                    if (admin?.role !== "ORTU") return true;
-                    const u = (admin?.username || "").toLowerCase();
-                    const n = (admin?.name || "").toLowerCase();
-                    const sName = (att.studentName || "").toLowerCase();
-                    const sUser = (att.student?.username || "").toLowerCase();
-
-                    return (
-                      (u && (sName.includes(u) || sUser.includes(u))) ||
-                      (n && (n.includes(sName) || sName.includes(n.replace("wali", "").trim()))) ||
-                      att.studentId === admin?.id
-                    );
+                    return matchHomeroom;
                   })
                   .map((att) => (
                     <div key={att.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-2 flex items-center justify-between">
@@ -5243,6 +5429,18 @@ export default function AdminDashboardPage() {
                     </div>
                   ))}
               </div>
+
+              {isParent && myAttendanceList.length === 0 && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center space-y-3 w-full">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-800/80 text-emerald-400 mx-auto flex items-center justify-center text-2xl">
+                    📅
+                  </div>
+                  <h3 className="font-extrabold text-white text-base">Belum Ada Catatan Presensi Ananda</h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                    Riwayat presensi kehadiran ananda akan otomatis tercatat dan tampil di sini setelah guru kelas melakukan absensi harian.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -5299,6 +5497,368 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
+          {/* TAB: PUSAT PROGRESIF FITUR SISTEM (SUPER ADMIN & ADMIN CABANG) */}
+          {activeTab === "teacher-progress" && (
+            <div className="space-y-8 w-full">
+              {/* TOP HEADER & ACTION BANNER */}
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black border border-indigo-500/30 text-lg">
+                      🚀
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-2xl font-black text-white tracking-tight">
+                          Pusat Progresif Fitur Sistem
+                        </h2>
+                        <span className="text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full border border-indigo-500/30">
+                          Super Admin & Cabang
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Analisis progresif skema SPP, alokasi jam KBM, capaian bulanan pengajar, dan insentif guru
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleExportProgressiveCSV}
+                    className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition cursor-pointer shadow-sm"
+                    title="Unduh Data CSV"
+                  >
+                    <Download className="w-4 h-4 text-emerald-400" />
+                    <span>Ekspor CSV</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setProgressiveHistoryModal((prev) => ({
+                        ...prev,
+                        isOpen: true,
+                        selectedTeacherId: "ALL",
+                        activeSubTab: "summary",
+                      }))
+                    }
+                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition shadow-lg shadow-indigo-600/30 cursor-pointer"
+                  >
+                    <Eye className="w-4 h-4" />
+                    <span>Detail History & Analisis Lengkap</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTeacherProgressModal({
+                        isOpen: true,
+                        teacherId: teachersList[0]?.id || "",
+                        teacherName: teachersList[0]?.name || "Guru",
+                        month: "Juli 2026",
+                        programTitle: programsList[0]?.title || "Program TK A",
+                        hoursTaught: 36,
+                        targetHours: 40,
+                        evaluatedStudentsCount: 15,
+                        notes: "",
+                      })
+                    }
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/30 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Input Manual Capaian</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4 KPI SUMMARY STRIP */}
+              {(() => {
+                const targetTeachers = teachersList.filter((t) =>
+                  selectedSchoolId === "ALL" || t.schoolId === selectedSchoolId
+                );
+                const sppAmounts = programsList.map((p) => Number(p.sppAmount || 200000)).filter((a) => a > 0);
+                const minSpp = sppAmounts.length > 0 ? Math.min(...sppAmounts) : 200000;
+
+                let totalHadir = 0;
+                let totalHours = 0;
+                let totalResult = 0;
+                let sumRatio = 0;
+
+                targetTeachers.forEach((teacher) => {
+                  const teacherAtts = teacherAttendanceList.filter(
+                    (att) => att.teacherId === teacher.id && att.status === "hadir"
+                  );
+                  const tp = teacherProgressList.find((p) => p.teacherId === teacher.id);
+                  const hadir = teacherAtts.length || (tp ? Math.round(Number(tp.hoursTaught || 0) / 3) : 12);
+                  const hours = tp ? Number(tp.hoursTaught) : hadir * 3;
+
+                  const schoolProgs = programsList.filter((p) => !p.schoolId || p.schoolId === teacher.schoolId);
+                  const matchedProg = schoolProgs[0] || programsList[0];
+                  const teacherSpp = Number(matchedProg?.sppAmount || minSpp);
+                  const ratio = Math.max(Math.round((teacherSpp / Math.max(minSpp, 1)) * 100) / 100, 1.0);
+
+                  totalHadir += hadir;
+                  totalHours += hours;
+                  sumRatio += ratio;
+                  totalResult += Math.round(hadir * 50000 * ratio);
+                });
+
+                const avgRatio = targetTeachers.length > 0 ? sumRatio / targetTeachers.length : 1.0;
+
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-5 space-y-2 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Guru Terpantau</span>
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                          <Award className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <p className="text-2xl font-black text-white">{targetTeachers.length} Guru</p>
+                      <p className="text-[11px] text-slate-400">Terdaftar di cabang sekolah aktif</p>
+                    </div>
+
+                    <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-5 space-y-2 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Rata-Rata Rasio SPP</span>
+                        <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+                          <TrendingUp className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <p className="text-2xl font-black text-indigo-300 font-mono">{avgRatio.toFixed(2)}x</p>
+                      <p className="text-[11px] text-slate-400">Multiplier terhadap basis Rp 200rb</p>
+                    </div>
+
+                    <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-5 space-y-2 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-slate-400">Total KBM Bulan Ini</span>
+                        <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center border border-cyan-500/20">
+                          <Clock className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <p className="text-2xl font-black text-cyan-300 font-mono">{totalHours} Jam</p>
+                      <p className="text-[11px] text-slate-400">{totalHadir} Hari kehadiran terakumulasi</p>
+                    </div>
+
+                    <div className="bg-slate-900/80 border border-slate-800/90 rounded-3xl p-5 space-y-2 shadow-xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-emerald-400">Total Estimasi Hasil</span>
+                        <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <p className="text-2xl font-black text-emerald-400 font-mono">
+                        Rp {totalResult.toLocaleString("id-ID")}
+                      </p>
+                      <p className="text-[11px] text-slate-400">Estimasi insentif progresif seluruh guru</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* MAIN CONTENT 12-COL GRID */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full">
+                {/* LEFT (7 COLS): PUSAT PROGRESIF KARTU GURU */}
+                <div className="lg:col-span-7 bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/70 border border-indigo-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none" />
+
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-4 relative z-10">
+                    <div>
+                      <h3 className="font-extrabold text-base sm:text-lg text-white">
+                        Matriks Kinerja & Rasio SPP Per Guru
+                      </h3>
+                      <p className="text-xs text-slate-400">
+                        Otomatis tersinkronisasi dengan presensi harian QR & skema program cabang
+                      </p>
+                    </div>
+
+                    <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full border border-emerald-500/30">
+                      Live Sync
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const sppAmounts = programsList.map((p) => Number(p.sppAmount || 200000)).filter((a) => a > 0);
+                    const minSpp = sppAmounts.length > 0 ? Math.min(...sppAmounts) : 200000;
+                    const displayTeachers = teachersList.filter(
+                      (t) => selectedSchoolId === "ALL" || t.schoolId === selectedSchoolId
+                    );
+
+                    if (displayTeachers.length === 0) {
+                      return (
+                        <div className="p-8 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400">
+                          Belum ada data guru pada cabang yang dipilih
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-10">
+                        {displayTeachers.map((teacher) => {
+                          const tpRecord = teacherProgressList.find(
+                            (tp) => tp.teacherId === teacher.id || (tp.teacherName && tp.teacherName.toLowerCase() === teacher.name.toLowerCase())
+                          );
+                          const assignedCls = classesList.find(
+                            (c) => c.homeroomTeacherId === teacher.id || c.id === teacher.classId
+                          );
+                          const plottedClass = assignedCls?.name || teacher.assignedClass || teacher.role;
+                          const schoolName = schoolsList.find((s) => s.id === teacher.schoolId)?.name || "Smart Kids Sadjati";
+
+                          const schoolProgs = programsList.filter((p) => !p.schoolId || p.schoolId === teacher.schoolId);
+                          const matchedProgram = schoolProgs[0] || programsList[0];
+                          const teacherSpp = Number(matchedProgram?.sppAmount || minSpp);
+                          const sppRatio = Math.max(Math.round((teacherSpp / Math.max(minSpp, 1)) * 100) / 100, 1.0);
+
+                          const teacherAtts = teacherAttendanceList.filter(
+                            (att) => att.teacherId === teacher.id && att.status === "hadir"
+                          );
+                          const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
+                          const hoursTaught = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+                          const targetHours = tpRecord ? Number(tpRecord.targetHours) : 40;
+                          const pct = Math.min(Math.round((hoursTaught / targetHours) * 100), 100);
+
+                          const baseRate = 50000;
+                          const monthlyResult = Math.round(hadirDays * baseRate * sppRatio);
+
+                          return (
+                            <div
+                              key={teacher.id}
+                              className="bg-slate-950/90 border border-slate-800/90 hover:border-emerald-500/40 p-4 rounded-2xl space-y-3 shadow-xl transition-all relative overflow-hidden group"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs border border-emerald-500/30 shrink-0">
+                                    👩‍🏫
+                                  </div>
+                                  <div className="min-w-0">
+                                    <h5 className="font-extrabold text-white text-xs leading-tight truncate">{teacher.name}</h5>
+                                    <p className="text-[10px] text-slate-400 truncate">📍 {schoolName} • {plottedClass}</p>
+                                  </div>
+                                </div>
+                                <span className="text-[10px] font-mono font-black text-emerald-300 bg-emerald-950/80 border border-emerald-800/80 px-2 py-0.5 rounded-full shrink-0">
+                                  {sppRatio.toFixed(2)}x Rasio
+                                </span>
+                              </div>
+
+                              <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800/80 space-y-1 text-[11px]">
+                                <div className="flex justify-between text-slate-300">
+                                  <span>SPP Program: <strong className="text-emerald-400 font-mono">Rp {teacherSpp.toLocaleString("id-ID")}</strong></span>
+                                  <span className="text-slate-400 text-[10px]">Basis: Rp {minSpp.toLocaleString("id-ID")}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-300 border-t border-slate-800/80 pt-1 mt-1">
+                                  <span>Presensi Hadir Bulan Ini:</span>
+                                  <strong className="text-amber-300 font-mono">{hadirDays} Hari ({hoursTaught} Jam)</strong>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between bg-gradient-to-r from-emerald-950/60 to-teal-950/60 border border-emerald-500/30 p-2.5 rounded-xl">
+                                <div className="text-[10px] text-emerald-200">
+                                  <span className="block font-bold">Hasil Progresif Bulanan:</span>
+                                  <span className="text-[9px] text-slate-400">({hadirDays} Hari × 50rb × {sppRatio.toFixed(2)}x)</span>
+                                </div>
+                                <span className="text-sm font-black font-mono text-emerald-400">
+                                  Rp {monthlyResult.toLocaleString("id-ID")}
+                                </span>
+                              </div>
+
+                              <div className="space-y-1">
+                                <div className="flex justify-between text-[10px] text-slate-400">
+                                  <span>Target Mengajar ({pct}%)</span>
+                                  <span>{hoursTaught} / {targetHours} Jam</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                                  <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" style={{ width: `${pct}%` }} />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setProgressiveHistoryModal((prev) => ({
+                                      ...prev,
+                                      isOpen: true,
+                                      selectedTeacherId: teacher.id,
+                                      activeSubTab: "attendance_logs",
+                                    }))
+                                  }
+                                  className="w-full mt-2 py-1.5 px-2 bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white rounded-xl text-[10px] font-bold border border-slate-800/80 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                                >
+                                  <Eye className="w-3 h-3 text-indigo-400" />
+                                  <span>Riwayat & Log Guru Ini</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* RIGHT (5 COLS): VIDEO PLAYER DEMONSTRASI & PANDUAN SISTEM */}
+                <div className="lg:col-span-5 bg-slate-900/90 border border-slate-800/90 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center font-black border border-red-500/30">
+                          ▶️
+                        </div>
+                        <div>
+                          <h3 className="font-extrabold text-base text-white">Video Demonstrasi System</h3>
+                          <p className="text-[11px] text-slate-400">Panduan tata kelola progresif SPP & KBM</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full border border-slate-700">
+                        Tutorial HD
+                      </span>
+                    </div>
+
+                    <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-inner group">
+                      <iframe
+                        src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+                        title="Video Demonstrasi Dashboard Sekolah"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+
+                    <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-4 space-y-2 text-xs">
+                      <h5 className="font-bold text-emerald-400 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Keunggulan Skema Multiplier Progresif</span>
+                      </h5>
+                      <ul className="space-y-1.5 text-[11px] text-slate-300 list-disc list-inside">
+                        <li>Kompensasi pengajar otomatis menyesuaikan rasio SPP program ajar.</li>
+                        <li>Sinkronisasi presensi harian otomatis menghitung akumulasi jam KBM.</li>
+                        <li>Transparansi evaluasi siswa dapat dilihat langsung oleh Super Admin.</li>
+                        <li>Laporan siap cetak dan ekspor format CSV untuk pembukuan yayasan.</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setProgressiveHistoryModal((prev) => ({
+                          ...prev,
+                          isOpen: true,
+                          selectedTeacherId: "ALL",
+                          activeSubTab: "monthly_records",
+                        }))
+                      }
+                      className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer"
+                    >
+                      <Calendar className="w-4 h-4 text-amber-400" />
+                      <span>Buka Riwayat Capaian Seluruh Guru</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB: SPP & KEUANGAN */}
           {activeTab === "spp" && (
             <div className="space-y-6 w-full">
@@ -5306,29 +5866,29 @@ export default function AdminDashboardPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-2xl font-black text-white tracking-tight">SPP & Catatan Keuangan</h2>
-                    {sppList.filter((s) => s.status === "menunggu_konfirmasi").length > 0 && (
-                      <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 animate-pulse">
-                        {sppList.filter((s) => s.status === "menunggu_konfirmasi").length} Menunggu Konfirmasi
-                      </span>
-                    )}
+                    {(() => {
+                      const targetList = isParent ? mySppList : sppList;
+                      const pendingCount = targetList.filter((s) => s.status === "menunggu_konfirmasi").length;
+                      if (pendingCount === 0) return null;
+                      return (
+                        <span className="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 animate-pulse">
+                          {pendingCount} Menunggu Konfirmasi
+                        </span>
+                      );
+                    })()}
                   </div>
                   <p className="text-xs text-slate-400">
-                    {admin?.role === "ORTU" || admin?.role === "ORANG_TUA"
+                    {isParent
                       ? "Status, riwayat pembayaran SPP ananda, serta fitur unggah bukti transfer."
                       : "Kelola status dan verifikasi bukti pembayaran SPP bulanan siswa."}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
-                  {(admin?.role === "ORTU" || admin?.role === "ORANG_TUA") && (
+                  {isParent && (
                     <button
                       onClick={() => {
-                        const child = studentsList.find(
-                          (s) =>
-                            (s.parentPhone && admin?.phone && s.parentPhone === admin.phone) ||
-                            (s.username && admin?.username && s.username === admin.username) ||
-                            (s.parentName && admin?.name && s.parentName.toLowerCase().includes(admin.name.toLowerCase()))
-                        ) || studentsList[0];
+                        const child = parentChildren[0] || studentsList[0];
                         setSppPaymentModal({
                           isOpen: true,
                           studentId: child?.id || "",
@@ -5351,7 +5911,7 @@ export default function AdminDashboardPage() {
                     </button>
                   )}
 
-                  {admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+                  {!isParent && (
                     <button
                       onClick={() =>
                         setEditingSpp({
@@ -5400,14 +5960,15 @@ export default function AdminDashboardPage() {
                       <div>
                         <label className="block text-xs font-bold text-slate-400 mb-1">Nama Siswa / Ananda</label>
                         <SearchableSelect
-                          options={studentsList.map((s) => ({
+                          options={(isParent ? (parentChildren.length > 0 ? parentChildren : studentsList.slice(0, 1)) : studentsList).map((s) => ({
                             value: s.id,
                             label: s.name,
                             sublabel: `NISN: ${s.nisn} • ${s.className}`,
                           }))}
                           value={sppPaymentModal.studentId}
                           onChange={(selectedId) => {
-                            const found = studentsList.find((s) => s.id === selectedId);
+                            const sourceList = isParent ? parentChildren : studentsList;
+                            const found = sourceList.find((s) => s.id === selectedId) || studentsList.find((s) => s.id === selectedId);
                             if (found) {
                               setSppPaymentModal((prev) => ({
                                 ...prev,
@@ -5457,49 +6018,125 @@ export default function AdminDashboardPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-xs font-bold text-slate-400 mb-1">Metode Pembayaran</label>
-                        <SearchableSelect
-                          options={[
-                            { value: "TRANSFER_BCA", label: "🏦 Transfer Bank BCA" },
-                            { value: "TRANSFER_MANDIRI", label: "🏦 Transfer Bank Mandiri" },
-                            { value: "QRIS", label: "📱 QRIS (Scan QR Code)" },
+                        {(() => {
+                          const activeBanks = bankAccountsList.filter((b) => b.isActive !== false);
+                          const dynamicOptions = [
+                            ...(activeBanks.length > 0
+                              ? activeBanks.map((b) => ({
+                                  value: `BANK_${b.id}`,
+                                  label: `🏦 Transfer Bank ${b.bankName} (${b.accountNumber})`,
+                                }))
+                              : [
+                                  { value: "TRANSFER_BCA", label: "🏦 Transfer Bank BCA" },
+                                  { value: "TRANSFER_MANDIRI", label: "🏦 Transfer Bank Mandiri" },
+                                ]),
+                            { value: "QRIS", label: "📱 QRIS (Scan QR Code Resmi)" },
                             { value: "TUNAI", label: "💵 Tunai di Kasir Sekolah" },
-                          ]}
-                          value={sppPaymentModal.paymentMethod}
-                          onChange={(val) => setSppPaymentModal((prev) => ({ ...prev, paymentMethod: val }))}
-                        />
+                          ];
+                          return (
+                            <SearchableSelect
+                              options={dynamicOptions}
+                              value={sppPaymentModal.paymentMethod}
+                              onChange={(val) => setSppPaymentModal((prev) => ({ ...prev, paymentMethod: val }))}
+                            />
+                          );
+                        })()}
                       </div>
 
-                      {/* INFORMASI REKENING TUJUAN */}
-                      <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-1.5">
+                      {/* INFORMASI REKENING TUJUAN DINAMIS */}
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-xs space-y-2">
                         <span className="font-bold uppercase text-emerald-400 text-[11px] tracking-wider block">
                           📌 Instruksi Pembayaran Tujuan:
                         </span>
-                        {sppPaymentModal.paymentMethod === "TRANSFER_BCA" && (
-                          <div className="space-y-1 text-slate-300">
-                            <p>Bank: <strong className="text-white">Bank BCA</strong></p>
-                            <p>No. Rekening: <strong className="font-mono text-emerald-300 text-sm">8830-123-456</strong></p>
-                            <p>Atas Nama: <strong className="text-white">Yayasan Pendidikan YAPCHI</strong></p>
-                          </div>
-                        )}
-                        {sppPaymentModal.paymentMethod === "TRANSFER_MANDIRI" && (
-                          <div className="space-y-1 text-slate-300">
-                            <p>Bank: <strong className="text-white">Bank Mandiri</strong></p>
-                            <p>No. Rekening: <strong className="font-mono text-emerald-300 text-sm">137-00-98765-43</strong></p>
-                            <p>Atas Nama: <strong className="text-white">Yayasan Pendidikan YAPCHI</strong></p>
-                          </div>
-                        )}
-                        {sppPaymentModal.paymentMethod === "QRIS" && (
-                          <div className="space-y-1 text-slate-300">
-                            <p>QRIS Name: <strong className="text-white">YAPCHI Smart Kids School</strong></p>
-                            <p className="text-[11px] text-amber-300">Scan melalui BCA Mobile, GoPay, OVO, ShopeePay, DANA, dll.</p>
-                          </div>
-                        )}
-                        {sppPaymentModal.paymentMethod === "TUNAI" && (
-                          <div className="space-y-1 text-slate-300">
-                            <p>Lokasi: <strong className="text-white">Kasir Keuangan Sekolah</strong></p>
-                            <p className="text-[11px] text-slate-400">Pembayaran langsung saat jam kerja sekolah (07.30 - 14.00 WIB).</p>
-                          </div>
-                        )}
+                        {(() => {
+                          const activeBanks = bankAccountsList.filter((b) => b.isActive !== false);
+
+                          if (sppPaymentModal.paymentMethod === "QRIS") {
+                            return (
+                              <div className="space-y-1.5 text-slate-300">
+                                <p>Metode: <strong className="text-white">QRIS Nasional (QR Code)</strong></p>
+                                <p>Merchant: <strong className="text-white">{siteProfile.qrisName || "YAPCHI Smart Kids School"}</strong></p>
+                                <p className="text-[11px] text-amber-300">Scan via BCA Mobile, GoPay, OVO, ShopeePay, DANA, Livin, dll.</p>
+                                {siteProfile.qrisImageUrl && (
+                                  <div className="pt-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setPreviewModal({ isOpen: true, src: siteProfile.qrisImageUrl, title: "QRIS Sekolah Resmi" })}
+                                      className="inline-flex items-center gap-2 p-1.5 bg-white rounded-xl shadow cursor-pointer hover:opacity-90"
+                                    >
+                                      <img src={siteProfile.qrisImageUrl} alt="QRIS" className="w-20 h-20 object-contain rounded-lg" />
+                                      <span className="text-[10px] text-slate-800 font-bold px-1">Klik perbesar</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          if (sppPaymentModal.paymentMethod === "TUNAI") {
+                            return (
+                              <div className="space-y-1 text-slate-300">
+                                <p>Lokasi: <strong className="text-white">Kasir Keuangan Sekolah</strong></p>
+                                <p className="text-[11px] text-slate-400">Pembayaran langsung saat jam kerja sekolah (07.30 - 14.00 WIB).</p>
+                              </div>
+                            );
+                          }
+
+                          // Bank account matching
+                          const selectedBank =
+                            activeBanks.find((b) => `BANK_${b.id}` === sppPaymentModal.paymentMethod) ||
+                            activeBanks.find((b) => sppPaymentModal.paymentMethod?.toUpperCase().includes(b.bankName.toUpperCase())) ||
+                            (activeBanks.length > 0 ? activeBanks[0] : null);
+
+                          if (selectedBank) {
+                            return (
+                              <div className="space-y-1.5 text-slate-300">
+                                <div className="flex items-center justify-between">
+                                  <span>Bank:</span>
+                                  <strong className="text-white font-bold">{selectedBank.bankName}</strong>
+                                </div>
+                                <div className="flex items-center justify-between gap-2 bg-slate-900/90 p-2 rounded-xl border border-slate-800">
+                                  <div>
+                                    <span className="text-[10px] text-slate-400 block">Nomor Rekening:</span>
+                                    <strong className="font-mono text-emerald-300 text-sm font-black">
+                                      {selectedBank.accountNumber}
+                                    </strong>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopyBankAccount(selectedBank.accountNumber)}
+                                    className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 rounded-lg text-[11px] font-bold inline-flex items-center gap-1 transition-colors cursor-pointer border border-emerald-500/30 shrink-0"
+                                  >
+                                    {copiedBankNo ? (
+                                      <>
+                                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                        <span>Tersalin!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="w-3.5 h-3.5" />
+                                        <span>Salin</span>
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <span>Atas Nama:</span>
+                                  <strong className="text-white font-bold">{selectedBank.accountHolder}</strong>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // Fallback default
+                          return (
+                            <div className="space-y-1 text-slate-300">
+                              <p>Bank: <strong className="text-white">Bank BCA</strong></p>
+                              <p>No. Rekening: <strong className="font-mono text-emerald-300 text-sm">8830-123-456</strong></p>
+                              <p>Atas Nama: <strong className="text-white">Yayasan Pendidikan YAPCHI</strong></p>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -5521,7 +6158,7 @@ export default function AdminDashboardPage() {
                           </span>
                           <input
                             type="file"
-                            accept="image/*,.pdf"
+                            accept={DOCUMENT_UPLOAD_ACCEPT}
                             onChange={handleUploadSppProof}
                             className="hidden"
                           />
@@ -5693,56 +6330,67 @@ export default function AdminDashboardPage() {
 
               {/* FILTER STATUS TABS FOR ADMIN & ORTU */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                <button
-                  onClick={() => setSppStatusFilter("ALL")}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                    sppStatusFilter === "ALL"
-                      ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
-                      : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
-                  }`}
-                >
-                  Semua Record ({sppList.length})
-                </button>
-                <button
-                  onClick={() => setSppStatusFilter("menunggu_konfirmasi")}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
-                    sppStatusFilter === "menunggu_konfirmasi"
-                      ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30"
-                      : "bg-slate-900 text-amber-400 hover:bg-slate-800 border border-slate-800"
-                  }`}
-                >
-                  <span>⏳ Menunggu Konfirmasi</span>
-                  {sppList.filter((s) => s.status === "menunggu_konfirmasi").length > 0 && (
-                    <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
-                      {sppList.filter((s) => s.status === "menunggu_konfirmasi").length}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={() => setSppStatusFilter("lunas")}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                    sppStatusFilter === "lunas"
-                      ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
-                      : "bg-slate-900 text-emerald-400 hover:bg-slate-800 border border-slate-800"
-                  }`}
-                >
-                  ✓ Lunas ({sppList.filter((s) => s.status === "lunas").length})
-                </button>
-                <button
-                  onClick={() => setSppStatusFilter("belum_bayar")}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-                    sppStatusFilter === "belum_bayar"
-                      ? "bg-red-600 text-white shadow-md shadow-red-600/30"
-                      : "bg-slate-900 text-red-400 hover:bg-slate-800 border border-slate-800"
-                  }`}
-                >
-                  ✕ Belum Bayar ({sppList.filter((s) => s.status === "belum_bayar").length})
-                </button>
+                {(() => {
+                  const targetList = isParent ? mySppList : sppList;
+                  const waitingCount = targetList.filter((s) => s.status === "menunggu_konfirmasi").length;
+                  const lunasCount = targetList.filter((s) => s.status === "lunas").length;
+                  const belumBayarCount = targetList.filter((s) => s.status === "belum_bayar" || s.status === "belum_lunas").length;
+
+                  return (
+                    <>
+                      <button
+                        onClick={() => setSppStatusFilter("ALL")}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                          sppStatusFilter === "ALL"
+                            ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                            : "bg-slate-900 text-slate-400 hover:bg-slate-800 border border-slate-800"
+                        }`}
+                      >
+                        Semua Record ({targetList.length})
+                      </button>
+                      <button
+                        onClick={() => setSppStatusFilter("menunggu_konfirmasi")}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
+                          sppStatusFilter === "menunggu_konfirmasi"
+                            ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-500/30"
+                            : "bg-slate-900 text-amber-400 hover:bg-slate-800 border border-slate-800"
+                        }`}
+                      >
+                        <span>⏳ Menunggu Konfirmasi</span>
+                        {waitingCount > 0 && (
+                          <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black">
+                            {waitingCount}
+                          </span>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => setSppStatusFilter("lunas")}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                          sppStatusFilter === "lunas"
+                            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+                            : "bg-slate-900 text-emerald-400 hover:bg-slate-800 border border-slate-800"
+                        }`}
+                      >
+                        ✓ Lunas ({lunasCount})
+                      </button>
+                      <button
+                        onClick={() => setSppStatusFilter("belum_bayar")}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                          sppStatusFilter === "belum_bayar"
+                            ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                            : "bg-slate-900 text-red-400 hover:bg-slate-800 border border-slate-800"
+                        }`}
+                      >
+                        ✕ Belum Bayar ({belumBayarCount})
+                      </button>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* SPP RECORDS CARDS GRID */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {sppList
+                {(isParent ? mySppList : sppList)
                   .filter((spp) => {
                     if (sppStatusFilter !== "ALL" && spp.status !== sppStatusFilter) return false;
 
@@ -5751,6 +6399,8 @@ export default function AdminDashboardPage() {
                       (spp.studentName && spp.studentName.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
                       (spp.nisn && spp.nisn.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
                       (spp.className && spp.className.toLowerCase().includes(sppSearchQuery.toLowerCase()));
+
+                    if (isParent) return matchSearch;
 
                     const teacherName =
                       spp.homeroomTeacherName ||
@@ -5766,18 +6416,7 @@ export default function AdminDashboardPage() {
                       teacherId === selectedHomeroomFilter ||
                       teacherName === selectedHomeroomFilter;
 
-                    if (!matchSearch || !matchHomeroom) return false;
-
-                    if (admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA") return true;
-                    const u = (admin?.username || "").toLowerCase();
-                    const n = (admin?.name || "").toLowerCase();
-                    const sName = (spp.studentName || "").toLowerCase();
-
-                    return (
-                      (u && sName.includes(u)) ||
-                      (n && (n.includes(sName) || sName.includes(n.replace("wali", "").trim()))) ||
-                      spp.studentId === admin?.id
-                    );
+                    return matchHomeroom && matchSearch;
                   })
                   .map((spp) => {
                     const hTeacherName =
@@ -5910,6 +6549,18 @@ export default function AdminDashboardPage() {
                   );
                 })}
               </div>
+
+              {isParent && mySppList.length === 0 && (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center space-y-3 w-full">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-800/80 text-amber-400 mx-auto flex items-center justify-center text-2xl">
+                    💳
+                  </div>
+                  <h3 className="font-extrabold text-white text-base">Belum Ada Tagihan / Riwayat SPP Ananda</h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                    Catatan tagihan bulanan SPP ananda akan muncul di sini. Anda juga dapat melakukan pembayaran dan mengunggah bukti transfer melalui tombol di atas.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -6546,7 +7197,7 @@ export default function AdminDashboardPage() {
                       <span>{uploadingQris ? "Mengunggah QRIS..." : "Pilih File Gambar QRIS"}</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept={IMAGE_UPLOAD_ACCEPT}
                         className="hidden"
                         disabled={uploadingQris}
                         onChange={handleUploadQrisImage}
@@ -6734,12 +7385,12 @@ export default function AdminDashboardPage() {
                 <div>
                   <h2 className="text-2xl font-black text-white tracking-tight">Pengumuman Sekolah</h2>
                   <p className="text-xs text-slate-400">
-                    {admin?.role === "ORTU"
+                    {isParent
                       ? "Informasi dan pengumuman resmi terbaru dari sekolah."
                       : "Terbitkan pengumuman resmi ke aplikasi mobile guru dan wali murid."}
                   </p>
                 </div>
-                {admin?.role !== "ORTU" && (
+                {!isParent && (
                   <button
                     onClick={() =>
                       setEditingAnnouncement({
@@ -6803,7 +7454,7 @@ export default function AdminDashboardPage() {
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs text-slate-500">
                       <span>Pengirim: {ann.sender}</span>
-                      {admin?.role !== "ORTU" && (
+                      {!isParent && (
                         <button onClick={() => handleDeleteAnnouncement(ann.id)} className="p-1.5 bg-red-500/10 text-red-400 rounded-xl"><Trash2 className="w-3.5 h-3.5" /></button>
                       )}
                     </div>
@@ -6964,7 +7615,7 @@ export default function AdminDashboardPage() {
                         </span>
                         <input
                           type="file"
-                          accept="image/*,.pdf"
+                          accept={DOCUMENT_UPLOAD_ACCEPT}
                           onChange={handleUploadLeaveAttachment}
                           className="hidden"
                         />
@@ -7174,12 +7825,12 @@ export default function AdminDashboardPage() {
                 <div>
                   <h2 className="text-2xl font-black text-white tracking-tight">Jadwal Kegiatan Belajar (KBM)</h2>
                   <p className="text-xs text-slate-400">
-                    {admin?.role === "ORTU"
+                    {isParent
                       ? "Jadwal dan alokasi kegiatan belajar harian ananda."
                       : "Atur alokasi waktu dan materi pelajaran harian."}
                   </p>
                 </div>
-                {admin?.role !== "ORTU" && (
+                {!isParent && (
                   <button
                     onClick={() =>
                       setEditingSchedule({
@@ -7295,7 +7946,7 @@ export default function AdminDashboardPage() {
                       <h4 className="font-bold text-white text-base mt-1">{sch.subject}</h4>
                       <p className="text-xs text-slate-400 leading-relaxed">{sch.activities}</p>
                     </div>
-                    {admin?.role !== "ORTU" && (
+                    {!isParent && (
                       <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
                         <button onClick={() => setEditingSchedule(sch)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Edit Jadwal KBM"><Edit className="w-3.5 h-3.5" /></button>
                         <button onClick={() => handleDeleteSchedule(sch.id)} className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer" title="Hapus Jadwal"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -7315,7 +7966,7 @@ export default function AdminDashboardPage() {
                   Kelola Galeri Foto
                 </h2>
                 <p className="text-xs text-slate-400">
-                  Unggah gambar dokumentasi kegiatan sekolah. (Folder storage: uploads/)
+                  Unggah gambar dokumentasi kegiatan sekolah. File disimpan per tanggal di uploads/gallery/.
                 </p>
               </div>
 
@@ -7339,16 +7990,16 @@ export default function AdminDashboardPage() {
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
-                      Pilih File Gambar (uploads/)
+                      Pilih File Gambar (maksimal 1 MB)
                     </label>
                     <input
                       type="file"
-                      accept="image/*"
+                      accept={IMAGE_UPLOAD_ACCEPT}
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (file) {
                           try {
-                            const url = await uploadFile(file, "uploads");
+                            const url = await uploadFile(file, "gallery");
                             setNewGalleryImage(url);
                             showMessage("Gambar berhasil diunggah!", "success");
                           } catch (err: any) {
@@ -7838,6 +8489,119 @@ export default function AdminDashboardPage() {
                       />
                     </div>
                   </div>
+
+                  {/* ALAMAT SEKOLAH */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                      Alamat Sekolah / Cabang
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={siteProfile.address || ""}
+                      onChange={(e) =>
+                        setSiteProfile({ ...siteProfile, address: e.target.value })
+                      }
+                      placeholder="Contoh: Jl. Cisaranten Kulon No. 12, Arcamanik, Bandung"
+                      className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-emerald-500 focus:outline-none"
+                    />
+                  </div>
+
+                  {/* SECTION BUTUH BANTUAN & INFORMASI DUKUNGAN PPDB/PORTAL */}
+                  <div className="pt-6 border-t border-slate-800/80 space-y-5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                        💬
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">
+                          Pengaturan Kontak & Kotak "Butuh Bantuan?" (PPDB & Portal)
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          Data ini tampil secara dinamis pada bilah samping form PPDB dan portal informasi wali murid.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                          Judul Kotak Bantuan
+                        </label>
+                        <input
+                          type="text"
+                          value={siteProfile.helpTitle || ""}
+                          onChange={(e) =>
+                            setSiteProfile({ ...siteProfile, helpTitle: e.target.value })
+                          }
+                          placeholder="Butuh Bantuan?"
+                          className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                          Subjudul Kotak Bantuan
+                        </label>
+                        <input
+                          type="text"
+                          value={siteProfile.helpSubtitle || ""}
+                          onChange={(e) =>
+                            setSiteProfile({ ...siteProfile, helpSubtitle: e.target.value })
+                          }
+                          placeholder="Tim kami siap membantu anda setiap hari!"
+                          className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                          Jam Layanan / Operasional
+                        </label>
+                        <input
+                          type="text"
+                          value={siteProfile.helpHours || ""}
+                          onChange={(e) =>
+                            setSiteProfile({ ...siteProfile, helpHours: e.target.value })
+                          }
+                          placeholder="Senin - Sabtu | 08.00 - 17.00 WIB"
+                          className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                          Catatan Penting / Pengingat Pendaftaran
+                        </label>
+                        <input
+                          type="text"
+                          value={siteProfile.importantNotice || ""}
+                          onChange={(e) =>
+                            setSiteProfile({ ...siteProfile, importantNotice: e.target.value })
+                          }
+                          placeholder="Pastikan data yang dimasukan pada form pendaftaran sudah sesuai"
+                          className="w-full p-4 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white focus:border-emerald-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    {/* LIVE PREVIEW BOX */}
+                    <div className="bg-slate-950/70 border border-emerald-500/20 rounded-2xl p-4 space-y-2">
+                      <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider block">
+                        Preview Tampilan Kotak Bantuan (PPDB):
+                      </span>
+                      <div className="bg-white text-slate-900 rounded-xl p-4 border border-emerald-100 shadow-sm space-y-2">
+                        <div className="font-extrabold text-sm">{siteProfile.helpTitle || "Butuh Bantuan?"}</div>
+                        <div className="text-xs text-slate-600">{siteProfile.helpSubtitle || "Tim kami siap membantu anda setiap hari!"}</div>
+                        <div className="text-xs font-mono bg-emerald-50 text-emerald-800 p-2 rounded-lg border border-emerald-200">
+                          📱 WhatsApp: {siteProfile.phone || "0812 3456 7890"} | 📸 IG: @{siteProfile.instagram || "smartkids"} | 🕒 {siteProfile.helpHours || "Senin - Sabtu | 08.00 - 17.00 WIB"}
+                        </div>
+                        <div className="text-[11px] text-amber-700 bg-amber-50 p-2 rounded-lg border border-amber-200 flex items-center gap-1.5">
+                          <span>⚠️</span>
+                          <span>{siteProfile.importantNotice || "Pastikan data yang dimasukan pada form pendaftaran sudah sesuai"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="pt-4 flex justify-end border-t border-slate-800">
@@ -8196,8 +8960,12 @@ export default function AdminDashboardPage() {
                     <strong className="text-amber-300 font-mono font-black">{teacherCredentialModal.username}</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Password Default:</span>
-                    <strong className="text-emerald-400 font-mono font-black">{teacherCredentialModal.password}</strong>
+                    <span className="text-slate-400">Password:</span>
+                    <strong className="text-emerald-400 font-mono font-black text-right">
+                      {teacherCredentialModal.passwordAvailable
+                        ? teacherCredentialModal.password
+                        : "Tersimpan aman (bcrypt)"}
+                    </strong>
                   </div>
                 </div>
 
@@ -8220,32 +8988,689 @@ export default function AdminDashboardPage() {
 
                 <div className="flex flex-col gap-2 pt-2">
                   <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        `Akun Portal Guru TK Smart Kids:\nNama: ${teacherCredentialModal.teacherName}\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\nLogin: ${window.location.origin}/login`
-                      );
-                      showMessage("Akun login guru berhasil disalin!", "success");
-                    }}
-                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    onClick={handleResetTeacherPassword}
+                    className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
-                    <Copy className="w-4 h-4" />
-                    <span>Salin Akun Login Guru</span>
+                    <RefreshCw className="w-4 h-4" />
+                    <span>Reset & Buat Password Baru</span>
                   </button>
 
-                  <a
-                    href={`https://wa.me/?text=${encodeURIComponent(
-                      `Halo Ibu/Bapak ${teacherCredentialModal.teacherName},\nBerikut akun login Portal Guru Smart Kids:\n\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\n\nSilakan login di: ${window.location.origin}/login`
-                    )}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30 text-center"
-                  >
-                    <Send className="w-4 h-4" />
-                    <span>Kirim Akun via WhatsApp</span>
-                  </a>
+                  {teacherCredentialModal.passwordAvailable && (
+                    <>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `Akun Portal Guru TK Smart Kids:\nNama: ${teacherCredentialModal.teacherName}\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\nLogin: ${window.location.origin}/login`
+                          );
+                          showMessage("Akun login guru berhasil disalin!", "success");
+                        }}
+                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+                      >
+                        <Copy className="w-4 h-4" />
+                        <span>Salin Akun Login Guru</span>
+                      </button>
+
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(
+                          `Halo Ibu/Bapak ${teacherCredentialModal.teacherName},\nBerikut akun login Portal Guru Smart Kids:\n\nUsername: ${teacherCredentialModal.username}\nPassword: ${teacherCredentialModal.password}\n\nSilakan login di: ${window.location.origin}/login`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-600/30 text-center"
+                      >
+                        <Send className="w-4 h-4" />
+                        <span>Kirim Akun via WhatsApp</span>
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DETAIL HISTORY PUSAT PROGRESIF FITUR SISTEM */}
+      {progressiveHistoryModal.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+          <div className="bg-slate-900 border border-indigo-500/30 rounded-3xl max-w-5xl w-full max-h-[90vh] flex flex-col shadow-2xl relative overflow-hidden animate-fadeIn">
+            {/* Header */}
+            <div className="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-950/60 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black border border-indigo-500/30 shrink-0">
+                  🚀
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-base sm:text-lg text-white truncate">
+                      Detail History & Analisis Lengkap Pusat Progresif
+                    </h3>
+                    <span className="text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-500/30 shrink-0">
+                      Realtime Analytics
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 truncate">
+                    Eksplorasi riwayat skema SPP, log presensi mengajar harian, dan capaian bulanan guru
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                  title="Cetak Laporan"
+                >
+                  <Printer className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden sm:inline">Cetak</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportProgressiveCSV}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                  title="Ekspor Data ke CSV"
+                >
+                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden sm:inline">Ekspor CSV</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, isOpen: false }))}
+                  className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar & KPI Strip */}
+            <div className="p-4 sm:p-5 bg-slate-900/90 border-b border-slate-800/80 space-y-4 shrink-0">
+              {/* Filter Controls */}
+              <div className={`grid grid-cols-1 sm:grid-cols-2 ${(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT") ? "lg:grid-cols-5" : "lg:grid-cols-4"} gap-3`}>
+                {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT") && (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-400 mb-1">Filter Cabang</label>
+                    <SearchableSelect
+                      options={[
+                        { value: "ALL", label: "🏫 Semua Cabang" },
+                        ...schoolsList.map((s) => ({ value: s.id, label: s.name })),
+                      ]}
+                      value={progressiveHistoryModal.selectedSchoolId}
+                      onChange={(val) =>
+                        setProgressiveHistoryModal((prev) => ({
+                          ...prev,
+                          selectedSchoolId: val,
+                          selectedTeacherId: "ALL",
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Filter Guru</label>
+                  <SearchableSelect
+                    options={[
+                      { value: "ALL", label: "👥 Semua Guru Pengajar" },
+                      ...teachersList
+                        .filter(
+                          (t) =>
+                            progressiveHistoryModal.selectedSchoolId === "ALL" ||
+                            t.schoolId === progressiveHistoryModal.selectedSchoolId
+                        )
+                        .map((t) => ({
+                          value: t.id,
+                          label: t.name,
+                          sublabel: `${t.role} • ${schoolsList.find((s) => s.id === t.schoolId)?.name || "Cabang"}`,
+                        })),
+                    ]}
+                    value={progressiveHistoryModal.selectedTeacherId}
+                    onChange={(val) =>
+                      setProgressiveHistoryModal((prev) => ({ ...prev, selectedTeacherId: val }))
+                    }
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Dari Tanggal</label>
+                  <input
+                    type="date"
+                    value={progressiveHistoryModal.startDate}
+                    onChange={(e) =>
+                      setProgressiveHistoryModal((prev) => ({ ...prev, startDate: e.target.value }))
+                    }
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Sampai Tanggal</label>
+                  <input
+                    type="date"
+                    value={progressiveHistoryModal.endDate}
+                    onChange={(e) =>
+                      setProgressiveHistoryModal((prev) => ({ ...prev, endDate: e.target.value }))
+                    }
+                    className="w-full p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-400 mb-1">Pencarian Cepat</label>
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-3" />
+                    <input
+                      type="text"
+                      placeholder="Cari guru, kelas, catatan..."
+                      value={progressiveHistoryModal.searchQuery}
+                      onChange={(e) =>
+                        setProgressiveHistoryModal((prev) => ({ ...prev, searchQuery: e.target.value }))
+                      }
+                      className="w-full pl-9 pr-3 p-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:border-indigo-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* KPI Summary Strip */}
+              {(() => {
+                const targetTeachers = teachersList.filter(
+                  (t) =>
+                    (progressiveHistoryModal.selectedSchoolId === "ALL" || t.schoolId === progressiveHistoryModal.selectedSchoolId) &&
+                    (progressiveHistoryModal.selectedTeacherId === "ALL" || t.id === progressiveHistoryModal.selectedTeacherId) &&
+                    (!progressiveHistoryModal.searchQuery ||
+                      t.name.toLowerCase().includes(progressiveHistoryModal.searchQuery.toLowerCase()) ||
+                      (t.assignedClass && t.assignedClass.toLowerCase().includes(progressiveHistoryModal.searchQuery.toLowerCase())))
+                );
+
+                const sppAmounts = programsList.map((p) => Number(p.sppAmount || 200000)).filter((a) => a > 0);
+                const minSpp = sppAmounts.length > 0 ? Math.min(...sppAmounts) : 200000;
+
+                let totalHadirDays = 0;
+                let totalHours = 0;
+                let totalEstimatedProgressive = 0;
+                let sumRatios = 0;
+
+                targetTeachers.forEach((teacher) => {
+                  const teacherAtts = teacherAttendanceList.filter(
+                    (att) =>
+                      att.teacherId === teacher.id &&
+                      att.status === "hadir" &&
+                      (!progressiveHistoryModal.startDate || att.date >= progressiveHistoryModal.startDate) &&
+                      (!progressiveHistoryModal.endDate || att.date <= progressiveHistoryModal.endDate)
+                  );
+                  const tpRecord = teacherProgressList.find((tp) => tp.teacherId === teacher.id);
+                  const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
+                  const hours = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+
+                  const assignedCls = classesList.find((c) => c.homeroomTeacherId === teacher.id || c.id === teacher.classId);
+                  const plottedClass = assignedCls?.name || teacher.assignedClass || teacher.role;
+                  const schoolProgs = programsList.filter((p) => !p.schoolId || p.schoolId === teacher.schoolId);
+                  const matchedProg = schoolProgs[0] || programsList[0];
+                  const teacherSpp = Number(matchedProg?.sppAmount || minSpp);
+                  const ratio = Math.max(Math.round((teacherSpp / Math.max(minSpp, 1)) * 100) / 100, 1.0);
+
+                  totalHadirDays += hadirDays;
+                  totalHours += hours;
+                  sumRatios += ratio;
+                  totalEstimatedProgressive += Math.round(hadirDays * 50000 * ratio);
+                });
+
+                const avgRatio = targetTeachers.length > 0 ? sumRatios / targetTeachers.length : 1.0;
+
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Total Hari Hadir</span>
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className="text-lg font-black text-amber-300 font-mono">{totalHadirDays}</span>
+                        <span className="text-[10px] text-slate-400">Hari</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Total Jam Mengajar</span>
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className="text-lg font-black text-cyan-300 font-mono">{totalHours}</span>
+                        <span className="text-[10px] text-slate-400">Jam KBM</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase text-slate-400">Rata-Rata Rasio SPP</span>
+                      <div className="flex items-baseline gap-1.5 mt-1">
+                        <span className="text-lg font-black text-purple-300 font-mono">{avgRatio.toFixed(2)}x</span>
+                        <span className="text-[10px] text-slate-400">Multiplier</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-950 p-3 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold uppercase text-emerald-400">Total Estimasi Hasil</span>
+                      <div className="flex items-baseline gap-1 mt-1">
+                        <span className="text-base sm:text-lg font-black text-emerald-400 font-mono">
+                          Rp {totalEstimatedProgressive.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Subtabs Selector */}
+              <div className="flex items-center gap-2 border-b border-slate-800 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "summary" }))}
+                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
+                    progressiveHistoryModal.activeSubTab === "summary"
+                      ? "border-indigo-500 text-white bg-slate-800/60"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Award className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Analisis Skema SPP & Rasio</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "attendance_logs" }))}
+                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
+                    progressiveHistoryModal.activeSubTab === "attendance_logs"
+                      ? "border-indigo-500 text-white bg-slate-800/60"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Log Presensi Mengajar Harian</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "monthly_records" }))}
+                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
+                    progressiveHistoryModal.activeSubTab === "monthly_records"
+                      ? "border-indigo-500 text-white bg-slate-800/60"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Riwayat Capaian Bulanan</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Subtab Content Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+              {/* SUBTAB 1: SKEMA SPP & RASIO GURU */}
+              {progressiveHistoryModal.activeSubTab === "summary" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>
+                      Daftar perbandingan skema SPP program dan multiplier kompensasi progresif guru:
+                    </span>
+                    <span className="font-mono text-emerald-400">
+                      Basis Standar: Rp 200.000 / bln
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-slate-950 text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-800">
+                        <tr>
+                          <th className="p-3.5">Nama Guru / Pengajar</th>
+                          <th className="p-3.5">Cabang</th>
+                          <th className="p-3.5">Kelas & Program Belajar</th>
+                          <th className="p-3.5">SPP Program</th>
+                          <th className="p-3.5 text-center">Rasio SPP</th>
+                          <th className="p-3.5 text-center">Kehadiran</th>
+                          <th className="p-3.5 text-right">Hasil Progresif Bulanan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80">
+                        {teachersList
+                          .filter(
+                            (t) =>
+                              (progressiveHistoryModal.selectedSchoolId === "ALL" || t.schoolId === progressiveHistoryModal.selectedSchoolId) &&
+                              (progressiveHistoryModal.selectedTeacherId === "ALL" || t.id === progressiveHistoryModal.selectedTeacherId) &&
+                              (!progressiveHistoryModal.searchQuery ||
+                                t.name.toLowerCase().includes(progressiveHistoryModal.searchQuery.toLowerCase()) ||
+                                (t.assignedClass && t.assignedClass.toLowerCase().includes(progressiveHistoryModal.searchQuery.toLowerCase())))
+                          )
+                          .map((teacher) => {
+                            const schoolName = schoolsList.find((s) => s.id === teacher.schoolId)?.name || "Smart Kids Sadjati";
+                            const assignedCls = classesList.find((c) => c.homeroomTeacherId === teacher.id || c.id === teacher.classId);
+                            const plottedClass = assignedCls?.name || teacher.assignedClass || teacher.role;
+
+                            const schoolProgs = programsList.filter((p) => !p.schoolId || p.schoolId === teacher.schoolId);
+                            const sppAmounts = schoolProgs.map((p) => Number(p.sppAmount || 200000)).filter((a) => a > 0);
+                            const minSpp = sppAmounts.length > 0 ? Math.min(...sppAmounts) : 200000;
+                            const matchedProg = schoolProgs[0] || programsList[0];
+                            const teacherSpp = Number(matchedProg?.sppAmount || minSpp);
+                            const sppRatio = Math.max(Math.round((teacherSpp / Math.max(minSpp, 1)) * 100) / 100, 1.0);
+
+                            const teacherAtts = teacherAttendanceList.filter(
+                              (att) => att.teacherId === teacher.id && att.status === "hadir"
+                            );
+                            const tpRecord = teacherProgressList.find((tp) => tp.teacherId === teacher.id);
+                            const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
+                            const hoursTaught = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+                            const monthlyResult = Math.round(hadirDays * 50000 * sppRatio);
+
+                            return (
+                              <tr key={teacher.id} className="hover:bg-slate-900/70 transition-colors">
+                                <td className="p-3.5">
+                                  <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold text-xs shrink-0">
+                                      👩‍🏫
+                                    </div>
+                                    <div>
+                                      <span className="font-bold text-white block">{teacher.name}</span>
+                                      <span className="text-[10px] text-slate-400">{teacher.role}</span>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="p-3.5">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 border border-slate-800 text-emerald-400 whitespace-nowrap">
+                                    {schoolName}
+                                  </span>
+                                </td>
+                                <td className="p-3.5">
+                                  <span className="font-medium text-slate-200 block">{plottedClass}</span>
+                                  <span className="text-[10px] text-slate-400">{matchedProg?.title || "Program Standar"}</span>
+                                </td>
+                                <td className="p-3.5 font-mono text-white font-bold">
+                                  Rp {teacherSpp.toLocaleString("id-ID")}
+                                </td>
+                                <td className="p-3.5 text-center">
+                                  <span className="font-mono font-black text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded-full text-[11px]">
+                                    {sppRatio.toFixed(2)}x
+                                  </span>
+                                </td>
+                                <td className="p-3.5 text-center">
+                                  <span className="font-mono font-bold text-amber-300 block">{hadirDays} Hari</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">({hoursTaught} Jam)</span>
+                                </td>
+                                <td className="p-3.5 text-right font-mono font-black text-emerald-400 text-sm">
+                                  Rp {monthlyResult.toLocaleString("id-ID")}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* SUBTAB 2: LOG PRESENSI MENGAJAR HARIAN */}
+              {progressiveHistoryModal.activeSubTab === "attendance_logs" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>
+                      Log presensi harian guru pengajar berdasarkan jadwal dan sesi mengajar:
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      Total Catatan: {teacherAttendanceList.length}
+                    </span>
+                  </div>
+
+                  {(() => {
+                    const filteredLogs = teacherAttendanceList.filter((att) => {
+                      if (progressiveHistoryModal.selectedTeacherId !== "ALL" && att.teacherId !== progressiveHistoryModal.selectedTeacherId) {
+                        return false;
+                      }
+                      const teacher = teachersList.find((t) => t.id === att.teacherId || (t.name && att.teacherName && t.name.toLowerCase() === att.teacherName.toLowerCase()));
+                      if (progressiveHistoryModal.selectedSchoolId !== "ALL" && teacher && teacher.schoolId !== progressiveHistoryModal.selectedSchoolId) {
+                        return false;
+                      }
+                      if (progressiveHistoryModal.startDate && att.date && att.date < progressiveHistoryModal.startDate) {
+                        return false;
+                      }
+                      if (progressiveHistoryModal.endDate && att.date && att.date > progressiveHistoryModal.endDate) {
+                        return false;
+                      }
+                      if (progressiveHistoryModal.searchQuery) {
+                        const q = progressiveHistoryModal.searchQuery.toLowerCase();
+                        const matchTeacher = att.teacherName?.toLowerCase().includes(q);
+                        const matchNotes = att.notes?.toLowerCase().includes(q);
+                        const matchStatus = att.status?.toLowerCase().includes(q);
+                        if (!matchTeacher && !matchNotes && !matchStatus) return false;
+                      }
+                      return true;
+                    });
+
+                    if (filteredLogs.length === 0) {
+                      return (
+                        <div className="p-12 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400 space-y-2">
+                          <CheckCircle className="w-8 h-8 text-slate-600 mx-auto" />
+                          <p className="font-bold text-sm">Belum ada log presensi yang sesuai filter</p>
+                          <p className="text-xs text-slate-500">Coba ubah rentang tanggal atau pilihan guru</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                        <table className="w-full text-left text-xs text-slate-300">
+                          <thead className="bg-slate-950 text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                              <th className="p-3.5">Tanggal</th>
+                              <th className="p-3.5">Nama Guru</th>
+                              <th className="p-3.5">Cabang</th>
+                              <th className="p-3.5 text-center">Status</th>
+                              <th className="p-3.5 text-center">Jam Masuk - Pulang</th>
+                              <th className="p-3.5">Catatan / Aktivitas KBM</th>
+                              <th className="p-3.5 text-center">Bukti / Foto</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/80">
+                            {filteredLogs.map((log) => {
+                              const tRec = teachersList.find((t) => t.id === log.teacherId || (t.name && log.teacherName && t.name.toLowerCase() === log.teacherName.toLowerCase()));
+                              const sName = schoolsList.find((s) => s.id === tRec?.schoolId)?.name || "Smart Kids Sadjati";
+                              return (
+                              <tr key={log.id} className="hover:bg-slate-900/70 transition-colors">
+                                <td className="p-3.5 font-mono text-slate-300 whitespace-nowrap">
+                                  {log.date || (log.createdAt ? new Date(log.createdAt).toLocaleDateString("id-ID") : "-")}
+                                </td>
+                                <td className="p-3.5 font-bold text-white whitespace-nowrap">
+                                  {log.teacherName || tRec?.name || "Guru"}
+                                </td>
+                                <td className="p-3.5">
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 border border-slate-800 text-emerald-400 whitespace-nowrap">
+                                    {sName}
+                                  </span>
+                                </td>
+                                <td className="p-3.5 text-center">
+                                  <span
+                                    className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${
+                                      log.status === "hadir"
+                                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                        : log.status === "izin"
+                                        ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                        : log.status === "sakit"
+                                        ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                        : "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                                    }`}
+                                  >
+                                    {log.status}
+                                  </span>
+                                </td>
+                                <td className="p-3.5 text-center font-mono text-slate-300 whitespace-nowrap">
+                                  {log.checkInTime || "07:30"} - {log.checkOutTime || "14:00"}
+                                </td>
+                                <td className="p-3.5 text-slate-400 max-w-xs truncate">
+                                  {log.notes || "KBM sentra harian terlaksana dengan baik."}
+                                </td>
+                                <td className="p-3.5 text-center">
+                                  {log.photoUrl ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setPreviewModal({
+                                          isOpen: true,
+                                          src: log.photoUrl,
+                                          title: `Presensi Guru: ${log.teacherName || "Guru"}`,
+                                        })
+                                      }
+                                      className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-400 hover:text-indigo-300 cursor-pointer"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" />
+                                      <span>Lihat Foto</span>
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-600">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* SUBTAB 3: RIWAYAT CAPAIAN BULANAN (TEACHER PROGRESS) */}
+              {progressiveHistoryModal.activeSubTab === "monthly_records" && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>
+                      Rekapitulasi target jam mengajar dan evaluasi siswa bulanan:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProgressiveHistoryModal((prev) => ({ ...prev, isOpen: false }));
+                        setTeacherProgressModal({
+                          isOpen: true,
+                          teacherId: teachersList[0]?.id || "",
+                          teacherName: teachersList[0]?.name || "Guru",
+                          month: "Juli 2026",
+                          programTitle: programsList[0]?.title || "Program TK A",
+                          hoursTaught: 36,
+                          targetHours: 40,
+                          evaluatedStudentsCount: 15,
+                          notes: "",
+                        });
+                      }}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Input Capaian Baru</span>
+                    </button>
+                  </div>
+
+                  {(() => {
+                    const filteredRecords = teacherProgressList.filter((tp) => {
+                      if (progressiveHistoryModal.selectedTeacherId !== "ALL" && tp.teacherId !== progressiveHistoryModal.selectedTeacherId) {
+                        return false;
+                      }
+                      const teacher = teachersList.find((t) => t.id === tp.teacherId || (t.name && tp.teacherName && t.name.toLowerCase() === tp.teacherName.toLowerCase()));
+                      if (progressiveHistoryModal.selectedSchoolId !== "ALL" && teacher && teacher.schoolId !== progressiveHistoryModal.selectedSchoolId) {
+                        return false;
+                      }
+                      if (progressiveHistoryModal.searchQuery) {
+                        const q = progressiveHistoryModal.searchQuery.toLowerCase();
+                        const matchTeacher = tp.teacherName?.toLowerCase().includes(q);
+                        const matchProg = tp.programTitle?.toLowerCase().includes(q);
+                        const matchMonth = tp.month?.toLowerCase().includes(q);
+                        if (!matchTeacher && !matchProg && !matchMonth) return false;
+                      }
+                      return true;
+                    });
+
+                    if (filteredRecords.length === 0) {
+                      return (
+                        <div className="p-12 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400 space-y-2">
+                          <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
+                          <p className="font-bold text-sm">Belum ada riwayat capaian bulanan yang tersimpan</p>
+                          <p className="text-xs text-slate-500">Klik tombol "+ Input Capaian Baru" di atas untuk menambahkan data</p>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                        <table className="w-full text-left text-xs text-slate-300">
+                          <thead className="bg-slate-950 text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                              <th className="p-3.5">Bulan</th>
+                              <th className="p-3.5">Nama Guru</th>
+                              <th className="p-3.5">Cabang</th>
+                              <th className="p-3.5">Program Belajar</th>
+                              <th className="p-3.5 text-center">Jam Aktual / Target</th>
+                              <th className="p-3.5 text-center">Evaluasi Siswa</th>
+                              <th className="p-3.5">Catatan</th>
+                              <th className="p-3.5 text-right">Aksi</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/80">
+                            {filteredRecords.map((rec) => {
+                              const tRec = teachersList.find((t) => t.id === rec.teacherId || (t.name && rec.teacherName && t.name.toLowerCase() === rec.teacherName.toLowerCase()));
+                              const sName = schoolsList.find((s) => s.id === tRec?.schoolId)?.name || "Smart Kids Sadjati";
+                              const pct = Math.min(Math.round((Number(rec.hoursTaught || 0) / Number(rec.targetHours || 1)) * 100), 100);
+                              return (
+                                <tr key={rec.id} className="hover:bg-slate-900/70 transition-colors">
+                                  <td className="p-3.5 font-bold text-indigo-300 whitespace-nowrap">
+                                    {rec.month}
+                                  </td>
+                                  <td className="p-3.5 font-bold text-white whitespace-nowrap">
+                                    {rec.teacherName}
+                                  </td>
+                                  <td className="p-3.5">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-900 border border-slate-800 text-emerald-400 whitespace-nowrap">
+                                      {sName}
+                                    </span>
+                                  </td>
+                                  <td className="p-3.5 text-slate-300">
+                                    {rec.programTitle || "Program Sentra"}
+                                  </td>
+                                  <td className="p-3.5 text-center font-mono">
+                                    <span className="text-white font-bold">{rec.hoursTaught}</span> / {rec.targetHours} Jam
+                                    <div className="w-16 h-1.5 bg-slate-800 rounded-full mx-auto mt-1 overflow-hidden">
+                                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                                    </div>
+                                  </td>
+                                  <td className="p-3.5 text-center font-mono font-bold text-emerald-400">
+                                    {rec.evaluatedStudentsCount || 0} Anak
+                                  </td>
+                                  <td className="p-3.5 text-slate-400 max-w-xs truncate">
+                                    {rec.notes || "-"}
+                                  </td>
+                                  <td className="p-3.5 text-right">
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!confirm("Hapus catatan capaian ini?")) return;
+                                        try {
+                                          const res = await fetch(`/api/teacher-progress?id=${rec.id}`, { method: "DELETE" });
+                                          const data = await res.json();
+                                          if (res.ok && data.success) {
+                                            showMessage("Catatan capaian berhasil dihapus", "success");
+                                            setTeacherProgressList((prev) => prev.filter((p) => p.id !== rec.id));
+                                          }
+                                        } catch (err: any) {
+                                          showMessage(err.message, "error");
+                                        }
+                                      }}
+                                      className="p-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-lg text-xs transition cursor-pointer"
+                                      title="Hapus Catatan"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

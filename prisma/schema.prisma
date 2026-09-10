@@ -109,6 +109,10 @@ model SiteProfile {
   facebook      String   @default("Smart Kids") @map("facebook")
   address       String?  @default("DeKeraton, Karawang") @map("alamat")
   qrisImageUrl  String?  @default("/images/qris_default.png") @map("url_gambar_qris")
+  helpTitle     String?  @default("Butuh Bantuan?") @map("judul_bantuan")
+  helpSubtitle  String?  @default("Tim kami siap membantu anda setiap hari!") @map("subjudul_bantuan")
+  helpHours     String?  @default("Senin - Sabtu | 08.00 - 17.00 WIB") @map("jam_operasional_bantuan")
+  importantNotice String? @default("Pastikan data yang dimasukan pada form pendaftaran sudah sesuai") @map("catatan_penting")
   updatedAt     DateTime @updatedAt @map("diperbarui_pada")
 
   @@map("profil_situs")
@@ -136,7 +140,7 @@ model GalleryItem {
   school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   title      String   @map("judul")
   imageUrl   String   @map("url_gambar")
-  folder     String   @default("uploads") @map("folder")
+  folder     String   @default("gallery") @map("folder")
   orderIndex Int      @default(0) @map("urutan")
   createdAt  DateTime @default(now()) @map("dibuat_pada")
 

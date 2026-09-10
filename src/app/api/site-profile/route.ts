@@ -76,6 +76,10 @@ export async function PUT(req: Request) {
         facebook: body.facebook,
         address: body.address,
         ...(body.qrisImageUrl !== undefined && { qrisImageUrl: body.qrisImageUrl }),
+        ...(body.helpTitle !== undefined && { helpTitle: body.helpTitle }),
+        ...(body.helpSubtitle !== undefined && { helpSubtitle: body.helpSubtitle }),
+        ...(body.helpHours !== undefined && { helpHours: body.helpHours }),
+        ...(body.importantNotice !== undefined && { importantNotice: body.importantNotice }),
       },
       create: {
         schoolId,
@@ -90,6 +94,10 @@ export async function PUT(req: Request) {
         facebook: body.facebook,
         address: body.address,
         qrisImageUrl: body.qrisImageUrl || "/images/qris_default.png",
+        helpTitle: body.helpTitle || "Butuh Bantuan?",
+        helpSubtitle: body.helpSubtitle || "Tim kami siap membantu anda setiap hari!",
+        helpHours: body.helpHours || "Senin - Sabtu | 08.00 - 17.00 WIB",
+        importantNotice: body.importantNotice || "Pastikan data yang dimasukan pada form pendaftaran sudah sesuai",
       },
     });
 

@@ -60,7 +60,7 @@ export async function POST(req: Request) {
         schoolId: targetSchoolId,
         title: title || "Kegiatan Belajar",
         imageUrl,
-        folder: folder || "uploads",
+        folder: folder || "gallery",
         orderIndex: Number(orderIndex) || 0,
       },
     });
