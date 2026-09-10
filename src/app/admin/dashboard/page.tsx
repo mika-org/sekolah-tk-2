@@ -712,7 +712,12 @@ export default function AdminDashboardPage() {
     router.push("/admin/login");
   };
 
-  const uploadFile = async (file: File, folder: "uploads" | "profile" | "ppdb"): Promise<string> => {
+  const uploadFile = async (file: File, folder: "uploads" | "profile" | "ppdb" | "spp" | "payments" | "qris"): Promise<string> => {
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      throw new Error(`Ukuran berkas "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 10MB`);
+    }
+
     const formData = new FormData();
     formData.append("file", file);
     formData.append("folder", folder);
@@ -911,6 +916,11 @@ export default function AdminDashboardPage() {
   const handleUploadProgramIcon = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !editingProgram) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showMessage(`Ukuran file icon (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 10MB`, "error");
+      e.target.value = "";
+      return;
+    }
     try {
       setSaving(true);
       const formData = new FormData();
@@ -1333,6 +1343,11 @@ export default function AdminDashboardPage() {
   const handleUploadSppProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showMessage(`Ukuran file bukti transfer (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 10MB`, "error");
+      e.target.value = "";
+      return;
+    }
     try {
       setSppPaymentModal((prev) => ({ ...prev, uploading: true }));
       const url = await uploadFile(file, "spp" as any);
@@ -1709,6 +1724,11 @@ export default function AdminDashboardPage() {
   const handleUploadQrisImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showMessage(`Ukuran file barcode QRIS (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 10MB`, "error");
+      e.target.value = "";
+      return;
+    }
     setUploadingQris(true);
     try {
       const formData = new FormData();
@@ -5486,7 +5506,7 @@ export default function AdminDashboardPage() {
                     {/* FIELD UPLOAD BUKTI BAYAR */}
                     <div className="space-y-2">
                       <label className="block text-xs font-bold text-slate-400">
-                        Bukti Transfer / Pembayaran <span className="text-amber-400 font-normal">(Foto / Screenshot / Struk PDF)</span>
+                        Bukti Transfer / Pembayaran <span className="text-amber-400 font-normal">(Foto / Screenshot / Struk PDF, Maks. 10MB)</span>
                       </label>
 
                       <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -5497,7 +5517,7 @@ export default function AdminDashboardPage() {
                               ? "Mengunggah foto..."
                               : sppPaymentModal.proofUrl
                               ? "Ganti File Bukti Transfer"
-                              : "Pilih / Ambil Foto Bukti Transfer"}
+                              : "Pilih / Ambil Foto Bukti Transfer (Maks. 10MB)"}
                           </span>
                           <input
                             type="file"

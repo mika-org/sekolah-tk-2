@@ -4,6 +4,11 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "*": ["./public/storage/**"],
   },
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

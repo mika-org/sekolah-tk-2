@@ -196,7 +196,15 @@ export default function PpdbForm({
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
   const handleFileSelect = (docKey: string, file: File) => {
+    if (file.size > MAX_FILE_SIZE) {
+      alert(
+        `Ukuran file "${file.name}" (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal 10MB. Silakan pilih berkas yang berukuran lebih kecil.`
+      );
+      return;
+    }
     setSelectedFileObjects((prev) => ({ ...prev, [docKey]: file }));
   };
 
@@ -801,7 +809,7 @@ export default function PpdbForm({
                           {selectedFileObjects.kk.name}
                         </span>
                       ) : (
-                        "Unggah KK (PDF / Gambar)"
+                        "Unggah KK (PDF / Gambar, Maks. 10MB)"
                       )}
                     </span>
                   </label>
@@ -830,7 +838,7 @@ export default function PpdbForm({
                           {selectedFileObjects.akta.name}
                         </span>
                       ) : (
-                        "Unggah Akta (PDF / Gambar)"
+                        "Unggah Akta (PDF / Gambar, Maks. 10MB)"
                       )}
                     </span>
                   </label>
@@ -859,7 +867,7 @@ export default function PpdbForm({
                           {selectedFileObjects.foto.name}
                         </span>
                       ) : (
-                        "Unggah Foto Anak"
+                        "Unggah Foto Anak (Maks. 10MB)"
                       )}
                     </span>
                   </label>
@@ -888,7 +896,7 @@ export default function PpdbForm({
                           {selectedFileObjects.ktp.name}
                         </span>
                       ) : (
-                        "Unggah KTP Ortu"
+                        "Unggah KTP Ortu (Maks. 10MB)"
                       )}
                     </span>
                   </label>
@@ -1212,7 +1220,7 @@ export default function PpdbForm({
                               {selectedFileObjects.buktiBayar.name}
                             </span>
                           ) : (
-                            "Unggah Bukti Transfer (PDF / Gambar)"
+                            "Unggah Bukti Transfer (PDF / Gambar, Maks. 10MB)"
                           )}
                         </span>
                       </label>
@@ -1274,7 +1282,7 @@ export default function PpdbForm({
                             {selectedFileObjects.buktiBayar.name}
                           </span>
                         ) : (
-                          "Upload bukti transaksi QRIS Anda di sini"
+                          "Upload bukti transaksi QRIS Anda di sini (Maks. 10MB)"
                         )}
                       </span>
                     </label>
