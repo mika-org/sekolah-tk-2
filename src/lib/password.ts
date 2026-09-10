@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
 
 export const BCRYPT_SALT_ROUNDS = 10;
