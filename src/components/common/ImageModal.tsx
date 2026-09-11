@@ -9,6 +9,7 @@ interface ImageModalProps {
   src: string | null;
   title?: string;
   alt?: string;
+  allowDownload?: boolean;
 }
 
 export default function ImageModal({
@@ -17,6 +18,7 @@ export default function ImageModal({
   src,
   title = "Pratinjau Berkas",
   alt = "Gambar Berkas",
+  allowDownload = true,
 }: ImageModalProps) {
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -83,26 +85,30 @@ export default function ImageModal({
               </button>
             )}
 
-            <a
-              href={src}
-              target="_blank"
-              rel="noreferrer"
-              className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl transition-all border border-slate-700/50 flex items-center gap-1.5 text-xs font-semibold"
-              title="Buka di Tab Baru"
-            >
-              <ExternalLink className="w-4 h-4 text-emerald-400" />
-              <span className="hidden sm:inline">Tab Baru</span>
-            </a>
+            {allowDownload && (
+              <>
+                <a
+                  href={src}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl transition-all border border-slate-700/50 flex items-center gap-1.5 text-xs font-semibold"
+                  title="Buka di Tab Baru"
+                >
+                  <ExternalLink className="w-4 h-4 text-emerald-400" />
+                  <span className="hidden sm:inline">Tab Baru</span>
+                </a>
 
-            <a
-              href={src}
-              download
-              className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold shadow-md shadow-emerald-600/20"
-              title="Unduh Berkas"
-            >
-              <Download className="w-4 h-4" />
-              <span className="hidden sm:inline">Unduh</span>
-            </a>
+                <a
+                  href={src}
+                  download
+                  className="p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all flex items-center gap-1.5 text-xs font-semibold shadow-md shadow-emerald-600/20"
+                  title="Unduh Berkas"
+                >
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Unduh</span>
+                </a>
+              </>
+            )}
 
             <button
               type="button"
@@ -116,7 +122,7 @@ export default function ImageModal({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-auto bg-slate-950 p-4 sm:p-6 flex items-center justify-center relative min-h-75">
+        <div className="flex-1 overflow-auto bg-slate-950 p-4 sm:p-6 flex items-center justify-center relative min-h-75 select-none">
           {isPdf ? (
             <iframe
               src={src}
@@ -125,17 +131,24 @@ export default function ImageModal({
             />
           ) : (
             <div
-              className={`relative transition-all duration-300 flex items-center justify-center ${
+              className={`relative transition-all duration-300 flex items-center justify-center select-none ${
                 isZoomed ? "w-full cursor-zoom-out" : "max-w-full max-h-[72vh] cursor-zoom-in"
               }`}
               onClick={() => setIsZoomed(!isZoomed)}
+              onContextMenu={(e) => {
+                if (!allowDownload) e.preventDefault();
+              }}
             >
               {/* Standard img tag for optimal responsive view within modal */}
               {/* eslint-disable-next-html-element-for-img */}
               <img
                 src={src}
                 alt={alt}
-                className={`rounded-2xl object-contain shadow-2xl border border-slate-800/60 max-h-[72vh] transition-transform duration-200 ${
+                draggable={allowDownload}
+                onContextMenu={(e) => {
+                  if (!allowDownload) e.preventDefault();
+                }}
+                className={`rounded-2xl object-contain shadow-2xl border border-slate-800/60 max-h-[72vh] transition-transform duration-200 select-none ${
                   isZoomed ? "scale-125 my-8 max-h-none" : "scale-100"
                 }`}
               />

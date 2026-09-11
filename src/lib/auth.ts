@@ -9,6 +9,8 @@ export interface AdminPayload {
   name: string;
   role: string;
   schoolId?: string | null;
+  phone?: string | null;
+  email?: string | null;
 }
 
 export function signAdminToken(payload: AdminPayload): string {

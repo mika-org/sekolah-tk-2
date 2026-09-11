@@ -18,6 +18,18 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "smartkids.elevore.web.id",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.elevore.web.id",
+        port: "",
+        pathname: "/**",
+      },
     ],
   },
 };

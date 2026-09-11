@@ -42,6 +42,79 @@ async function resolveSchoolId(schoolId?: string | null, schoolCode?: string | n
   return null;
 }
 
+const DEFAULT_PPDB_COMPONENTS = [
+  {
+    code: "pendaftaran",
+    name: "Biaya Pendaftaran",
+    category: "PPDB",
+    description: "Biaya pendaftaran dan administrasi utama",
+    amount: 200000,
+    isRequired: true,
+    isActive: true,
+    orderIndex: 10,
+  },
+  {
+    code: "seragam_kuning",
+    name: "Seragam Kuning",
+    category: "PPDB",
+    description: "Stelan seragam khas kuning Smart Kids",
+    amount: 150000,
+    isRequired: false,
+    isActive: true,
+    orderIndex: 20,
+  },
+  {
+    code: "seragam_abu_abu",
+    name: "Seragam Abu-abu",
+    category: "PPDB",
+    description: "Stelan seragam formal abu-abu",
+    amount: 170000,
+    isRequired: false,
+    isActive: true,
+    orderIndex: 30,
+  },
+  {
+    code: "seragam_olahraga",
+    name: "Seragam Olahraga",
+    category: "PPDB",
+    description: "Stelan kaos dan celana olahraga",
+    amount: 130000,
+    isRequired: false,
+    isActive: true,
+    orderIndex: 40,
+  },
+  {
+    code: "raport",
+    name: "Raport",
+    category: "PPDB",
+    description: "Buku laporan hasil capaian belajar anak",
+    amount: 50000,
+    isRequired: false,
+    isActive: true,
+    orderIndex: 50,
+  },
+  {
+    code: "buku_penghubung",
+    name: "Buku Penghubung",
+    category: "PPDB",
+    description: "Buku komunikasi harian orang tua dan guru",
+    amount: 15000,
+    isRequired: true,
+    isActive: true,
+    orderIndex: 60,
+  },
+  {
+    code: "spp_bulan_pertama",
+    name: "SPP S-3",
+    category: "PPDB",
+    description: "spp bulan pertama",
+    amount: 200000,
+    isRequired: true,
+    isActive: true,
+    orderIndex: 70,
+  },
+];
+
 // Public read endpoint used by the PPDB form and authenticated dashboards.
 export async function GET(req: Request) {
   try {
@@ -73,7 +146,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const components = await prisma.feeComponent.findMany({
+    let components = await prisma.feeComponent.findMany({
       where: {
         ...(schoolId ? { schoolId } : {}),
         ...(category ? { category } : {}),
@@ -82,6 +155,59 @@ export async function GET(req: Request) {
       include: { school: true },
       orderBy: [{ category: "asc" }, { orderIndex: "asc" }, { name: "asc" }],
     });
+
+    // Auto-seed default PPDB components if database has 0 items
+    if (components.length === 0 && (!category || category === "PPDB")) {
+      const targetSchools = schoolId
+        ? await prisma.school.findMany({ where: { id: schoolId } })
+        : await prisma.school.findMany();
+
+      for (const targetSch of targetSchools) {
+        for (const item of DEFAULT_PPDB_COMPONENTS) {
+          try {
+            await prisma.feeComponent.upsert({
+              where: {
+                schoolId_code: {
+                  schoolId: targetSch.id,
+                  code: item.code,
+                },
+              },
+              update: {
+                name: item.name,
+                amount: item.amount,
+                description: item.description,
+                isRequired: item.isRequired,
+                isActive: true,
+                orderIndex: item.orderIndex,
+              },
+              create: {
+                schoolId: targetSch.id,
+                code: item.code,
+                name: item.name,
+                category: "PPDB",
+                description: item.description,
+                amount: item.amount,
+                isRequired: item.isRequired,
+                isActive: true,
+                orderIndex: item.orderIndex,
+              },
+            });
+          } catch (e) {
+            console.error("Error auto-seeding fee component:", e);
+          }
+        }
+      }
+
+      components = await prisma.feeComponent.findMany({
+        where: {
+          ...(schoolId ? { schoolId } : {}),
+          ...(category ? { category } : {}),
+          ...(!includeInactive ? { isActive: true } : {}),
+        },
+        include: { school: true },
+        orderBy: [{ category: "asc" }, { orderIndex: "asc" }, { name: "asc" }],
+      });
+    }
 
     return NextResponse.json({ success: true, data: components });
   } catch (error: unknown) {

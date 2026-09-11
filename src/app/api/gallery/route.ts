@@ -16,11 +16,48 @@ export async function GET(req: Request) {
       if (school) where.schoolId = school.id;
     }
 
-    const gallery = await prisma.galleryItem.findMany({
+    let gallery = await prisma.galleryItem.findMany({
       where,
       orderBy: { orderIndex: "asc" },
       include: { school: true },
     });
+
+    if (gallery.length === 0) {
+      const targetSchools = where.schoolId
+        ? await prisma.school.findMany({ where: { id: where.schoolId } })
+        : await prisma.school.findMany();
+
+      const defaultGallery = [
+        { title: "Kegiatan Belajar Sentra Sains & Motorik", imageUrl: "/images/gallery1.png", orderIndex: 1 },
+        { title: "Keceriaan Bermain Outdoor & Interaksi", imageUrl: "/images/gallery2.png", orderIndex: 2 },
+        { title: "Kemandirian & Kreasi Seni Melipat Origami", imageUrl: "/images/gallery3.png", orderIndex: 3 },
+      ];
+
+      for (const targetSch of targetSchools) {
+        for (const g of defaultGallery) {
+          try {
+            await prisma.galleryItem.create({
+              data: {
+                schoolId: targetSch.id,
+                title: g.title,
+                imageUrl: g.imageUrl,
+                folder: "gallery",
+                orderIndex: g.orderIndex,
+              },
+            });
+          } catch (e) {
+            // ignore
+          }
+        }
+      }
+
+      gallery = await prisma.galleryItem.findMany({
+        where,
+        orderBy: { orderIndex: "asc" },
+        include: { school: true },
+      });
+    }
+
     return NextResponse.json({ success: true, data: gallery });
   } catch (error: any) {
     return NextResponse.json(

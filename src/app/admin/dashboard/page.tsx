@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
 import Image from "next/image";
+import LesSdParentTab from "@/components/les-sd/LesSdParentTab";
+import LesSdAdminTab from "@/components/les-sd/LesSdAdminTab";
+import LesSdTeacherTab from "@/components/les-sd/LesSdTeacherTab";
 import {
   DOCUMENT_UPLOAD_ACCEPT,
   IMAGE_UPLOAD_ACCEPT,
@@ -16,6 +19,7 @@ import {
   BookOpen,
   Image as ImageIcon,
   MessageSquare,
+  MessageCircle,
   Settings,
   LogOut,
   Plus,
@@ -83,6 +87,7 @@ export default function AdminDashboardPage() {
     | "gallery"
     | "testimonials"
     | "profile"
+    | "les-sd"
   >("overview");
 
   const [loading, setLoading] = useState(true);
@@ -265,6 +270,14 @@ export default function AdminDashboardPage() {
   const [sppList, setSppList] = useState<any[]>([]);
   const [editingSpp, setEditingSpp] = useState<any | null>(null);
   const [sppStatusFilter, setSppStatusFilter] = useState<string>("ALL");
+  const [sppViewMode, setSppViewMode] = useState<"students" | "records">("students");
+  const [studentSppHistoryModal, setStudentSppHistoryModal] = useState<{
+    isOpen: boolean;
+    student: any | null;
+  }>({
+    isOpen: false,
+    student: null,
+  });
   const [sppPaymentModal, setSppPaymentModal] = useState<{
     isOpen: boolean;
     studentId: string;
@@ -1543,6 +1556,131 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Helper to clean and format Indonesian phone number for WhatsApp
+  const cleanPhoneForWa = (phone?: string) => {
+    if (!phone) return "";
+    let p = phone.replace(/[^0-9]/g, "");
+    if (p.startsWith("0")) {
+      p = "62" + p.slice(1);
+    }
+    return p;
+  };
+
+  // WhatsApp Reminder Handler
+  const handleSendWaReminder = (student: any, latestSpp?: any) => {
+    if (!student) return;
+    let phone = cleanPhoneForWa(student.parentPhone);
+    if (!phone) {
+      const inputPhone = prompt(
+        `Nomor telepon orang tua untuk siswa "${student.name}" belum terdaftar.\nMasukkan nomor WhatsApp orang tua (contoh: 08123456789):`
+      );
+      if (!inputPhone) return;
+      phone = cleanPhoneForWa(inputPhone);
+      if (!phone || phone.length < 9) {
+        alert("Nomor telepon tidak valid. Pengingat WA dibatalkan.");
+        return;
+      }
+    }
+
+    const currentMonthName = new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(new Date());
+    const monthTarget = latestSpp?.month || currentMonthName;
+    const amountStr = latestSpp?.amount
+      ? `Rp ${Number(latestSpp.amount).toLocaleString("id-ID")}`
+      : "Rp 200.000";
+    const parentSalutation = student.parentName ? `Bapak/Ibu ${student.parentName}` : "Bapak/Ibu Orang Tua / Wali";
+
+    let statusNote = "Mohon untuk segera melakukan pembayaran SPP bulanan.";
+    if (latestSpp?.status === "menunggu_konfirmasi") {
+      statusNote = "Bukti transfer telah diterima dan saat ini sedang menunggu verifikasi oleh bagian administrasi.";
+    } else if (latestSpp?.status === "lunas") {
+      statusNote = "Status pembayaran SPP bulan ini tercatat: Lunas. Terima kasih atas partisipasi aktif Bapak/Ibu!";
+    }
+
+    const message = `Halo ${parentSalutation}, wali dari ananda *${student.name}* (Kelas: ${student.className || "TK"}).
+
+Pemberitahuan dari Administrasi & Keuangan Sekolah:
+📌 *Perihal:* Pengingat Pembayaran SPP Sekolah
+📅 *Periode:* ${monthTarget}
+💰 *Nominal:* ${amountStr}
+ℹ️ *Keterangan:* ${statusNote}
+
+Pembayaran dapat ditransfer melalui rekening resmi yayasan atau tunai di kantor tata usaha sekolah. Bukti pembayaran dapat diunggah melalui portal aplikasi sekolah atau langsung dikirimkan membalas pesan ini.
+
+Terima kasih atas perhatian dan kerjasamanya. 🙏✨
+_Tata Usaha & Keuangan Sekolah_`;
+
+    const waUrl = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+    window.open(waUrl, "_blank");
+  };
+
+  // Helper to group SPP records by month for the SPP History Modal
+  const getStudentMonthlyGroups = (student: any, allSpp: any[]) => {
+    if (!student) return [];
+    // Find all SPP records for this student
+    const studentRecords = allSpp.filter(
+      (s) =>
+        (s.studentId && s.studentId === student.id) ||
+        (s.nisn && student.nisn && s.nisn === student.nisn) ||
+        (s.studentName && student.name && s.studentName.trim().toLowerCase() === student.name.trim().toLowerCase())
+    );
+
+    // Group by month
+    const groups: { [key: string]: any[] } = {};
+
+    studentRecords.forEach((rec) => {
+      let m = (rec.month || "").toLowerCase().trim();
+      if (!m.startsWith("bulan ")) {
+        // e.g. "Agustus 2026" -> "bulan agustus"
+        const monthPart = m.split(" ")[0];
+        m = `bulan ${monthPart || "pembayaran"}`;
+      }
+      if (!groups[m]) groups[m] = [];
+      groups[m].push(rec);
+    });
+
+    // If no records in database yet, provide default months for clean display
+    if (Object.keys(groups).length === 0) {
+      return [
+        {
+          monthLabel: "bulan agustus",
+          records: [
+            {
+              id: "dummy-1",
+              paymentDate: "7 agustus",
+              amount: 200000,
+              paymentMethod: "cash",
+              status: "lunas",
+            },
+            {
+              id: "dummy-2",
+              paymentDate: "28 agustus",
+              amount: 50000,
+              paymentMethod: "transfer",
+              status: "lunas",
+            },
+          ],
+        },
+        {
+          monthLabel: "bulan september",
+          records: [
+            {
+              id: "dummy-3",
+              paymentDate: "6 september",
+              amount: 250000,
+              paymentMethod: "qris",
+              status: "menunggu konfirmasi",
+            },
+          ],
+        },
+      ];
+    }
+
+    return Object.keys(groups).map((monthLabel) => ({
+      monthLabel,
+      records: groups[monthLabel],
+    }));
+  };
+
   // Teacher Progress Handlers
   const handleSaveTeacherProgress = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1970,7 +2108,14 @@ export default function AdminDashboardPage() {
           id: "keuangan_ortu",
           title: "Keuangan & Tagihan SPP",
           items: [
-            { id: "spp", label: "Pembayaran SPP", icon: CreditCard, iconColor: "text-amber-400", badge: mySppList.length },
+            { id: "spp", label: "Pembayaran SPP TK", icon: CreditCard, iconColor: "text-amber-400", badge: mySppList.length },
+          ],
+        },
+        {
+          id: "program_les_sd",
+          title: "Bimbingan Belajar SD",
+          items: [
+            { id: "les-sd", label: "Program Les SD", icon: BookOpen, iconColor: "text-emerald-400" },
           ],
         },
         {
@@ -2010,6 +2155,13 @@ export default function AdminDashboardPage() {
           ],
         },
         {
+          id: "bimbel_sd_guru",
+          title: "Bimbingan Belajar SD",
+          items: [
+            { id: "les-sd", label: "Bimbingan Les SD (PIC)", icon: Award, iconColor: "text-purple-400" },
+          ],
+        },
+        {
           id: "informasi_guru",
           title: "Informasi Sekolah",
           items: [
@@ -2045,6 +2197,7 @@ export default function AdminDashboardPage() {
           { id: "ppdb", label: "Pendaftaran PPDB", icon: Users, iconColor: "text-emerald-400", badge: ppdbList.length },
           { id: "students", label: "Kelola Data Siswa", icon: GraduationCap, iconColor: "text-blue-400", badge: studentsList.length },
           { id: "classes", label: "Master Kelas & Plotting", icon: Layers, iconColor: "text-emerald-400", badge: classesList.length },
+          { id: "les-sd", label: "Kelola Les SD", icon: BookOpen, iconColor: "text-teal-400" },
           { id: "schedules", label: "Jadwal KBM", icon: Clock, iconColor: "text-cyan-400", badge: schedulesList.length },
           { id: "attendance", label: "Presensi Siswa", icon: CheckCircle, iconColor: "text-emerald-400", badge: attendanceList.length },
         ],
@@ -4674,15 +4827,27 @@ export default function AdminDashboardPage() {
                       className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 flex flex-col justify-between transition-all shadow-xl group"
                     >
                       <div className="space-y-3 flex flex-col items-center text-center">
-                        <div className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-emerald-500/30 bg-slate-950 flex items-center justify-center">
+                        <div
+                          className="relative w-24 h-24 rounded-full overflow-hidden border-2 border-emerald-500/30 bg-slate-950 flex items-center justify-center select-none"
+                          onContextMenu={(e) => e.preventDefault()}
+                        >
                           {teacher.photoUrl ? (
-                            <Image
-                              src={teacher.photoUrl}
-                              alt={teacher.name}
-                              fill
-                              sizes="96px"
-                              className="object-cover"
-                            />
+                            <>
+                              <Image
+                                src={teacher.photoUrl}
+                                alt={teacher.name}
+                                fill
+                                sizes="96px"
+                                draggable={false}
+                                onContextMenu={(e) => e.preventDefault()}
+                                className="object-cover pointer-events-none select-none"
+                              />
+                              <div
+                                className="absolute inset-0 z-10 select-none cursor-default"
+                                onContextMenu={(e) => e.preventDefault()}
+                                onDragStart={(e) => e.preventDefault()}
+                              />
+                            </>
                           ) : (
                             <Users className="w-10 h-10 text-emerald-400" />
                           )}
@@ -5212,7 +5377,16 @@ export default function AdminDashboardPage() {
                             {s.name.charAt(0)}
                           </div>
                           <div>
-                            <h4 className="font-bold text-white text-sm">{s.name}</h4>
+                            <h4
+                              onClick={() => setStudentSppHistoryModal({ isOpen: true, student: s })}
+                              className="font-bold text-white text-sm hover:text-emerald-400 hover:underline cursor-pointer transition flex items-center gap-1.5"
+                              title="Klik untuk melihat riwayat pembayaran SPP"
+                            >
+                              <span>{s.name}</span>
+                              <span className="text-[10px] text-emerald-400 font-normal bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                Riwayat SPP
+                              </span>
+                            </h4>
                             <p className="text-xs text-slate-400">
                               NIM/NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{s.nisn}</span> • <span className="text-emerald-400 font-semibold">{s.className}</span>
                             </p>
@@ -5273,6 +5447,17 @@ export default function AdminDashboardPage() {
                         >
                           <Key className="w-3.5 h-3.5" />
                           <span>Akun</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const studentSpp = sppList.find((sp) => sp.studentId === s.id || sp.nisn === s.nisn);
+                            handleSendWaReminder(s, studentSpp);
+                          }}
+                          className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl transition cursor-pointer"
+                          title="Kirim WA Pengingat Pembayaran SPP"
+                        >
+                          <MessageCircle className="w-4 h-4 text-emerald-400" />
                         </button>
                         <button onClick={() => setEditingStudent(s)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Edit Data & Transkrip Siswa"><Edit className="w-4 h-4" /></button>
                         <button onClick={() => handleDeleteStudent(s.id)} className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer" title="Hapus Siswa"><Trash2 className="w-4 h-4" /></button>
@@ -5885,6 +6070,35 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  {!isParent && (
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setSppViewMode("students")}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                          sppViewMode === "students"
+                            ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Data Siswa & SPP ({studentsList.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSppViewMode("records")}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                          sppViewMode === "records"
+                            ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
+                            : "text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>Log Transaksi SPP ({sppList.length})</span>
+                      </button>
+                    </div>
+                  )}
+
                   {isParent && (
                     <button
                       onClick={() => {
@@ -6388,167 +6602,385 @@ export default function AdminDashboardPage() {
                 })()}
               </div>
 
-              {/* SPP RECORDS CARDS GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
-                {(isParent ? mySppList : sppList)
-                  .filter((spp) => {
-                    if (sppStatusFilter !== "ALL" && spp.status !== sppStatusFilter) return false;
+              {/* VIEW 1: DATA SISWA DENGAN STATUS SPP & TOMBOL WA (DEFAULT UNTUK ADMIN) */}
+              {!isParent && sppViewMode === "students" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                  {studentsList
+                    .filter((s) => {
+                      const matchSearch =
+                        !sppSearchQuery ||
+                        s.name.toLowerCase().includes(sppSearchQuery.toLowerCase()) ||
+                        (s.nisn && s.nisn.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
+                        (s.parentName && s.parentName.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
+                        (s.className && s.className.toLowerCase().includes(sppSearchQuery.toLowerCase()));
 
-                    const matchSearch =
-                      !sppSearchQuery ||
-                      (spp.studentName && spp.studentName.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
-                      (spp.nisn && spp.nisn.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
-                      (spp.className && spp.className.toLowerCase().includes(sppSearchQuery.toLowerCase()));
+                      const teacherName = s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "";
+                      const teacherId = s.classRoom?.homeroomTeacherId || s.homeroomTeacherId || "";
+                      const matchHomeroom =
+                        selectedHomeroomFilter === "ALL" ||
+                        teacherId === selectedHomeroomFilter ||
+                        teacherName === selectedHomeroomFilter;
 
-                    if (isParent) return matchSearch;
+                      const studentRecords = sppList.filter(
+                        (sp) =>
+                          sp.studentId === s.id ||
+                          (sp.nisn && sp.nisn === s.nisn) ||
+                          (sp.studentName && sp.studentName.toLowerCase() === s.name.toLowerCase())
+                      );
+                      const latestSpp = studentRecords[0];
 
-                    const teacherName =
-                      spp.homeroomTeacherName ||
-                      studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherName ||
-                      "";
-                    const teacherId =
-                      spp.homeroomTeacherId ||
-                      studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherId ||
-                      "";
+                      let matchStatus = true;
+                      if (sppStatusFilter === "lunas") {
+                        matchStatus = latestSpp?.status === "lunas";
+                      } else if (sppStatusFilter === "menunggu_konfirmasi") {
+                        matchStatus = latestSpp?.status === "menunggu_konfirmasi";
+                      } else if (sppStatusFilter === "belum_bayar") {
+                        matchStatus =
+                          !latestSpp ||
+                          latestSpp?.status === "belum_bayar" ||
+                          latestSpp?.status === "belum_lunas" ||
+                          latestSpp?.status === "ditolak";
+                      }
 
-                    const matchHomeroom =
-                      selectedHomeroomFilter === "ALL" ||
-                      teacherId === selectedHomeroomFilter ||
-                      teacherName === selectedHomeroomFilter;
+                      return matchSearch && matchHomeroom && matchStatus;
+                    })
+                    .map((s) => {
+                      const studentRecords = sppList.filter(
+                        (sp) =>
+                          sp.studentId === s.id ||
+                          (sp.nisn && sp.nisn === s.nisn) ||
+                          (sp.studentName && sp.studentName.toLowerCase() === s.name.toLowerCase())
+                      );
+                      const latestSpp = studentRecords[0];
 
-                    return matchHomeroom && matchSearch;
-                  })
-                  .map((spp) => {
-                    const hTeacherName =
-                      spp.homeroomTeacherName ||
-                      studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherName ||
-                      "Guru Wali";
-                    return (
-                      <div
-                        key={spp.id}
-                        className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl ${
-                          spp.status === "menunggu_konfirmasi"
-                            ? "border-amber-500/50 bg-amber-950/20"
-                            : spp.status === "lunas"
-                            ? "border-slate-800 hover:border-emerald-500/40"
-                            : "border-red-500/30"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
-                              {spp.month}
-                            </span>
-                            <h4 className="font-extrabold text-white text-base mt-1.5">{spp.studentName}</h4>
-                            <p className="text-xs text-slate-400">
-                              NIM/NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{spp.nisn}</span> • {spp.className}
-                            </p>
-                            <p className="text-[11px] text-cyan-300 font-medium mt-1">
-                              👤 Wali Kelas: <span className="font-bold text-white">{hTeacherName}</span>
-                            </p>
-                          </div>
-                        <span
-                          className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-center shrink-0 ${
-                            spp.status === "lunas"
-                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                              : spp.status === "menunggu_konfirmasi"
-                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
-                              : spp.status === "ditolak"
-                              ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                              : "bg-red-500/20 text-red-300 border border-red-500/30"
+                      return (
+                        <div
+                          key={s.id}
+                          className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl flex flex-col justify-between ${
+                            latestSpp?.status === "menunggu_konfirmasi"
+                              ? "border-amber-500/50 bg-amber-950/20"
+                              : latestSpp?.status === "lunas"
+                              ? "border-slate-800 hover:border-emerald-500/40"
+                              : "border-rose-500/30 bg-rose-950/10"
                           }`}
                         >
-                          {spp.status === "menunggu_konfirmasi"
-                            ? "Menunggu Konfirmasi"
-                            : spp.status}
-                        </span>
-                      </div>
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-emerald-400 transition-all"
+                                  onClick={() => setStudentSppHistoryModal({ isOpen: true, student: s })}
+                                  title="Klik untuk membuka riwayat pembayaran SPP"
+                                >
+                                  {s.name.charAt(0)}
+                                </div>
+                                <div>
+                                  {/* NAMA SISWA CLICKABLE -> BUKA RIWAYAT SEPERTI GAMBAR 1 */}
+                                  <h4
+                                    onClick={() => setStudentSppHistoryModal({ isOpen: true, student: s })}
+                                    className="font-extrabold text-white text-base hover:text-emerald-400 hover:underline cursor-pointer transition flex items-center gap-1.5"
+                                    title="Klik nama siswa untuk melihat riwayat pembayaran SPP"
+                                  >
+                                    <span>{s.name}</span>
+                                    <span className="text-[10px] text-emerald-400 font-normal bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                      Riwayat SPP
+                                    </span>
+                                  </h4>
+                                  <p className="text-xs text-slate-400">
+                                    NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{s.nisn}</span> • <span className="text-emerald-400 font-semibold">{s.className}</span>
+                                  </p>
+                                  <p className="text-[11px] text-cyan-300 font-medium mt-0.5">
+                                    👤 Wali Kelas: <span className="font-bold text-white">{s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "Guru Wali"}</span>
+                                  </p>
+                                  <p className="text-[11px] text-slate-400 mt-0.5">
+                                    Ortu: <strong className="text-slate-200">{s.parentName || "-"}</strong> ({s.parentPhone || "No WA belum ada"})
+                                  </p>
+                                </div>
+                              </div>
 
-                      <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 space-y-1.5 text-xs">
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-400">Nominal SPP:</span>
-                          <span className="font-extrabold text-amber-400">
-                            Rp {Number(spp.amount).toLocaleString("id-ID")}
-                          </span>
+                              <span
+                                className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-center shrink-0 ${
+                                  latestSpp?.status === "lunas"
+                                    ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                    : latestSpp?.status === "menunggu_konfirmasi"
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                                    : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                }`}
+                              >
+                                {latestSpp?.status === "lunas"
+                                  ? "Lunas"
+                                  : latestSpp?.status === "menunggu_konfirmasi"
+                                  ? "Menunggu Konfirmasi"
+                                  : "Belum Bayar"}
+                              </span>
+                            </div>
+
+                            <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 space-y-1.5 text-xs">
+                              <div className="flex justify-between items-center">
+                                <span className="text-slate-400">Tagihan Terkini:</span>
+                                <span className="font-extrabold text-amber-400">
+                                  Rp {Number(latestSpp?.amount || 200000).toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                              <div className="flex justify-between items-center text-[11px]">
+                                <span className="text-slate-400">Bulan:</span>
+                                <span className="font-bold text-slate-200">{latestSpp?.month || "September 2026"}</span>
+                              </div>
+                              {latestSpp?.paymentDate && (
+                                <div className="flex justify-between items-center text-[11px]">
+                                  <span className="text-slate-400">Tgl Bayar:</span>
+                                  <span className="font-bold text-emerald-400">{latestSpp.paymentDate}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between items-center text-[11px] pt-1 border-t border-slate-800/80">
+                                <span className="text-slate-400">Total Transaksi Tercatat:</span>
+                                <span className="font-mono text-emerald-400 font-bold">{studentRecords.length} kali bayar</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* ACTION: RIWAYAT, WA PENGINGAT (SEBELAH EDIT), EDIT */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+                            <button
+                              type="button"
+                              onClick={() => setStudentSppHistoryModal({ isOpen: true, student: s })}
+                              className="px-3 py-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                              title="Buka popup riwayat pembayaran SPP"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                              <span>Riwayat SPP</span>
+                            </button>
+
+                            <div className="flex items-center gap-2">
+                              {/* TOMBOL WA PENGINGAT PEMBAYARAN */}
+                              <button
+                                type="button"
+                                onClick={() => handleSendWaReminder(s, latestSpp)}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition cursor-pointer"
+                                title="Kirim WA Pengingat Pembayaran"
+                              >
+                                <MessageCircle className="w-4 h-4" />
+                                <span>WA Pengingat</span>
+                              </button>
+
+                              {/* TOMBOL EDIT SPP */}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingSpp(
+                                    latestSpp || {
+                                      studentName: s.name,
+                                      nisn: s.nisn,
+                                      className: s.className,
+                                      studentId: s.id,
+                                      month: "September 2026",
+                                      amount: 200000,
+                                      status: "lunas",
+                                      paymentDate: new Date().toLocaleDateString("id-ID", {
+                                        day: "numeric",
+                                        month: "long",
+                                        year: "numeric",
+                                      }),
+                                    }
+                                  )
+                                }
+                                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
+                                title="Edit / Catat Pembayaran SPP"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        {spp.paymentMethod && (
-                          <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-slate-400">Metode:</span>
-                            <span className="font-bold text-slate-200 uppercase bg-slate-800 px-2 py-0.5 rounded-md">
-                              {spp.paymentMethod.replace("_", " ")}
+                      );
+                    })}
+                </div>
+              )}
+
+              {/* VIEW 2: LOG TRANSAKSI & VERIFIKASI BUKTI SPP */}
+              {(isParent || sppViewMode === "records") && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
+                  {(isParent ? mySppList : sppList)
+                    .filter((spp) => {
+                      if (sppStatusFilter !== "ALL" && spp.status !== sppStatusFilter) return false;
+
+                      const matchSearch =
+                        !sppSearchQuery ||
+                        (spp.studentName && spp.studentName.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
+                        (spp.nisn && spp.nisn.toLowerCase().includes(sppSearchQuery.toLowerCase())) ||
+                        (spp.className && spp.className.toLowerCase().includes(sppSearchQuery.toLowerCase()));
+
+                      if (isParent) return matchSearch;
+
+                      const teacherName =
+                        spp.homeroomTeacherName ||
+                        studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherName ||
+                        "";
+                      const teacherId =
+                        spp.homeroomTeacherId ||
+                        studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherId ||
+                        "";
+
+                      const matchHomeroom =
+                        selectedHomeroomFilter === "ALL" ||
+                        teacherId === selectedHomeroomFilter ||
+                        teacherName === selectedHomeroomFilter;
+
+                      return matchHomeroom && matchSearch;
+                    })
+                    .map((spp) => {
+                      const hTeacherName =
+                        spp.homeroomTeacherName ||
+                        studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn)?.classRoom?.homeroomTeacherName ||
+                        "Guru Wali";
+                      const foundStudent = studentsList.find((st) => st.id === spp.studentId || st.nisn === spp.nisn) || {
+                        name: spp.studentName,
+                        nisn: spp.nisn,
+                        className: spp.className,
+                      };
+
+                      return (
+                        <div
+                          key={spp.id}
+                          className={`bg-slate-900/90 border rounded-3xl p-5 space-y-3.5 transition-all shadow-xl ${
+                            spp.status === "menunggu_konfirmasi"
+                              ? "border-amber-500/50 bg-amber-950/20"
+                              : spp.status === "lunas"
+                              ? "border-slate-800 hover:border-emerald-500/40"
+                              : "border-red-500/30"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <span className="text-[10px] font-black uppercase text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                                {spp.month}
+                              </span>
+                              <h4
+                                onClick={() => setStudentSppHistoryModal({ isOpen: true, student: foundStudent })}
+                                className="font-extrabold text-white text-base mt-1.5 hover:text-emerald-400 hover:underline cursor-pointer transition"
+                                title="Klik untuk membuka riwayat pembayaran SPP siswa ini"
+                              >
+                                {spp.studentName}
+                              </h4>
+                              <p className="text-xs text-slate-400">
+                                NIM/NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{spp.nisn}</span> • {spp.className}
+                              </p>
+                              <p className="text-[11px] text-cyan-300 font-medium mt-1">
+                                👤 Wali Kelas: <span className="font-bold text-white">{hTeacherName}</span>
+                              </p>
+                            </div>
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-center shrink-0 ${
+                                spp.status === "lunas"
+                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                  : spp.status === "menunggu_konfirmasi"
+                                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse"
+                                  : spp.status === "ditolak"
+                                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                                  : "bg-red-500/20 text-red-300 border border-red-500/30"
+                              }`}
+                            >
+                              {spp.status === "menunggu_konfirmasi"
+                                ? "Menunggu Konfirmasi"
+                                : spp.status}
                             </span>
                           </div>
-                        )}
-                        {spp.paymentDate && (
-                          <div className="flex justify-between items-center text-[11px]">
-                            <span className="text-slate-400">Tgl Bayar:</span>
-                            <span className="font-bold text-emerald-400">{spp.paymentDate}</span>
-                          </div>
-                        )}
-                        {spp.note && (
-                          <div className="text-[11px] text-slate-300 pt-1 border-t border-slate-800">
-                            <span className="text-slate-400 italic">Catatan: </span>
-                            <span>{spp.note}</span>
-                          </div>
-                        )}
-                      </div>
 
-                      {/* BUKTI TRANSFER & VERIFIKASI ADMIN */}
-                      <div className="flex items-center justify-between pt-1">
-                        {spp.proofUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPreview(spp.proofUrl, `Bukti Transfer SPP: ${spp.studentName} (${spp.month})`)}
-                            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Lihat Bukti Transfer</span>
-                          </button>
-                        ) : (
-                          <span className="text-[11px] text-slate-500 italic">Belum ada foto bukti</span>
-                        )}
-
-                        {admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
-                          <div className="flex items-center gap-1.5">
-                            {spp.status === "menunggu_konfirmasi" && (
-                              <>
-                                <button
-                                  onClick={() => handleUpdateSppStatus(spp.id, "lunas")}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
-                                  title="Setujui Pembayaran SPP (Lunas)"
-                                >
-                                  Setujui
-                                </button>
-                                <button
-                                  onClick={() => handleUpdateSppStatus(spp.id, "ditolak")}
-                                  className="px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
-                                  title="Tolak Bukti Pembayaran"
-                                >
-                                  Tolak
-                                </button>
-                              </>
+                          <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 space-y-1.5 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-400">Nominal SPP:</span>
+                              <span className="font-extrabold text-amber-400">
+                                Rp {Number(spp.amount).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                            {spp.paymentMethod && (
+                              <div className="flex justify-between items-center text-[11px]">
+                                <span className="text-slate-400">Metode:</span>
+                                <span className="font-bold text-slate-200 uppercase bg-slate-800 px-2 py-0.5 rounded-md">
+                                  {spp.paymentMethod.replace("_", " ")}
+                                </span>
+                              </div>
                             )}
-                            <button
-                              onClick={() => setEditingSpp(spp)}
-                              className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-xl cursor-pointer"
-                              title="Edit Detail Pembayaran"
-                            >
-                              <Edit className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSpp(spp.id)}
-                              className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer"
-                              title="Hapus Data SPP"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {spp.paymentDate && (
+                              <div className="flex justify-between items-center text-[11px]">
+                                <span className="text-slate-400">Tgl Bayar:</span>
+                                <span className="font-bold text-emerald-400">{spp.paymentDate}</span>
+                              </div>
+                            )}
+                            {spp.note && (
+                              <div className="text-[11px] text-slate-300 pt-1 border-t border-slate-800">
+                                <span className="text-slate-400 italic">Catatan: </span>
+                                <span>{spp.note}</span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+
+                          {/* BUKTI TRANSFER & VERIFIKASI ADMIN */}
+                          <div className="flex items-center justify-between pt-1">
+                            {spp.proofUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPreview(spp.proofUrl, `Bukti Transfer SPP: ${spp.studentName} (${spp.month})`)}
+                                className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Lihat Bukti Transfer</span>
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-500 italic">Belum ada foto bukti</span>
+                            )}
+
+                            {admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
+                              <div className="flex items-center gap-1.5">
+                                {spp.status === "menunggu_konfirmasi" && (
+                                  <>
+                                    <button
+                                      onClick={() => handleUpdateSppStatus(spp.id, "lunas")}
+                                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+                                      title="Setujui Pembayaran SPP (Lunas)"
+                                    >
+                                      Setujui
+                                    </button>
+                                    <button
+                                      onClick={() => handleUpdateSppStatus(spp.id, "ditolak")}
+                                      className="px-2.5 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition shadow-sm cursor-pointer"
+                                      title="Tolak Bukti Pembayaran"
+                                    >
+                                      Tolak
+                                    </button>
+                                  </>
+                                )}
+                                {/* TOMBOL WA DI SEBELAH EDIT PADA LOG TRANSAKSI */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSendWaReminder(foundStudent, spp)}
+                                  className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl transition cursor-pointer"
+                                  title="Kirim WA Pengingat Pembayaran"
+                                >
+                                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                                </button>
+                                <button
+                                  onClick={() => setEditingSpp(spp)}
+                                  className="p-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 rounded-xl cursor-pointer"
+                                  title="Edit Detail Pembayaran"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteSpp(spp.id)}
+                                  className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer"
+                                  title="Hapus Data SPP"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
 
               {isParent && mySppList.length === 0 && (
                 <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center space-y-3 w-full">
@@ -8616,6 +9048,32 @@ export default function AdminDashboardPage() {
               </form>
             </div>
           )}
+
+          {/* TAB: LES SD */}
+          {activeTab === "les-sd" && (
+            <div>
+              {admin?.role === "ORTU" || admin?.role === "ORANG_TUA" ? (
+                <LesSdParentTab
+                  admin={admin}
+                  schools={schoolsList}
+                  bankAccounts={bankAccountsList}
+                  onOpenPreview={handleOpenPreview}
+                />
+              ) : admin?.role === "GURU" ? (
+                <LesSdTeacherTab
+                  admin={admin}
+                  onOpenPreview={handleOpenPreview}
+                />
+              ) : (
+                <LesSdAdminTab
+                  admin={admin}
+                  schools={schoolsList}
+                  teachers={teachersList}
+                  onOpenPreview={handleOpenPreview}
+                />
+              )}
+            </div>
+          )}
         </main>
       </div>
 
@@ -9670,6 +10128,180 @@ export default function AdminDashboardPage() {
                   })()}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL RIWAYAT PEMBAYARAN SPP SISWA (GAMBAR 1 DESAIN) */}
+      {studentSppHistoryModal.isOpen && studentSppHistoryModal.student && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/80 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-base border border-emerald-500/30">
+                  📋
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-white text-base sm:text-lg flex items-center gap-2">
+                    <span>Riwayat Pembayaran SPP</span>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      {studentSppHistoryModal.student.className || "TK"}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Siswa: <strong className="text-white">{studentSppHistoryModal.student.name}</strong> • NISN: <span className="font-mono text-emerald-400 font-bold">{studentSppHistoryModal.student.nisn || "-"}</span> • Ortu: <span className="text-slate-300">{studentSppHistoryModal.student.parentName || "-"} ({studentSppHistoryModal.student.parentPhone || "-"})</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const latestSpp = sppList.find(
+                      (sp) =>
+                        sp.studentId === studentSppHistoryModal.student?.id ||
+                        sp.nisn === studentSppHistoryModal.student?.nisn
+                    );
+                    handleSendWaReminder(studentSppHistoryModal.student, latestSpp);
+                  }}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-emerald-600/30 transition cursor-pointer"
+                  title="Kirim Pesan WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span className="hidden sm:inline">Kirim WA</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setStudentSppHistoryModal({ isOpen: false, student: null })}
+                  className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                  title="Tutup Modal"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body: Desain persis Gambar 1 */}
+            <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-white">
+              <div className="space-y-6">
+                {getStudentMonthlyGroups(studentSppHistoryModal.student, sppList).map((group, gIdx) => (
+                  <div key={gIdx} className="space-y-2.5">
+                    {/* Header bar bulan (pill abu-abu di tengah) */}
+                    <div className="w-full bg-[#cbd5e1] text-slate-800 text-center py-2.5 rounded-lg text-base sm:text-lg font-medium tracking-wide">
+                      {group.monthLabel}
+                    </div>
+
+                    {/* Table columns header */}
+                    <div className="grid grid-cols-12 gap-2 sm:gap-3 text-slate-800 text-xs sm:text-sm font-medium">
+                      <div className="col-span-1 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                        no
+                      </div>
+                      <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                        tanggal pembayaran
+                      </div>
+                      <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                        nominal
+                      </div>
+                      <div className="col-span-2 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                        metode pembayaran
+                      </div>
+                      <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                        keterangan
+                      </div>
+                    </div>
+
+                    {/* Table rows */}
+                    {group.records.length === 0 ? (
+                      <div className="w-full bg-[#cbd5e1]/40 text-slate-500 text-center py-3 rounded-lg text-xs italic">
+                        belum ada catatan transaksi untuk {group.monthLabel}
+                      </div>
+                    ) : (
+                      group.records.map((rec, rIdx) => {
+                        let dateStr = rec.paymentDate || "";
+                        if (!dateStr && rec.createdAt) {
+                          const d = new Date(rec.createdAt);
+                          dateStr = d.toLocaleDateString("id-ID", { day: "numeric", month: "long" });
+                        }
+                        dateStr = dateStr.toLowerCase().replace(/\s+\d{4}$/, "").trim();
+
+                        const nominalStr = `Rp${Number(rec.amount || 0).toLocaleString("id-ID")}`;
+
+                        let methodStr = (rec.paymentMethod || "cash").toLowerCase();
+                        if (methodStr.includes("transfer")) methodStr = "transfer";
+                        else if (methodStr.includes("qris")) methodStr = "qris";
+                        else if (methodStr.includes("cash") || methodStr.includes("tunai")) methodStr = "cash";
+
+                        let ketStr = (rec.status || "lunas").toLowerCase();
+                        if (ketStr === "menunggu_konfirmasi") ketStr = "menunggu konfirmasi";
+                        else if (ketStr === "belum_bayar" || ketStr === "belum_lunas") ketStr = "belum bayar";
+
+                        return (
+                          <div
+                            key={rec.id || rIdx}
+                            className="grid grid-cols-12 gap-2 sm:gap-3 text-slate-800 text-xs sm:text-sm font-medium"
+                          >
+                            <div className="col-span-1 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                              {rIdx + 1}
+                            </div>
+                            <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                              {dateStr}
+                            </div>
+                            <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                              {nominalStr}
+                            </div>
+                            <div className="col-span-2 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                              {methodStr}
+                            </div>
+                            <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
+                              {ketStr}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-800 bg-slate-950 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs shrink-0">
+              <span className="text-slate-400">
+                Total Transaksi SPP: <strong className="text-white">{sppList.filter((s) => s.studentId === studentSppHistoryModal.student?.id || s.nisn === studentSppHistoryModal.student?.nisn).length} Transaksi</strong>
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingSpp({
+                      studentName: studentSppHistoryModal.student.name,
+                      studentId: studentSppHistoryModal.student.id,
+                      nisn: studentSppHistoryModal.student.nisn,
+                      className: studentSppHistoryModal.student.className,
+                      month: "September 2026",
+                      amount: 200000,
+                      status: "lunas",
+                      paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                    });
+                    setStudentSppHistoryModal({ isOpen: false, student: null });
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Catat Pembayaran Baru</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStudentSppHistoryModal({ isOpen: false, student: null })}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition cursor-pointer"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -52,6 +52,7 @@ model School {
   bankAccounts      BankAccount[]
   additionalFees    AdditionalFee[]
   feeComponents     FeeComponent[]
+  lesSdRegistrations LesSdRegistration[]
 
   @@map("sekolah")
 }
@@ -227,6 +228,8 @@ model Teacher {
   orderIndex    Int        @default(0) @map("urutan")
   createdAt     DateTime   @default(now()) @map("dibuat_pada")
   updatedAt     DateTime   @updatedAt @map("diperbarui_pada")
+
+  lesSdStudents LesSdRegistration[]
 
   @@map("guru")
 }
@@ -477,4 +480,55 @@ model AdditionalFee {
   updatedAt      DateTime      @updatedAt @map("diperbarui_pada")
 
   @@map("biaya_tambahan")
+}
+
+model LesSdRegistration {
+  id              String   @id @default(uuid())
+  schoolId        String   @map("id_sekolah")
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  registrationNo  String   @unique @map("nomor_pendaftaran")
+  studentName     String   @map("nama_siswa")
+  gender          String   @default("L") @map("jenis_kelamin")
+  sdGrade         String   @default("Kelas 1 SD") @map("kelas_sd")
+  schoolOrigin    String?  @map("sekolah_asal")
+  parentName      String   @map("nama_orang_tua")
+  parentPhone     String   @map("telepon_orang_tua")
+  parentEmail     String?  @map("email_orang_tua")
+  address         String?  @map("alamat")
+  programPackage  String   @default("1 Minggu 3x Pertemuan - Semua Mata Pelajaran") @map("paket_program")
+  scheduleDays    String?  @default("Senin, Rabu, Jumat") @map("hari_jadwal")
+  scheduleTime    String?  @default("14:00 - 15:30 WIB") @map("waktu_jadwal")
+  sppAmount       Float    @default(200000) @map("jumlah_spp")
+  teacherPicId    String?  @map("id_guru_pic")
+  teacherPic      Teacher? @relation(fields: [teacherPicId], references: [id], onDelete: SetNull)
+  teacherPicName  String?  @map("nama_guru_pic")
+  status          String   @default("PENDING") @map("status") // PENDING, AKTIF, SELESAI, BATAL
+  notes           String?  @map("catatan")
+  createdAt       DateTime @default(now()) @map("dibuat_pada")
+  updatedAt       DateTime @updatedAt @map("diperbarui_pada")
+
+  payments        LesSdPayment[]
+
+  @@map("pendaftaran_les_sd")
+}
+
+model LesSdPayment {
+  id              String             @id @default(uuid())
+  registrationId  String             @map("id_pendaftaran_les")
+  registration    LesSdRegistration  @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  studentName     String             @map("nama_siswa")
+  month           String             @map("bulan")
+  amount          Float              @default(200000) @map("jumlah")
+  status          String             @default("menunggu_konfirmasi") @map("status") // belum_bayar, menunggu_konfirmasi, lunas, ditolak
+  paymentDate     String?            @map("tanggal_pembayaran")
+  paymentMethod   String?            @default("TRANSFER") @map("metode_pembayaran")
+  proofUrl        String?            @map("url_bukti_bayar")
+  bankName        String?            @map("nama_bank")
+  notes           String?            @map("catatan")
+  verifiedBy      String?            @map("diverifikasi_oleh")
+  verifiedAt      DateTime?          @map("diverifikasi_pada")
+  createdAt       DateTime           @default(now()) @map("dibuat_pada")
+  updatedAt       DateTime           @updatedAt @map("diperbarui_pada")
+
+  @@map("pembayaran_spp_les_sd")
 }

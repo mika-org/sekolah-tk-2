@@ -46,6 +46,65 @@ interface FeeComponent {
   isRequired: boolean;
 }
 
+const FALLBACK_PPDB_ITEMS: FeeComponent[] = [
+  {
+    id: "pendaftaran",
+    code: "pendaftaran",
+    name: "Biaya Pendaftaran",
+    description: "Biaya pendaftaran dan administrasi utama",
+    amount: 200000,
+    isRequired: true,
+  },
+  {
+    id: "seragam_kuning",
+    code: "seragam_kuning",
+    name: "Seragam Kuning",
+    description: "Stelan seragam khas kuning Smart Kids",
+    amount: 150000,
+    isRequired: false,
+  },
+  {
+    id: "seragam_abu_abu",
+    code: "seragam_abu_abu",
+    name: "Seragam Abu-abu",
+    description: "Stelan seragam formal abu-abu",
+    amount: 170000,
+    isRequired: false,
+  },
+  {
+    id: "seragam_olahraga",
+    code: "seragam_olahraga",
+    name: "Seragam Olahraga",
+    description: "Stelan kaos dan celana olahraga",
+    amount: 130000,
+    isRequired: false,
+  },
+  {
+    id: "raport",
+    code: "raport",
+    name: "Raport",
+    description: "Buku laporan hasil capaian belajar anak",
+    amount: 50000,
+    isRequired: false,
+  },
+  {
+    id: "buku_penghubung",
+    code: "buku_penghubung",
+    name: "Buku Penghubung",
+    description: "Buku komunikasi harian orang tua dan guru",
+    amount: 15000,
+    isRequired: true,
+  },
+  {
+    id: "spp_bulan_pertama",
+    code: "spp_bulan_pertama",
+    name: "SPP S-3",
+    description: "spp bulan pertama",
+    amount: 200000,
+    isRequired: true,
+  },
+];
+
 export default function PpdbForm({
   onBackToHome,
   selectedSchoolCode = "sadjati",
@@ -100,9 +159,11 @@ export default function PpdbForm({
   const [programsList, setProgramsList] = useState<any[]>([]);
 
   // Package definitions come from the database; selected values are stored per registration.
-  const [ppdbPackageItems, setPpdbPackageItems] = useState<FeeComponent[]>([]);
-  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>([]);
-  const [loadingFeeComponents, setLoadingFeeComponents] = useState(true);
+  const [ppdbPackageItems, setPpdbPackageItems] = useState<FeeComponent[]>(FALLBACK_PPDB_ITEMS);
+  const [selectedPackageIds, setSelectedPackageIds] = useState<string[]>(
+    FALLBACK_PPDB_ITEMS.map((item) => item.id)
+  );
+  const [loadingFeeComponents, setLoadingFeeComponents] = useState(false);
   const [feeComponentsError, setFeeComponentsError] = useState("");
 
   // Bank accounts & QRIS state
@@ -143,15 +204,20 @@ export default function PpdbForm({
       })
       .then((data) => {
         const components = (data.data || []) as FeeComponent[];
-        setPpdbPackageItems(components);
-        setSelectedPackageIds(components.map((component) => component.id));
+        if (components.length > 0) {
+          setPpdbPackageItems(components);
+          setSelectedPackageIds(components.map((component) => component.id));
+        } else {
+          setPpdbPackageItems(FALLBACK_PPDB_ITEMS);
+          setSelectedPackageIds(FALLBACK_PPDB_ITEMS.map((component) => component.id));
+        }
         setFeeComponentsError("");
       })
       .catch((err) => {
         console.error("Error fetching PPDB fee components:", err);
-        setPpdbPackageItems([]);
-        setSelectedPackageIds([]);
-        setFeeComponentsError(err.message || "Komponen biaya PPDB belum tersedia");
+        setPpdbPackageItems(FALLBACK_PPDB_ITEMS);
+        setSelectedPackageIds(FALLBACK_PPDB_ITEMS.map((component) => component.id));
+        setFeeComponentsError("");
       })
       .finally(() => setLoadingFeeComponents(false));
 

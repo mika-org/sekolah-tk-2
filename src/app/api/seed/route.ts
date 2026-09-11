@@ -4,7 +4,7 @@ import { hashPassword } from "@/lib/password";
 
 export async function GET() {
   try {
-    const passwordHash = await hashPassword("password123");
+    const passwordHash = await hashPassword("purw4k4rt4");
 
     // 0. Ensure required DB columns exist
     try {
@@ -98,6 +98,14 @@ export async function GET() {
         sppAmount: 300000,
         orderIndex: 4,
       },
+      {
+        title: "LES SD",
+        ageRange: "1 Minggu 3X Pertemuan (Semua Mata Pelajaran)",
+        iconUrl: "/images/program_kindergarten.png",
+        features: JSON.stringify(["1 Minggu 3x Pertemuan", "Semua Mata Pelajaran SD", "SPP Perbulan Rp 200.000", "Bimbingan Guru PIC Berpengalaman"]),
+        sppAmount: 200000,
+        orderIndex: 5,
+      },
     ];
 
     const activeSchools: any[] = await prisma.$queryRawUnsafe(`SELECT id, nama FROM "sekolah"`);
@@ -128,6 +136,118 @@ export async function GET() {
           school.nama
         );
       }
+
+      // 3b. Gallery Items check
+      const rawGallery: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM "item_galeri" WHERE "id_sekolah" = $1`, school.id);
+      if (rawGallery.length === 0) {
+        const defaultGallery = [
+          { title: "Kegiatan Belajar Sentra Sains & Motorik", imageUrl: "/images/gallery1.png", orderIndex: 1 },
+          { title: "Keceriaan Bermain Outdoor & Interaksi", imageUrl: "/images/gallery2.png", orderIndex: 2 },
+          { title: "Kemandirian & Kreasi Seni Melipat Origami", imageUrl: "/images/gallery3.png", orderIndex: 3 },
+        ];
+        for (const g of defaultGallery) {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "item_galeri" ("id", "id_sekolah", "judul", "url_gambar", "folder", "urutan", "dibuat_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, 'gallery', $4, NOW())`,
+            school.id,
+            g.title,
+            g.imageUrl,
+            g.orderIndex
+          );
+        }
+      }
+
+      // 3c. Testimonials check
+      const rawTestimonials: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM "testimoni" WHERE "id_sekolah" = $1`, school.id);
+      if (rawTestimonials.length === 0) {
+        const defaultTestimonials = [
+          {
+            parentName: "Bunda Rayyan (Ibu Maya)",
+            role: "Orang Tua Siswa",
+            initials: "BM",
+            content: "Metode bermain sambil belajar di Smart Kids sangat menyenangkan! Rayyan jadi lebih mandiri dan berani berbicara di depan umum.",
+            rating: 5,
+            bgColor: "emerald",
+            orderIndex: 1,
+          },
+          {
+            parentName: "Bapak Hendra Pratama",
+            role: "Orang Tua Siswa",
+            initials: "BP",
+            content: "Program bimbingan belajarnya sangat intensif dan guru-gurunya sabar sekali membimbing anak. Nilai dan pemahaman anak meningkat pesat!",
+            rating: 5,
+            bgColor: "blue",
+            orderIndex: 2,
+          },
+          {
+            parentName: "Mama Alif (Ibu Dian)",
+            role: "Orang Tua Siswa",
+            initials: "MD",
+            content: "Fasilitas lengkap, kelasnya nyaman dan aman. Anak saya selalu antusias berangkat ke sekolah setiap hari.",
+            rating: 5,
+            bgColor: "amber",
+            orderIndex: 3,
+          },
+        ];
+        for (const t of defaultTestimonials) {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "testimoni" ("id", "id_sekolah", "nama_orang_tua", "peran", "inisial", "konten", "penilaian", "warna_latar", "urutan", "dibuat_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+            school.id,
+            t.parentName,
+            t.role,
+            t.initials,
+            t.content,
+            t.rating,
+            t.bgColor,
+            t.orderIndex
+          );
+        }
+      }
+
+      // 3d. Bank Accounts check
+      const rawBanks: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM "rekening_bank" WHERE "id_sekolah" = $1`, school.id);
+      if (rawBanks.length === 0) {
+        const defaultBanks = [
+          { bankName: "BCA", accountNumber: "123-456-7890", accountHolder: "Yayasan Smart Kids", logoUrl: "/images/bca_logo.png" },
+          { bankName: "MANDIRI", accountNumber: "987-654-3210", accountHolder: "Yayasan Smart Kids", logoUrl: "/images/mandiri_logo.png" },
+        ];
+        for (const b of defaultBanks) {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "rekening_bank" ("id", "id_sekolah", "nama_bank", "nomor_rekening", "atas_nama", "url_logo_bank", "aktif", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, true, NOW(), NOW())`,
+            school.id,
+            b.bankName,
+            b.accountNumber,
+            b.accountHolder,
+            b.logoUrl
+          );
+        }
+      }
+
+      // 3e. Fee Components check
+      const rawFeeComps: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM "komponen_biaya" WHERE "id_sekolah" = $1`, school.id);
+      if (rawFeeComps.length === 0) {
+        const defaultFeeComps = [
+          { code: "pendaftaran", name: "Biaya Pendaftaran", category: "PPDB", description: "Biaya pendaftaran dan administrasi utama", amount: 200000, isRequired: true, orderIndex: 10 },
+          { code: "seragam_kuning", name: "Seragam Kuning", category: "PPDB", description: "Stelan seragam khas kuning Smart Kids", amount: 150000, isRequired: false, orderIndex: 20 },
+          { code: "seragam_abu_abu", name: "Seragam Abu-abu", category: "PPDB", description: "Stelan seragam formal abu-abu", amount: 170000, isRequired: false, orderIndex: 30 },
+          { code: "seragam_olahraga", name: "Seragam Olahraga", category: "PPDB", description: "Stelan kaos dan celana olahraga", amount: 130000, isRequired: false, orderIndex: 40 },
+          { code: "raport", name: "Raport", category: "PPDB", description: "Buku laporan hasil capaian belajar anak", amount: 50000, isRequired: false, orderIndex: 50 },
+          { code: "buku_penghubung", name: "Buku Penghubung", category: "PPDB", description: "Buku komunikasi harian orang tua dan guru", amount: 15000, isRequired: true, orderIndex: 60 },
+          { code: "spp_bulan_pertama", name: "SPP S-3", category: "PPDB", description: "spp bulan pertama", amount: 200000, isRequired: true, orderIndex: 70 },
+        ];
+        for (const fc of defaultFeeComps) {
+          await prisma.$executeRawUnsafe(
+            `INSERT INTO "komponen_biaya" ("id", "id_sekolah", "kode", "nama", "kategori", "deskripsi", "jumlah", "wajib", "aktif", "urutan", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, true, $8, NOW(), NOW())`,
+            school.id,
+            fc.code,
+            fc.name,
+            fc.category,
+            fc.description,
+            fc.amount,
+            fc.isRequired,
+            fc.orderIndex
+          );
+        }
+      }
     }
 
     // 4. Reset & Seed Teachers (Guru), Master Kelas (Kelas), Students (Siswa), & KBM Schedules (Jadwal) per Walikelas
@@ -143,7 +263,7 @@ export async function GET() {
         role: "Wali Kelas Miss Afifah",
         className: "Kelas Miss Afifah",
         grade: "S3",
-        photo: "https://i.pravatar.cc/300?img=5",
+        photo: "https://smartkids.elevore.web.id/uploads/profiles/2026/09/07/1788752422345_32fcc984_WhatsApp_Image_2026-09-06_at_15_57_54.webp",
         bio: "Mendidik dan mendampingi si kecil tumbuh cerdas & kreatif.",
         education: "S1 Pendidikan PAUD",
         students: [
@@ -156,7 +276,7 @@ export async function GET() {
         role: "Wali Kelas Miss Ulin",
         className: "Kelas Miss Ulin",
         grade: "S4",
-        photo: "https://i.pravatar.cc/300?img=9",
+        photo: "/images/teacher2.jpg",
         bio: "Fokus pada pengembangan kognitif & emosional anak.",
         education: "S1 Pendidikan Anak Dini",
         students: [
@@ -169,7 +289,7 @@ export async function GET() {
         role: "Wali Kelas Miss Lia",
         className: "Kelas Miss Lia",
         grade: "S5",
-        photo: "https://i.pravatar.cc/300?img=16",
+        photo: "/images/teacher3.jpg",
         bio: "Mendampingi kemandirian & kecerdasan si kecil.",
         education: "S1 Psikologi Anak",
         students: [
@@ -186,7 +306,7 @@ export async function GET() {
         role: "Wali Kelas Miss Sintia",
         className: "Kelas Miss Sintia",
         grade: "S3",
-        photo: "https://i.pravatar.cc/300?img=32",
+        photo: "/images/teacher4.jpg",
         bio: "Kreatif, penuh energi, dan berdedikasi tinggi.",
         education: "S1 Pendidikan PAUD",
         students: [
@@ -199,7 +319,7 @@ export async function GET() {
         role: "Wali Kelas Miss Alif",
         className: "Kelas Miss Alif",
         grade: "S4",
-        photo: "https://i.pravatar.cc/300?img=24",
+        photo: "/images/teacher5.jpg",
         bio: "Membimbing kecerdasan berbahasa & sains dasar.",
         education: "S1 Pendidikan Karakter",
         students: [
@@ -212,7 +332,7 @@ export async function GET() {
         role: "Wali Kelas Miss Maya",
         className: "Kelas Miss Maya",
         grade: "S5",
-        photo: "https://i.pravatar.cc/300?img=47",
+        photo: "/images/teacher6.jpg",
         bio: "Menghidupkan suasana belajar yang menyenangkan.",
         education: "S1 Pendidikan Dasar",
         students: [

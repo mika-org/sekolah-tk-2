@@ -21,6 +21,7 @@ export async function GET(req: Request) {
         g."telepon" as phone,
         g."kode_qr" as "qrCode", 
         g."url_foto" as "photoUrl", 
+        g."url_foto" as "url_foto", 
         g."bio" as bio, 
         g."pendidikan" as education, 
         g."urutan" as "orderIndex", 

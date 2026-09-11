@@ -103,6 +103,7 @@ export default function Home() {
           <LandingPage
             onStartRegistration={() => setCurrentTab("ppdb")}
             selectedSchoolCode={selectedSchoolCode}
+            schools={schools}
           />
         ) : (
           <PpdbForm

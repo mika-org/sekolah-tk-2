@@ -20,13 +20,16 @@ export type UploadCategory =
   | "spp"
   | "payments"
   | "qris"
-  | "leave";
+  | "leave"
+  | "les-sd";
 
 const categoryAliases: Record<string, UploadCategory> = {
   uploads: "general",
   upload: "general",
   profile: "profiles",
   payment: "payments",
+  "les_sd": "les-sd",
+  lessd: "les-sd",
 };
 
 const categories = new Set<UploadCategory>([
@@ -39,6 +42,7 @@ const categories = new Set<UploadCategory>([
   "payments",
   "qris",
   "leave",
+  "les-sd",
 ]);
 
 const imageOnlyCategories = new Set<UploadCategory>([
