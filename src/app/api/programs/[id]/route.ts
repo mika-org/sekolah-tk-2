@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { handleOrderOnUpdate, normalizeAfterDelete } from "@/lib/order-helper";
 
 export async function PUT(
   req: Request,
@@ -18,6 +19,24 @@ export async function PUT(
     const { id } = await params;
     const { title, ageRange, iconUrl, features, sppAmount, orderIndex } = await req.json();
 
+    const existing = await prisma.program.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Program tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    let effectiveOrder = Number(orderIndex);
+    if (!effectiveOrder || effectiveOrder < 1) effectiveOrder = existing.orderIndex;
+
+    effectiveOrder = await handleOrderOnUpdate(
+      "programs",
+      existing.schoolId,
+      id,
+      effectiveOrder
+    );
+
     const updated = await prisma.program.update({
       where: { id },
       data: {
@@ -26,7 +45,7 @@ export async function PUT(
         iconUrl,
         features: typeof features === "string" ? features : JSON.stringify(features || []),
         ...(sppAmount !== undefined ? { sppAmount: Number(sppAmount) } : {}),
-        orderIndex: Number(orderIndex) || 0,
+        orderIndex: effectiveOrder,
       },
     });
 
@@ -53,7 +72,11 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    await prisma.program.delete({ where: { id } });
+    const existing = await prisma.program.findUnique({ where: { id } });
+    if (existing) {
+      await prisma.program.delete({ where: { id } });
+      await normalizeAfterDelete("programs", existing.schoolId);
+    }
 
     return NextResponse.json({ success: true, message: "Program dihapus" });
   } catch (error: any) {
@@ -63,3 +86,4 @@ export async function DELETE(
     );
   }
 }
+

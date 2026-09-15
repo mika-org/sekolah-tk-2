@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { prepareOrderForInsert } from "@/lib/order-helper";
 
 export async function GET(req: Request) {
   try {
@@ -135,6 +136,12 @@ export async function POST(req: Request) {
       );
     }
 
+    const effectiveOrder = await prepareOrderForInsert(
+      "testimonials",
+      targetSchoolId,
+      Number(orderIndex) || 0
+    );
+
     const testimonial = await prisma.testimonial.create({
       data: {
         schoolId: targetSchoolId,
@@ -144,7 +151,7 @@ export async function POST(req: Request) {
         content,
         rating: Number(rating) || 5,
         bgColor: bgColor || "emerald",
-        orderIndex: Number(orderIndex) || 0,
+        orderIndex: effectiveOrder,
       },
       include: { school: true },
     });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { handleOrderOnUpdate, normalizeAfterDelete } from "@/lib/order-helper";
 
 export async function PUT(
   req: Request,
@@ -26,6 +27,25 @@ export async function PUT(
       );
     }
 
+    const existing = await prisma.testimonial.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Testimoni tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    const targetSchoolId = schoolId || existing.schoolId;
+    let effectiveOrder = Number(orderIndex);
+    if (!effectiveOrder || effectiveOrder < 1) effectiveOrder = existing.orderIndex;
+
+    effectiveOrder = await handleOrderOnUpdate(
+      "testimonials",
+      targetSchoolId,
+      id,
+      effectiveOrder
+    );
+
     const updated = await prisma.testimonial.update({
       where: { id },
       data: {
@@ -36,7 +56,7 @@ export async function PUT(
         content,
         rating: Number(rating) || 5,
         bgColor: bgColor || "emerald",
-        orderIndex: Number(orderIndex) || 0,
+        orderIndex: effectiveOrder,
       },
       include: { school: true },
     });
@@ -64,7 +84,11 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    await prisma.testimonial.delete({ where: { id } });
+    const existing = await prisma.testimonial.findUnique({ where: { id } });
+    if (existing) {
+      await prisma.testimonial.delete({ where: { id } });
+      await normalizeAfterDelete("testimonials", existing.schoolId);
+    }
 
     return NextResponse.json({ success: true, message: "Testimoni dihapus" });
   } catch (error: any) {
@@ -74,3 +98,4 @@ export async function DELETE(
     );
   }
 }
+

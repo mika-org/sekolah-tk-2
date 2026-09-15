@@ -65,10 +65,10 @@ export default function AdminLoginPage() {
             />
           </div>
           <h1 className="text-2xl font-extrabold text-white tracking-tight">
-            Dashboard Admin CMS
+            Portal Akun Smart Kids
           </h1>
           <p className="text-xs text-slate-400 max-w-xs mx-auto">
-            Masuk untuk mengelola data sekolah, program, & pendaftaran PPDB TK Smart Kids
+            Masuk ke portal Guru, Wali Murid, atau Pengelola Sekolah Smart Kids
           </p>
         </div>
 
@@ -82,7 +82,7 @@ export default function AdminLoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
-              Username / Email
+              Username / No. WhatsApp / Email
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -93,7 +93,7 @@ export default function AdminLoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
-                placeholder="Username atau Email"
+                placeholder="Username, No. WA, atau Email"
                 className="w-full pl-10 pr-4 py-3 bg-slate-900/80 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500 transition-colors placeholder:text-slate-500"
               />
             </div>
@@ -129,21 +129,21 @@ export default function AdminLoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2"
+            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 mt-2 cursor-pointer"
           >
             {loading ? (
               <span>Memproses...</span>
             ) : (
               <>
                 <LogIn className="w-4 h-4" />
-                <span>Masuk Ke Dashboard</span>
+                <span>Masuk ke Portal Akun</span>
               </>
             )}
           </button>
         </form>
 
         <div className="mt-6 pt-4 border-t border-slate-700/40 text-center text-xs text-slate-500">
-          <p>© {new Date().getFullYear()} Smart Kids Sadjati CMS</p>
+          <p>© {new Date().getFullYear()} Elevore • Smart Kids System</p>
         </div>
       </div>
     </div>

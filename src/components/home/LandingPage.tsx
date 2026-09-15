@@ -692,35 +692,49 @@ export default function LandingPage({
                 Testimoni Orang Tua
               </h2>
 
-              {(testimonials.length > 0 ? testimonials : DEFAULT_TESTIMONIALS).map((t: any, index: number) => (
-                <div
-                  key={t.id}
-                  className={`rounded-2xl p-5 border-2 space-y-3 shadow-sm ${
-                    index % 2 === 0
-                      ? "bg-[#eff6ff] border-blue-200"
-                      : "bg-[#fffbeb] border-amber-300"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                        index % 2 === 0
-                          ? "bg-blue-200 text-blue-900"
-                          : "bg-amber-400 text-slate-950"
-                      }`}
-                    >
-                      {t.initials || "TK"}
+              {(testimonials.length > 0 ? testimonials : DEFAULT_TESTIMONIALS).map((t: any, index: number) => {
+                const color = t.bgColor || (index % 2 === 0 ? "blue" : "amber");
+                const isEmerald = color === "emerald";
+                const isBlue = color === "blue";
+                const cardBg = isEmerald
+                  ? "bg-[#ecfdf5] border-emerald-300 shadow-emerald-100/50"
+                  : isBlue
+                  ? "bg-[#eff6ff] border-blue-200 shadow-blue-100/50"
+                  : "bg-[#fffbeb] border-amber-300 shadow-amber-100/50";
+
+                const avatarBg = isEmerald
+                  ? "bg-emerald-200 text-emerald-900 border border-emerald-300"
+                  : isBlue
+                  ? "bg-blue-200 text-blue-900 border border-blue-300"
+                  : "bg-amber-400 text-slate-950 border border-amber-500";
+
+                return (
+                  <div
+                    key={t.id}
+                    className={`rounded-2xl p-5 border-2 space-y-3 shadow-sm transition-all duration-300 ${cardBg}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-xs ${avatarBg}`}
+                      >
+                        {t.initials || "TK"}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-bold text-sm text-slate-900">{t.parentName}</h4>
+                          <div className="flex text-amber-500 text-xs">
+                            {"★".repeat(Math.max(1, Math.min(5, t.rating || 5)))}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500">{t.role || "Orang Tua Siswa"}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-slate-900">{t.parentName}</h4>
-                      <p className="text-[11px] text-slate-500">{t.role || "Orang Tua Siswa"}</p>
-                    </div>
+                    <p className="text-xs text-slate-700 italic leading-relaxed">
+                      &quot;{t.content}&quot;
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-700 italic leading-relaxed">
-                    &quot;{t.content}&quot;
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

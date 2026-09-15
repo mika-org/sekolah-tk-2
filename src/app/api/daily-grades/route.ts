@@ -55,7 +55,7 @@ export async function POST(req: Request) {
       data: {
         studentId,
         subject: subject || "Moral & Agama",
-        score: Number(score) || 85.0,
+        score: score !== undefined && score !== null && !isNaN(Number(score)) ? Number(score) : 0.0,
         date: gradeDate,
         notes: notes || null,
       } as any,

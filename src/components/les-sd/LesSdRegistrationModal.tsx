@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   X,
   BookOpen,
@@ -58,6 +58,8 @@ export default function LesSdRegistrationModal({
   });
 
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+  const [showManualEdit, setShowManualEdit] = useState<boolean>(false);
+  const [fetchedStudents, setFetchedStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successData, setSuccessData] = useState<{
@@ -67,13 +69,45 @@ export default function LesSdRegistrationModal({
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // If registeredStudents is passed and changes, handle auto-selection
+  // Fetch registered students if not provided by prop
+  useEffect(() => {
+    if (isOpen && registeredStudents.length === 0) {
+      fetch("/api/students")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.success && Array.isArray(data.data)) {
+            setFetchedStudents(data.data);
+          }
+        })
+        .catch((err) => console.error("Error fetching students:", err));
+    }
+  }, [isOpen, registeredStudents.length]);
+
+  const availableStudents = registeredStudents.length > 0 ? registeredStudents : fetchedStudents;
+
+  // Handle auto-selection & deselecting
   const handleSelectRegisteredStudent = (studentId: string) => {
     setSelectedStudentId(studentId);
-    if (!studentId) return;
+    if (!studentId) {
+      // DESELECT / RESET
+      setShowManualEdit(false);
+      setFormData((prev) => ({
+        ...prev,
+        studentName: "",
+        nisn: "",
+        gender: "L",
+        schoolOrigin: "",
+        parentName: defaultParentName,
+        parentPhone: defaultParentPhone,
+        parentEmail: defaultParentEmail,
+        address: "",
+      }));
+      return;
+    }
 
-    const student = registeredStudents.find((s) => s.id === studentId);
+    const student = availableStudents.find((s) => s.id === studentId);
     if (student) {
+      setShowManualEdit(false);
       setFormData((prev) => ({
         ...prev,
         studentName: student.name || prev.studentName,
@@ -84,7 +118,7 @@ export default function LesSdRegistrationModal({
         parentPhone: student.parentPhone || prev.parentPhone,
         parentEmail: student.parentEmail || prev.parentEmail,
         address: student.address || prev.address,
-        schoolOrigin: student.className ? `Smart Kids (${student.className})` : prev.schoolOrigin,
+        schoolOrigin: student.className ? `Smart Kids (${student.className})` : (student.school?.name || "TK Smart Kids"),
       }));
     }
   };
@@ -321,27 +355,59 @@ export default function LesSdRegistrationModal({
                 </div>
               )}
 
-              {/* REGISTERED STUDENT SELECTOR (IF PARENT IS LOGGED IN) */}
-              {registeredStudents.length > 0 && (
-                <div className="bg-slate-950/80 border border-emerald-500/40 rounded-2xl p-3.5 space-y-1.5 shadow-inner">
+              {/* REGISTERED STUDENT SELECTOR */}
+              <div className="bg-slate-950/80 border border-emerald-500/40 rounded-2xl p-4 space-y-3 shadow-inner">
+                <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Pilih Ananda yang Sudah Terdaftar:</span>
+                    <span>Pilih Siswa Terdaftar (Otomatis Isi Data Formulir):</span>
                   </label>
-                  <select
-                    value={selectedStudentId}
-                    onChange={(e) => handleSelectRegisteredStudent(e.target.value)}
-                    className="w-full bg-slate-900 border border-emerald-500/40 focus:border-emerald-400 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none"
-                  >
-                    <option value="">-- Pilih Ananda Terdaftar (Otomatis Isi Data) --</option>
-                    {registeredStudents.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name} ({s.className || "Siswa Terdaftar"} {s.school?.name ? `• ${s.school.name}` : ""})
-                      </option>
-                    ))}
-                  </select>
+                  {selectedStudentId && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectRegisteredStudent("")}
+                      className="text-[11px] font-bold text-rose-400 hover:text-rose-300 hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Deselect / Reset Form</span>
+                    </button>
+                  )}
                 </div>
-              )}
+                <select
+                  value={selectedStudentId}
+                  onChange={(e) => handleSelectRegisteredStudent(e.target.value)}
+                  className="w-full bg-slate-900 border border-emerald-500/40 focus:border-emerald-400 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none"
+                >
+                  <option value="">-- {selectedStudentId ? "Deselect / Input Siswa Baru" : "Pilih Ananda Terdaftar (Otomatis Isi Data)"} --</option>
+                  {availableStudents.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.className || "Siswa Terdaftar"} {s.nisn ? `• NISN: ${s.nisn}` : ""})
+                    </option>
+                  ))}
+                </select>
+
+                {/* SUMMARY DATA TERPILIH */}
+                {selectedStudentId && (
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-xl text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <p className="text-emerald-300 font-extrabold flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Data Ananda {formData.studentName} Terisi Otomatis</span>
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        NISN: <span className="font-mono text-slate-200">{formData.nisn || "-"}</span> • Wali: <span className="text-slate-200">{formData.parentName}</span> ({formData.parentPhone})
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowManualEdit(!showManualEdit)}
+                      className="text-[11px] text-emerald-400 hover:underline font-semibold text-left sm:text-right cursor-pointer"
+                    >
+                      {showManualEdit ? "Tutup Form Detail" : "Ubah Data Manual"}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* SEKSI 1: DATA SISWA SD */}
               <div className="space-y-4">
@@ -351,41 +417,15 @@ export default function LesSdRegistrationModal({
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
+                  {/* Tingkat Kelas SD (Selalu Tampil) */}
+                  <div className={`space-y-1.5 ${selectedStudentId && !showManualEdit ? "sm:col-span-2 bg-slate-950/60 p-3.5 rounded-2xl border border-emerald-500/30" : ""}`}>
                     <label className="text-xs font-bold text-slate-300">
-                      Nama Lengkap Anak <span className="text-rose-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Contoh: Muhammad Rayyan"
-                      value={formData.studentName}
-                      onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-300">
-                      NISN / No. Induk <span className="text-slate-500 font-normal">(Siswa Terdaftar)</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: 1001"
-                      value={formData.nisn}
-                      onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition font-mono"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-300">
-                      Tingkat Kelas SD <span className="text-rose-400">*</span>
+                      Tingkat Kelas SD Yang Diikuti <span className="text-rose-400">*</span>
                     </label>
                     <select
                       value={formData.sdGrade}
                       onChange={(e) => setFormData({ ...formData, sdGrade: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition"
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition font-semibold"
                     >
                       <option value="Kelas 1 SD">Kelas 1 SD</option>
                       <option value="Kelas 2 SD">Kelas 2 SD</option>
@@ -396,41 +436,73 @@ export default function LesSdRegistrationModal({
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-300">Jenis Kelamin</label>
-                    <select
-                      value={formData.gender}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition"
-                    >
-                      <option value="L">Laki-laki</option>
-                      <option value="P">Perempuan</option>
-                    </select>
-                  </div>
+                  {(!selectedStudentId || showManualEdit) && (
+                    <>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-300">
+                          Nama Lengkap Anak <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Contoh: Muhammad Rayyan"
+                          value={formData.studentName}
+                          onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition"
+                        />
+                      </div>
 
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-xs font-bold text-slate-300">
-                      Nama Asal Sekolah SD
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Contoh: SDN 1 DeKeraton / SDN Cikarang Pusat"
-                      value={formData.schoolOrigin}
-                      onChange={(e) => setFormData({ ...formData, schoolOrigin: e.target.value })}
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition"
-                    />
-                  </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-300">
+                          NISN / No. Induk <span className="text-slate-500 font-normal">(Siswa Terdaftar)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Contoh: 1001"
+                          value={formData.nisn}
+                          onChange={(e) => setFormData({ ...formData, nisn: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-slate-300">Jenis Kelamin</label>
+                        <select
+                          value={formData.gender}
+                          onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white outline-none transition"
+                        >
+                          <option value="L">Laki-laki</option>
+                          <option value="P">Perempuan</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-xs font-bold text-slate-300">
+                          Nama Asal Sekolah SD
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Contoh: SDN 1 DeKeraton / SDN Cikarang Pusat"
+                          value={formData.schoolOrigin}
+                          onChange={(e) => setFormData({ ...formData, schoolOrigin: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 outline-none transition"
+                        />
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* SEKSI 2: DATA ORANG TUA / WALI */}
-              <div className="space-y-4 pt-2">
-                <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-teal-400 border-b border-slate-800 pb-2">
-                  <User className="w-4 h-4" />
-                  <span>Data Orang Tua / Wali Murid</span>
-                </div>
+              {/* SEKSI 2: DATA ORANG TUA / WALI (HANYA DITAMPILKAN JIKA INPUT MANUAL / EDIT) */}
+              {(!selectedStudentId || showManualEdit) && (
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-teal-400 border-b border-slate-800 pb-2">
+                    <User className="w-4 h-4" />
+                    <span>Data Orang Tua / Wali Murid</span>
+                  </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-bold text-slate-300">
                       Nama Orang Tua / Wali <span className="text-rose-400">*</span>
@@ -482,6 +554,7 @@ export default function LesSdRegistrationModal({
                   </div>
                 </div>
               </div>
+              )}
 
               {/* SEKSI 3: CABANG SEKOLAH & JADWAL PILIHAN (3X SEMINGGU) */}
               <div className="space-y-4 pt-2">

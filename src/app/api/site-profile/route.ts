@@ -80,6 +80,7 @@ export async function PUT(req: Request) {
         ...(body.helpSubtitle !== undefined && { helpSubtitle: body.helpSubtitle }),
         ...(body.helpHours !== undefined && { helpHours: body.helpHours }),
         ...(body.importantNotice !== undefined && { importantNotice: body.importantNotice }),
+        ...(body.videoUrl !== undefined && { videoUrl: body.videoUrl }),
       },
       create: {
         schoolId,
@@ -98,6 +99,7 @@ export async function PUT(req: Request) {
         helpSubtitle: body.helpSubtitle || "Tim kami siap membantu anda setiap hari!",
         helpHours: body.helpHours || "Senin - Sabtu | 08.00 - 17.00 WIB",
         importantNotice: body.importantNotice || "Pastikan data yang dimasukan pada form pendaftaran sudah sesuai",
+        videoUrl: body.videoUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ",
       },
     });
 

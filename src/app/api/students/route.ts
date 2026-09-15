@@ -121,9 +121,9 @@ export async function POST(req: Request) {
       parentEmail || null,
       address || "-",
       attendanceRate !== undefined && attendanceRate !== null && !isNaN(Number(attendanceRate)) ? Number(attendanceRate) : 0.0,
-      Number(averageGrade) || 88.5,
-      dailyGrade !== undefined && dailyGrade !== null ? Number(dailyGrade) : 85.0,
-      semesterGrade !== undefined && semesterGrade !== null ? Number(semesterGrade) : 90.0,
+      averageGrade !== undefined && averageGrade !== null && !isNaN(Number(averageGrade)) ? Number(averageGrade) : 0.0,
+      dailyGrade !== undefined && dailyGrade !== null && !isNaN(Number(dailyGrade)) ? Number(dailyGrade) : 0.0,
+      semesterGrade !== undefined && semesterGrade !== null && !isNaN(Number(semesterGrade)) ? Number(semesterGrade) : 0.0,
       dailyWeight !== undefined && dailyWeight !== null ? Number(dailyWeight) : 40.0,
       semesterWeight !== undefined && semesterWeight !== null ? Number(semesterWeight) : 60.0
     );

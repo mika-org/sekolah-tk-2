@@ -11,10 +11,31 @@ export default function Home() {
   const [schools, setSchools] = useState<any[]>([]);
   const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("sadjati");
 
+  const handleSelectSchool = (code: string) => {
+    setSelectedSchoolCode(code);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("smartkids_selected_school", code);
+        const url = new URL(window.location.href);
+        url.searchParams.set("school", code);
+        window.history.replaceState({}, "", url.toString());
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   useEffect(() => {
     let detectedCode = "";
 
     if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("smartkids_selected_school");
+        if (stored) detectedCode = stored.toLowerCase();
+      } catch (e) {
+        // ignore
+      }
+
       const host = window.location.hostname.toLowerCase();
       // Match subdomain e.g. bcl.elevore.web.id -> bcl
       const hostParts = host.split(".");
@@ -93,7 +114,7 @@ export default function Home() {
         currentTab={currentTab}
         setCurrentTab={setCurrentTab}
         selectedSchoolCode={selectedSchoolCode}
-        onSelectSchool={setSelectedSchoolCode}
+        onSelectSchool={handleSelectSchool}
         schools={schools}
       />
 

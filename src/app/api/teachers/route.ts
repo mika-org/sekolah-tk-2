@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
 import { generateTemporaryPassword, hashPassword } from "@/lib/password";
+import { prepareOrderForInsert, handleOrderOnUpdate } from "@/lib/order-helper";
 
 export async function GET(req: Request) {
   try {
@@ -79,6 +80,13 @@ export async function POST(req: Request) {
 
     if (id) {
       // Update existing teacher
+      const effectiveOrder = await handleOrderOnUpdate(
+        "teachers",
+        targetSchoolId,
+        id,
+        Number(orderIndex) || 1
+      );
+
       await prisma.$executeRawUnsafe(
         `UPDATE "guru" SET "nama" = $1, "jabatan" = $2, "kelas_ditugaskan" = $3, "id_kelas" = $4, "email" = $5, "telepon" = $6, "url_foto" = $7, "bio" = $8, "pendidikan" = $9, "urutan" = $10, "diperbarui_pada" = NOW() WHERE "id" = $11`,
         name,
@@ -90,7 +98,7 @@ export async function POST(req: Request) {
         photoUrl || "/images/teacher_default.png",
         bio || null,
         education || null,
-        Number(orderIndex) || 0,
+        effectiveOrder,
         id
       );
 
@@ -107,6 +115,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, data: { id, name, role, assignedClass, email, phone } });
     }
 
+    const effectiveOrder = await prepareOrderForInsert(
+      "teachers",
+      targetSchoolId,
+      Number(orderIndex) || 0
+    );
+
     const res: any[] = await prisma.$queryRawUnsafe(
       `INSERT INTO "guru" ("id", "id_sekolah", "id_kelas", "nama", "jabatan", "kelas_ditugaskan", "email", "telepon", "kode_qr", "url_foto", "bio", "pendidikan", "urutan", "dibuat_pada", "diperbarui_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW()) RETURNING id`,
       targetSchoolId,
@@ -120,7 +134,7 @@ export async function POST(req: Request) {
       photoUrl || "/images/teacher_default.png",
       bio || null,
       education || null,
-      Number(orderIndex) || 0
+      effectiveOrder
     );
 
     const createdId = res[0].id;

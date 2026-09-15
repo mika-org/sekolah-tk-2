@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { prepareOrderForInsert } from "@/lib/order-helper";
 
 export async function GET(req: Request) {
   try {
@@ -55,6 +56,12 @@ export async function POST(req: Request) {
       );
     }
 
+    const effectiveOrder = await prepareOrderForInsert(
+      "programs",
+      targetSchoolId,
+      Number(orderIndex) || 0
+    );
+
     const program = await prisma.program.create({
       data: {
         schoolId: targetSchoolId,
@@ -63,7 +70,7 @@ export async function POST(req: Request) {
         iconUrl: iconUrl || "/images/program_playground.png",
         features: typeof features === "string" ? features : JSON.stringify(features || []),
         sppAmount: sppAmount !== undefined ? Number(sppAmount) : 200000,
-        orderIndex: Number(orderIndex) || 0,
+        orderIndex: effectiveOrder,
       },
     });
 

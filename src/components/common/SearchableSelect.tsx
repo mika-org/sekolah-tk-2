@@ -86,11 +86,11 @@ export default function SearchableSelect({
           className={`truncate ${
             selectedOption
               ? isLight
-                ? "text-slate-900"
-                : "text-white"
+                ? "text-slate-900 font-bold"
+                : "text-white font-bold"
               : isLight
-              ? "text-slate-400 font-normal"
-              : "text-slate-500 font-normal"
+              ? "text-slate-600 font-semibold"
+              : "text-slate-400 font-normal"
           }`}
         >
           {selectedOption ? (
@@ -98,8 +98,8 @@ export default function SearchableSelect({
               <span className="truncate">{selectedOption.label}</span>
               {selectedOption.sublabel && (
                 <span
-                  className={`text-[10px] font-normal truncate ${
-                    isLight ? "text-slate-500" : "text-slate-400"
+                  className={`text-[10px] font-medium truncate ${
+                    isLight ? "text-slate-600" : "text-slate-400"
                   }`}
                 >
                   ({selectedOption.sublabel})
@@ -112,7 +112,7 @@ export default function SearchableSelect({
         </span>
         <ChevronDown
           className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
-            isLight ? "text-slate-500" : "text-slate-400"
+            isLight ? "text-slate-700" : "text-slate-400"
           } ${isOpen ? "rotate-180 text-emerald-500" : ""}`}
         />
       </button>
@@ -193,8 +193,8 @@ export default function SearchableSelect({
                       <div className="truncate font-bold">{opt.label}</div>
                       {opt.sublabel && (
                         <div
-                          className={`text-[10px] font-normal truncate mt-0.5 ${
-                            isLight ? "text-slate-500" : "text-slate-400"
+                          className={`text-[10px] font-medium truncate mt-0.5 ${
+                            isLight ? "text-slate-600" : "text-slate-400"
                           }`}
                         >
                           {opt.sublabel}

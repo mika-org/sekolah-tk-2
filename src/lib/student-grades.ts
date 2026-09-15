@@ -24,18 +24,20 @@ export async function recalculateStudentGrades(studentId: string) {
 
     // 2. Calculate Average Daily Grade from DailyGrade records
     const totalDailyRecords = student.dailyGrades.length;
-    let dailyGradeAvg = student.dailyGrade ?? 85.0;
+    let dailyGradeAvg = 0.0;
 
     if (totalDailyRecords > 0) {
       const sumScores = student.dailyGrades.reduce((acc, curr) => acc + Number(curr.score || 0), 0);
       dailyGradeAvg = Math.round((sumScores / totalDailyRecords) * 10) / 10;
+    } else if (student.dailyGrade !== undefined && student.dailyGrade !== null) {
+      dailyGradeAvg = Number(student.dailyGrade);
     }
 
     // 3. Calculate Final Grade (averageGrade) based on weights
     const attWeight = Number((student as any).attendanceWeight ?? 20.0);
     const dWeight = Number(student.dailyWeight ?? 40.0);
     const semWeight = Number(student.semesterWeight ?? 40.0);
-    const semGrade = Number(student.semesterGrade ?? 90.0);
+    const semGrade = Number(student.semesterGrade ?? 0.0);
 
     const calculatedFinalGrade = Math.round(
       ((attendanceRate * attWeight) / 100 +

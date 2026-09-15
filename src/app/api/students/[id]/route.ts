@@ -56,9 +56,9 @@ export async function PUT(
       parentEmail,
       address,
       data.attendanceRate !== undefined && data.attendanceRate !== null && !isNaN(Number(data.attendanceRate)) ? Number(data.attendanceRate) : 0.0,
-      Number(data.averageGrade) || 88.5,
-      data.dailyGrade !== undefined && data.dailyGrade !== null ? Number(data.dailyGrade) : 85.0,
-      data.semesterGrade !== undefined && data.semesterGrade !== null ? Number(data.semesterGrade) : 90.0,
+      data.averageGrade !== undefined && data.averageGrade !== null && !isNaN(Number(data.averageGrade)) ? Number(data.averageGrade) : 0.0,
+      data.dailyGrade !== undefined && data.dailyGrade !== null && !isNaN(Number(data.dailyGrade)) ? Number(data.dailyGrade) : 0.0,
+      data.semesterGrade !== undefined && data.semesterGrade !== null && !isNaN(Number(data.semesterGrade)) ? Number(data.semesterGrade) : 0.0,
       data.dailyWeight !== undefined && data.dailyWeight !== null ? Number(data.dailyWeight) : 40.0,
       data.semesterWeight !== undefined && data.semesterWeight !== null ? Number(data.semesterWeight) : 60.0,
       id

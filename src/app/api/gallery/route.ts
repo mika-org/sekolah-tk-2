@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { prepareOrderForInsert } from "@/lib/order-helper";
 
 export async function GET(req: Request) {
   try {
@@ -92,13 +93,19 @@ export async function POST(req: Request) {
       );
     }
 
+    const effectiveOrder = await prepareOrderForInsert(
+      "gallery",
+      targetSchoolId,
+      Number(orderIndex) || 0
+    );
+
     const item = await prisma.galleryItem.create({
       data: {
         schoolId: targetSchoolId,
         title: title || "Kegiatan Belajar",
         imageUrl,
         folder: folder || "gallery",
-        orderIndex: Number(orderIndex) || 0,
+        orderIndex: effectiveOrder,
       },
     });
 

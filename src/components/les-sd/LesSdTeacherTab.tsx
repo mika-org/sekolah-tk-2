@@ -346,7 +346,7 @@ export default function LesSdTeacherTab({
                           className="text-[11px] text-purple-400 hover:text-purple-300 font-bold flex items-center gap-1"
                         >
                           <FileEdit className="w-3 h-3" />
-                          <span>{student.notes ? "Edit Catatan" : "+ Tambah Catatan"}</span>
+                          <span>{student.notes ? "Edit Catatan" : "Tambah Catatan"}</span>
                         </button>
                       )}
                     </div>
@@ -381,7 +381,7 @@ export default function LesSdTeacherTab({
                       </div>
                     ) : (
                       <p className="text-xs text-slate-400 italic">
-                        {student.notes || "Belum ada catatan progres. Klik '+ Tambah Catatan' untuk mencatat perkembangan materi les."}
+                        {student.notes || "Belum ada catatan progres. Klik 'Tambah Catatan' untuk mencatat perkembangan materi les."}
                       </p>
                     )}
                   </div>

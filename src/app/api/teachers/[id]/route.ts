@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getAdminFromCookies } from "@/lib/auth";
+import { handleOrderOnUpdate, normalizeAfterDelete } from "@/lib/order-helper";
 
 export async function PUT(
   req: Request,
@@ -18,13 +19,32 @@ export async function PUT(
     const { id } = await params;
     const { schoolId, name, role, photoUrl, bio, education, orderIndex } = await req.json();
 
+    const existing = await prisma.teacher.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Data guru tidak ditemukan" },
+        { status: 404 }
+      );
+    }
+
+    const targetSchoolId = schoolId || existing.schoolId;
+    let effectiveOrder = Number(orderIndex);
+    if (!effectiveOrder || effectiveOrder < 1) effectiveOrder = existing.orderIndex;
+
+    effectiveOrder = await handleOrderOnUpdate(
+      "teachers",
+      targetSchoolId,
+      id,
+      effectiveOrder
+    );
+
     const dataToUpdate: any = {
       name,
       role,
       photoUrl: photoUrl || "/images/teacher_default.png",
       bio: bio || null,
       education: education || null,
-      orderIndex: Number(orderIndex) || 0,
+      orderIndex: effectiveOrder,
     };
 
     if (schoolId) {
@@ -59,7 +79,11 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    await prisma.teacher.delete({ where: { id } });
+    const existing = await prisma.teacher.findUnique({ where: { id } });
+    if (existing) {
+      await prisma.teacher.delete({ where: { id } });
+      await normalizeAfterDelete("teachers", existing.schoolId);
+    }
 
     return NextResponse.json({ success: true, message: "Data guru berhasil dihapus" });
   } catch (error: any) {
@@ -69,3 +93,4 @@ export async function DELETE(
     );
   }
 }
+

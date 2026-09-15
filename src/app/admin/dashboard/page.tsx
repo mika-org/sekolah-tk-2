@@ -60,7 +60,10 @@ import {
   Download,
   Printer,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 export default function AdminDashboardPage() {
@@ -88,11 +91,56 @@ export default function AdminDashboardPage() {
     | "testimonials"
     | "profile"
     | "les-sd"
+    | "student-grades"
   >("overview");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Theme state (Dark / Light Theme)
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedTheme = localStorage.getItem("admin_theme");
+        if (savedTheme === "light" || savedTheme === "dark") {
+          setTheme(savedTheme);
+        }
+      } catch (e) {}
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("admin_theme", nextTheme);
+      } catch (e) {}
+    }
+  };
+
+  // Helper YouTube embed URL formatter
+  const getYoutubeEmbedUrl = (url?: string) => {
+    if (!url) return "https://www.youtube.com/embed/dQw4w9WgXcQ";
+    let trimmed = url.trim();
+    if (trimmed.includes("embed/")) return trimmed;
+    if (trimmed.includes("watch?v=")) {
+      const id = trimmed.split("watch?v=")[1]?.split("&")[0];
+      return id ? `https://www.youtube.com/embed/${id}` : trimmed;
+    }
+    if (trimmed.includes("youtu.be/")) {
+      const id = trimmed.split("youtu.be/")[1]?.split("?")[0];
+      return id ? `https://www.youtube.com/embed/${id}` : trimmed;
+    }
+    if (trimmed.includes("shorts/")) {
+      const id = trimmed.split("shorts/")[1]?.split("?")[0];
+      return id ? `https://www.youtube.com/embed/${id}` : trimmed;
+    }
+    return trimmed;
+  };
 
   // Image & Document Modal Preview State
   const [previewModal, setPreviewModal] = useState<{ isOpen: boolean; src: string | null; title: string }>({
@@ -106,6 +154,18 @@ export default function AdminDashboardPage() {
       setPreviewModal({ isOpen: true, src, title });
     }
   };
+
+  // Video YouTube Edit Modal State
+  const [editingVideoModal, setEditingVideoModal] = useState(false);
+  const [videoInputUrl, setVideoInputUrl] = useState("");
+
+  // Presensi Guru Filter States
+  const [teacherAttDateFilter, setTeacherAttDateFilter] = useState("");
+  const [teacherAttTeacherFilter, setTeacherAttTeacherFilter] = useState("ALL");
+  const [teacherAttStatusFilter, setTeacherAttStatusFilter] = useState("ALL");
+
+  // Kelola Siswa Class Placement Filter State
+  const [selectedClassStatusFilter, setSelectedClassStatusFilter] = useState<"ALL" | "UNASSIGNED" | "ASSIGNED">("ALL");
 
   // Multi-School & Admin Users States
   const [schoolsList, setSchoolsList] = useState<any[]>([]);
@@ -234,7 +294,7 @@ export default function AdminDashboardPage() {
     studentId: "",
     studentName: "",
     subject: "Moral & Agama",
-    score: 85,
+    score: 0,
     date: new Date().toISOString().split("T")[0],
     notes: "",
   });
@@ -441,6 +501,7 @@ export default function AdminDashboardPage() {
   const [galleryList, setGalleryList] = useState<any[]>([]);
   const [newGalleryTitle, setNewGalleryTitle] = useState("");
   const [newGalleryImage, setNewGalleryImage] = useState("");
+  const [newGalleryOrder, setNewGalleryOrder] = useState<number>(0);
 
   const [testimonialsList, setTestimonialsList] = useState<any[]>([]);
   const [editingTestimonial, setEditingTestimonial] = useState<any | null>(null);
@@ -571,6 +632,14 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (data.success && data.data) {
         setSchoolsList(data.data);
+        if (typeof window !== "undefined") {
+          try {
+            const saved = localStorage.getItem("admin_selectedSchoolId");
+            if (saved && (saved === "ALL" || data.data.some((s: any) => s.id === saved))) {
+              setSelectedSchoolId(saved);
+            }
+          } catch (e) {}
+        }
       }
     } catch (err) {
       console.error(err);
@@ -1638,41 +1707,9 @@ _Tata Usaha & Keuangan Sekolah_`;
       groups[m].push(rec);
     });
 
-    // If no records in database yet, provide default months for clean display
+    // If no records in database yet, return empty array
     if (Object.keys(groups).length === 0) {
-      return [
-        {
-          monthLabel: "bulan agustus",
-          records: [
-            {
-              id: "dummy-1",
-              paymentDate: "7 agustus",
-              amount: 200000,
-              paymentMethod: "cash",
-              status: "lunas",
-            },
-            {
-              id: "dummy-2",
-              paymentDate: "28 agustus",
-              amount: 50000,
-              paymentMethod: "transfer",
-              status: "lunas",
-            },
-          ],
-        },
-        {
-          monthLabel: "bulan september",
-          records: [
-            {
-              id: "dummy-3",
-              paymentDate: "6 september",
-              amount: 250000,
-              paymentMethod: "qris",
-              status: "menunggu konfirmasi",
-            },
-          ],
-        },
-      ];
+      return [];
     }
 
     return Object.keys(groups).map((monthLabel) => ({
@@ -1742,6 +1779,7 @@ _Tata Usaha & Keuangan Sekolah_`;
           title: newGalleryTitle || "Kegiatan Belajar",
           imageUrl: newGalleryImage,
           folder: "gallery",
+          orderIndex: Number(newGalleryOrder) > 0 ? Number(newGalleryOrder) : galleryList.length + 1,
         }),
       });
       const data = await res.json();
@@ -1750,6 +1788,7 @@ _Tata Usaha & Keuangan Sekolah_`;
       showMessage("Foto galeri ditambahkan", "success");
       setNewGalleryTitle("");
       setNewGalleryImage("");
+      setNewGalleryOrder(0);
       loadDataForSelectedSchool();
     } catch (err: any) {
       showMessage(err.message, "error");
@@ -1820,6 +1859,33 @@ _Tata Usaha & Keuangan Sekolah_`;
 
       showMessage("Testimoni dihapus", "success");
       setTestimonialsList((prev) => prev.filter((item) => item.id !== id));
+    } catch (err: any) {
+      showMessage(err.message, "error");
+    }
+  };
+
+  // Generic Reorder Swap Handler
+  const handleSwapOrder = async (
+    type: "testimonials" | "teachers" | "programs" | "gallery",
+    item: any,
+    direction: "up" | "down"
+  ) => {
+    try {
+      const res = await fetch("/api/reorder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          schoolId: item.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id),
+          id: item.id,
+          direction,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || "Gagal mengubah urutan");
+
+      showMessage("Urutan berhasil disesuaikan", "success");
+      loadDataForSelectedSchool();
     } catch (err: any) {
       showMessage(err.message, "error");
     }
@@ -2100,6 +2166,7 @@ _Tata Usaha & Keuangan Sekolah_`;
           id: "akademik_ananda",
           title: "Perkembangan & Kehadiran",
           items: [
+            { id: "student-grades", label: "Monitoring Nilai Ananda", icon: Award, iconColor: "text-amber-400" },
             { id: "attendance", label: "Presensi Kehadiran", icon: CheckCircle, iconColor: "text-emerald-400", badge: myAttendanceList.length },
             { id: "schedules", label: "Jadwal Belajar KBM", icon: Clock, iconColor: "text-cyan-400", badge: schedulesList.length },
           ],
@@ -2251,8 +2318,9 @@ _Tata Usaha & Keuangan Sekolah_`;
   const sidebarMenuGroups = getSidebarMenuGroups();
 
   const handleExportProgressiveCSV = () => {
-    const headers = ["Tanggal / Periode", "Cabang Sekolah", "Nama Guru", "Kelas / Jabatan", "Program Belajar", "Kehadiran / Jam", "Rasio SPP", "Estimasi Hasil (Rp)"];
+    const headers = ["No", "Periode", "Cabang Sekolah", "Nama Guru", "Kelas / Jabatan", "Program Belajar", "Total Hadir (Hari)", "Total Jam Mengajar", "Rasio SPP", "Estimasi Hasil (Rp)"];
     const rows: string[][] = [];
+    let no = 1;
 
     teachersList.forEach((teacher) => {
       if (progressiveHistoryModal.selectedTeacherId !== "ALL" && teacher.id !== progressiveHistoryModal.selectedTeacherId) return;
@@ -2279,30 +2347,43 @@ _Tata Usaha & Keuangan Sekolah_`;
       const monthlyResult = Math.round(hadirDays * 50000 * sppRatio);
 
       rows.push([
-        `"Bulan Berjalan (${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })})"`,
-        `"${schoolName}"`,
-        `"${teacher.name}"`,
-        `"${plottedClass}"`,
-        `"${matchedProgram?.title || '-'}"`,
-        `"${hadirDays} Hari (${hoursTaught} Jam)"`,
-        `"${sppRatio.toFixed(2)}x"`,
-        monthlyResult.toString(),
+        String(no++),
+        `Bulan Berjalan (${new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })})`,
+        schoolName,
+        teacher.name,
+        plottedClass,
+        matchedProgram?.title || '-',
+        String(hadirDays),
+        `${hoursTaught} Jam`,
+        `${sppRatio.toFixed(2)}x`,
+        monthlyResult.toLocaleString('id-ID'),
       ]);
     });
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
+    const escapeCsv = (val: string) => `"${(val || "").replace(/"/g, '""')}"`;
+    const csvRows = [
+      headers.map(escapeCsv).join(","),
+      ...rows.map((row) => row.map(escapeCsv).join(","))
+    ];
+    const csvContent = "\uFEFF" + csvRows.join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `Laporan_Pusat_Progresif_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     showMessage("Data riwayat pusat progresif berhasil diunduh ke format CSV!", "success");
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
+      theme === "light"
+        ? "admin-light-mode bg-slate-100 text-slate-800 selection:bg-emerald-600 selection:text-white"
+        : "admin-dark-mode bg-slate-950 text-slate-100 selection:bg-emerald-500 selection:text-white"
+    }`}>
       {/* ULTRA-PREMIUM GLASSMORPHISM HEADER */}
       <header className="bg-slate-900/80 border-b border-slate-800/80 sticky top-0 z-30 backdrop-blur-xl px-6 py-3.5 flex flex-col lg:flex-row items-center justify-between gap-4 w-full shadow-2xl">
         {/* BRAND TITLE & BADGES */}
@@ -2326,26 +2407,34 @@ _Tata Usaha & Keuangan Sekolah_`;
           </div>
         </div>
 
-        {/* CENTER: SCHOOL BRANCH SWITCHER PILL */}
-        <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-2xl px-3 py-1.5 w-full lg:w-72 shadow-inner">
-          <Building className="w-4 h-4 text-emerald-400 shrink-0" />
-          <div className="flex-1">
-            <SearchableSelect
-              options={[
-                { value: "ALL", label: "🏢 Semua Sekolah (Yayasan Level)" },
-                ...schoolsList.map((sch) => ({
-                  value: sch.id,
-                  label: `🏫 ${sch.name}`,
-                  sublabel: `Kode: ${sch.code}`,
-                })),
-              ]}
-              value={selectedSchoolId}
-              onChange={(val) => setSelectedSchoolId(val)}
-              placeholder="Pilih cabang..."
-              searchPlaceholder="Cari sekolah..."
-            />
+        {/* CENTER: SCHOOL BRANCH SWITCHER PILL (HIDDEN FOR PARENTS) */}
+        {!isParent && (
+          <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-2xl px-3 py-1.5 w-full lg:w-72 shadow-inner">
+            <Building className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex-1">
+              <SearchableSelect
+                options={[
+                  { value: "ALL", label: "🏢 Semua Sekolah (Yayasan Level)" },
+                  ...schoolsList.map((sch) => ({
+                    value: sch.id,
+                    label: `🏫 ${sch.name}`,
+                    sublabel: `Kode: ${sch.code}`,
+                  })),
+                ]}
+                value={selectedSchoolId}
+                onChange={(val) => {
+                  setSelectedSchoolId(val);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("admin_selectedSchoolId", val);
+                  }
+                }}
+                variant={theme === "light" ? "light" : "dark"}
+                placeholder="Pilih cabang..."
+                searchPlaceholder="Cari sekolah..."
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* RIGHT CONTROL ACTIONS */}
         <div className="flex items-center gap-3.5 w-full lg:w-auto justify-between lg:justify-end">
@@ -2353,6 +2442,26 @@ _Tata Usaha & Keuangan Sekolah_`;
             <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
             <span>{currentTime}</span>
           </div>
+
+          {/* THEME TOGGLE BUTTON (DARK / LIGHT) */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-sm bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border-slate-700"
+            title={theme === "dark" ? "Beralih ke Tema Terang (Light Mode)" : "Beralih ke Tema Gelap (Dark Mode)"}
+          >
+            {theme === "dark" ? (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Terang</span>
+              </>
+            ) : (
+              <>
+                <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                <span className="hidden sm:inline">Gelap</span>
+              </>
+            )}
+          </button>
 
           <a
             href="/"
@@ -2945,9 +3054,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                           setTeacherProgressModal({
                             isOpen: true,
                             teacherId: teachersList[0]?.id || "",
-                            teacherName: teachersList[0]?.name || admin?.name || "Guru Pengajar",
-                            month: "Juli 2026",
-                            programTitle: programsList[0]?.title || "Program TK A - Sentra Kognitif",
+                            teacherName: teachersList[0]?.name || admin?.name || "Guru",
+                            month: "September 2026",
+                            programTitle: programsList[0]?.title || "Program TK A",
                             hoursTaught: 36,
                             targetHours: 40,
                             evaluatedStudentsCount: 15,
@@ -2957,7 +3066,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                         className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all shrink-0 cursor-pointer border border-slate-700"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>+ Input Manual</span>
+                        <span>Input Manual</span>
                       </button>
                     </div>
 
@@ -3101,21 +3210,36 @@ _Tata Usaha & Keuangan Sekolah_`;
                           <p className="text-[11px] text-slate-400">Profil & Panduan Fitur Portal Sekolah TK</p>
                         </div>
                       </div>
-                      <span className="text-[10px] font-black uppercase text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-0.5 rounded-full">
-                        Interactive Video
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {!isParent && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setVideoInputUrl(siteProfile?.videoUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ");
+                              setEditingVideoModal(true);
+                            }}
+                            className="text-[10px] font-bold uppercase text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 px-2.5 py-1 rounded-xl transition flex items-center gap-1 cursor-pointer"
+                            title="Edit Link Video YouTube"
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Edit Video</span>
+                          </button>
+                        )}
+                        <span className="text-[10px] font-black uppercase text-red-400 bg-red-500/10 border border-red-500/20 px-2.5 py-0.5 rounded-full">
+                          YouTube Video
+                        </span>
+                      </div>
                     </div>
 
-                    {/* HTML5 VIDEO PLAYER WITH CONTROLS & POSTER */}
+                    {/* YOUTUBE IFRAME EMBED PLAYER */}
                     <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-black aspect-video group shadow-xl">
-                      <video
-                        controls
-                        poster="/images/yapchi_logo.png"
-                        className="w-full h-full object-cover"
-                      >
-                        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" type="video/mp4" />
-                        Browser Anda tidak mendukung pemutar video HTML5.
-                      </video>
+                      <iframe
+                        src={getYoutubeEmbedUrl(siteProfile?.videoUrl)}
+                        title="Video Demonstrasi System"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                      />
                     </div>
 
                     <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2">
@@ -4199,9 +4323,15 @@ _Tata Usaha & Keuangan Sekolah_`;
 
               {/* DETAIL MODAL */}
               {selectedPpdb && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-                  <div className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl p-6 sm:p-8 space-y-6 my-8 text-slate-200 shadow-2xl">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div
+                  onClick={() => setSelectedPpdb(null)}
+                  className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+                >
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-3xl p-6 sm:p-8 space-y-6 my-auto max-h-[90vh] flex flex-col text-slate-200 shadow-2xl"
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
                       <div>
                         <h3 className="text-xl font-black text-white flex items-center gap-2">
                           Detail PPDB #{selectedPpdb.registrationNo}
@@ -4212,144 +4342,147 @@ _Tata Usaha & Keuangan Sekolah_`;
                       </div>
                       <button
                         onClick={() => setSelectedPpdb(null)}
-                        className="text-slate-400 hover:text-white p-2 text-lg font-bold"
+                        className="text-slate-400 hover:text-white p-2 text-xl font-bold bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        title="Tutup (Esc)"
                       >
                         ✕
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                      <div className="bg-slate-950 p-4 rounded-2xl space-y-1.5 border border-slate-800">
-                        <p className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider">Data Murid</p>
-                        <p className="text-sm font-bold text-white">{selectedPpdb.namaAnak}</p>
-                        <p>Jenis Kelamin: {selectedPpdb.jenisKelamin}</p>
-                        <p>TTL: {selectedPpdb.tempatLahir}, {selectedPpdb.tanggalLahir}</p>
-                        <p>Program: <span className="font-bold text-emerald-300">{selectedPpdb.program}</span></p>
-                      </div>
-
-                      <div className="bg-slate-950 p-4 rounded-2xl space-y-1.5 border border-slate-800">
-                        <p className="font-bold text-blue-400 uppercase text-[10px] tracking-wider">Data Orang Tua</p>
-                        <p className="text-sm font-bold text-white">{selectedPpdb.namaOrtu}</p>
-                        <p>WhatsApp: {selectedPpdb.noWhatsapp || "-"}</p>
-                        <p>Email: {selectedPpdb.email || <span className="text-slate-500 italic">Tidak diisi (opsional)</span>}</p>
-                      </div>
-                    </div>
-
-                    {/* Snapshot biaya dipertahankan agar perubahan master tidak mengubah histori PPDB. */}
-                    <div className="bg-emerald-950/20 p-4 rounded-2xl border border-emerald-500/30 space-y-3 text-xs">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider">
-                          Komponen Paket PPDB Terpilih
-                        </p>
-                        <span className="font-black text-emerald-300 text-sm">
-                          Rp {Number(selectedPpdb.totalAmount || 0).toLocaleString("id-ID")}
-                        </span>
-                      </div>
-                      {selectedPpdb.feeSelections?.length ? (
-                        <div className="space-y-1.5">
-                          {selectedPpdb.feeSelections.map((selection: any) => (
-                            <div
-                              key={selection.id}
-                              className="flex items-center justify-between gap-3 border-b border-emerald-900/50 pb-1.5"
-                            >
-                              <span className="text-slate-300">{selection.componentName}</span>
-                              <span className="font-bold text-white">
-                                Rp {Number(selection.amount).toLocaleString("id-ID")}
-                              </span>
-                            </div>
-                          ))}
+                    <div className="space-y-6 overflow-y-auto flex-1 pr-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                        <div className="bg-slate-950 p-4 rounded-2xl space-y-1.5 border border-slate-800">
+                          <p className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider">Data Murid</p>
+                          <p className="text-sm font-bold text-white">{selectedPpdb.namaAnak}</p>
+                          <p>Jenis Kelamin: {selectedPpdb.jenisKelamin}</p>
+                          <p>TTL: {selectedPpdb.tempatLahir}, {selectedPpdb.tanggalLahir}</p>
+                          <p>Program: <span className="font-bold text-emerald-300">{selectedPpdb.program}</span></p>
                         </div>
-                      ) : (
-                        <p className="text-slate-400">
-                          Data lama: {selectedPpdb.selectedItems || "Rincian item belum tersimpan"}
+
+                        <div className="bg-slate-950 p-4 rounded-2xl space-y-1.5 border border-slate-800">
+                          <p className="font-bold text-blue-400 uppercase text-[10px] tracking-wider">Data Orang Tua</p>
+                          <p className="text-sm font-bold text-white">{selectedPpdb.namaOrtu}</p>
+                          <p>WhatsApp: {selectedPpdb.noWhatsapp || "-"}</p>
+                          <p>Email: {selectedPpdb.email || <span className="text-slate-500 italic">Tidak diisi (opsional)</span>}</p>
+                        </div>
+                      </div>
+
+                      {/* Snapshot biaya dipertahankan agar perubahan master tidak mengubah histori PPDB. */}
+                      <div className="bg-emerald-950/20 p-4 rounded-2xl border border-emerald-500/30 space-y-3 text-xs">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-bold text-emerald-400 uppercase text-[10px] tracking-wider">
+                            Komponen Paket PPDB Terpilih
+                          </p>
+                          <span className="font-black text-emerald-300 text-sm">
+                            Rp {Number(selectedPpdb.totalAmount || 0).toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        {selectedPpdb.feeSelections?.length ? (
+                          <div className="space-y-1.5">
+                            {selectedPpdb.feeSelections.map((selection: any) => (
+                              <div
+                                key={selection.id}
+                                className="flex items-center justify-between gap-3 border-b border-emerald-900/50 pb-1.5"
+                              >
+                                <span className="text-slate-300">{selection.componentName}</span>
+                                <span className="font-bold text-white">
+                                  Rp {Number(selection.amount).toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-slate-400">
+                            Data lama: {selectedPpdb.selectedItems || "Rincian item belum tersimpan"}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Dokumen Terunggah */}
+                      <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
+                        <p className="font-bold text-amber-400 uppercase text-[10px] tracking-wider">
+                          Dokumen & Berkas Terunggah
                         </p>
-                      )}
-                    </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {selectedPpdb.docKkUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPreview(selectedPpdb.docKkUrl, `Kartu Keluarga - ${selectedPpdb.namaAnak}`)}
+                              className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
+                            >
+                              <FileText className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">Kartu Keluarga</span>
+                            </button>
+                          ) : (
+                            <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                              KK: Belum ada
+                            </span>
+                          )}
 
-                    {/* Dokumen Terunggah */}
-                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
-                      <p className="font-bold text-amber-400 uppercase text-[10px] tracking-wider">
-                        Dokumen & Berkas Terunggah
-                      </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {selectedPpdb.docKkUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPreview(selectedPpdb.docKkUrl, `Kartu Keluarga - ${selectedPpdb.namaAnak}`)}
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
-                          >
-                            <FileText className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">Kartu Keluarga</span>
-                          </button>
-                        ) : (
-                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
-                            KK: Belum ada
-                          </span>
-                        )}
+                          {selectedPpdb.docAktaUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPreview(selectedPpdb.docAktaUrl, `Akta Kelahiran - ${selectedPpdb.namaAnak}`)}
+                              className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
+                            >
+                              <FileText className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">Akta Kelahiran</span>
+                            </button>
+                          ) : (
+                            <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                              Akta: Belum ada
+                            </span>
+                          )}
 
-                        {selectedPpdb.docAktaUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPreview(selectedPpdb.docAktaUrl, `Akta Kelahiran - ${selectedPpdb.namaAnak}`)}
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
-                          >
-                            <FileText className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">Akta Kelahiran</span>
-                          </button>
-                        ) : (
-                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
-                            Akta: Belum ada
-                          </span>
-                        )}
+                          {selectedPpdb.docFotoUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPreview(selectedPpdb.docFotoUrl, `Foto Anak - ${selectedPpdb.namaAnak}`)}
+                              className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
+                            >
+                              <ImageIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">Foto Anak</span>
+                            </button>
+                          ) : (
+                            <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                              Foto: Belum ada
+                            </span>
+                          )}
 
-                        {selectedPpdb.docFotoUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPreview(selectedPpdb.docFotoUrl, `Foto Anak - ${selectedPpdb.namaAnak}`)}
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
-                          >
-                            <ImageIcon className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">Foto Anak</span>
-                          </button>
-                        ) : (
-                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
-                            Foto: Belum ada
-                          </span>
-                        )}
+                          {selectedPpdb.docKtpUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPreview(selectedPpdb.docKtpUrl, `KTP Ortu - ${selectedPpdb.namaOrtu}`)}
+                              className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
+                            >
+                              <FileText className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">KTP Ortu</span>
+                            </button>
+                          ) : (
+                            <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                              KTP: Belum ada
+                            </span>
+                          )}
 
-                        {selectedPpdb.docKtpUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPreview(selectedPpdb.docKtpUrl, `KTP Ortu - ${selectedPpdb.namaOrtu}`)}
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
-                          >
-                            <FileText className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">KTP Ortu</span>
-                          </button>
-                        ) : (
-                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
-                            KTP: Belum ada
-                          </span>
-                        )}
-
-                        {selectedPpdb.buktiBayarUrl ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenPreview(selectedPpdb.buktiBayarUrl, `Bukti Bayar - ${selectedPpdb.namaAnak}`)}
-                            className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
-                          >
-                            <CreditCard className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">Bukti Bayar</span>
-                          </button>
-                        ) : (
-                          <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
-                            Bukti Bayar: Belum ada
-                          </span>
-                        )}
+                          {selectedPpdb.buktiBayarUrl ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenPreview(selectedPpdb.buktiBayarUrl, `Bukti Bayar - ${selectedPpdb.namaAnak}`)}
+                              className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-emerald-400 font-bold flex items-center gap-1.5 transition-all text-[11px] text-left cursor-pointer"
+                            >
+                              <CreditCard className="w-3.5 h-3.5 shrink-0" />
+                              <span className="truncate">Bukti Bayar</span>
+                            </button>
+                          ) : (
+                            <span className="p-2.5 bg-slate-900/50 border border-slate-800 rounded-xl text-slate-500 text-[11px]">
+                              Bukti Bayar: Belum ada
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3">
+                    <div className="pt-4 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
                       <div className="text-xs">
                         <span>Status: </span>
                         <span className="font-bold text-white">{selectedPpdb.status}</span>
@@ -4357,14 +4490,14 @@ _Tata Usaha & Keuangan Sekolah_`;
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleUpdatePpdbStatus(selectedPpdb.id, "APPROVED")}
-                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
+                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
                         >
                           <CheckCircle className="w-4 h-4" />
                           <span>Setuju (APPROVE)</span>
                         </button>
                         <button
                           onClick={() => handleUpdatePpdbStatus(selectedPpdb.id, "REJECTED")}
-                          className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-600/30"
+                          className="px-5 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-red-600/30 cursor-pointer"
                         >
                           <XCircle className="w-4 h-4" />
                           <span>Tolak (REJECT)</span>
@@ -4390,16 +4523,19 @@ _Tata Usaha & Keuangan Sekolah_`;
                   </p>
                 </div>
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    const targetSch = selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id;
+                    const schoolProgs = programsList.filter((p) => !targetSch || p.schoolId === targetSch);
+                    const maxOrder = schoolProgs.reduce((max, p) => Math.max(max, Number(p.orderIndex) || 0), 0);
                     setEditingProgram({
                       title: "",
                       ageRange: "",
                       iconUrl: "/images/program_playground.png",
                       features: JSON.stringify(["Materi 1", "Materi 2"]),
-                      orderIndex: programsList.length + 1,
-                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
-                    })
-                  }
+                      orderIndex: maxOrder + 1,
+                      schoolId: targetSch,
+                    });
+                  }}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
                 >
                   <Plus className="w-4 h-4" />
@@ -4416,7 +4552,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                     {editingProgram.id ? "Edit Program" : "Tambah Program Baru"}
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">
                         Pilih Cabang Sekolah
@@ -4487,12 +4623,27 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">
+                        Urutan (No. Urut)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={editingProgram.orderIndex || 1}
+                        onChange={(e) =>
+                          setEditingProgram({ ...editingProgram, orderIndex: Math.max(1, Number(e.target.value)) })
+                        }
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 mb-1">
                         Upload Icon Program
                       </label>
                       <div className="flex items-center gap-2">
                         <label className="flex-1 px-3 py-3 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold flex items-center justify-between cursor-pointer transition-all">
                           <span className="truncate text-[11px]">
-                            {editingProgram.iconUrl ? "🖼️ Ganti Icon" : "📁 Unggah File"}
+                            {editingProgram.iconUrl ? "Ganti Icon" : "Unggah File"}
                           </span>
                           <Upload className="w-4 h-4 text-emerald-400 shrink-0" />
                           <input
@@ -4535,7 +4686,9 @@ _Tata Usaha & Keuangan Sekolah_`;
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 w-full">
-                {programsList.map((prog) => (
+                {[...programsList]
+                  .sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0))
+                  .map((prog) => (
                   <div
                     key={prog.id}
                     className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 flex flex-col justify-between transition-all shadow-xl group"
@@ -4551,11 +4704,36 @@ _Tata Usaha & Keuangan Sekolah_`;
                             🎨
                           </div>
                         )}
-                        <div>
-                          <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                            {prog.school?.name}
-                          </span>
-                          <h3 className="font-extrabold text-base text-white group-hover:text-emerald-400 transition-colors mt-0.5">{prog.title}</h3>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 truncate">
+                              {prog.school?.name}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-[10px] font-mono font-bold text-slate-300 bg-slate-800/90 px-1.5 py-0.5 rounded border border-slate-700">
+                                #{prog.orderIndex || 0}
+                              </span>
+                              <div className="flex items-center bg-slate-950/80 rounded border border-slate-800 p-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwapOrder("programs", prog, "up")}
+                                  className="p-0.5 text-slate-400 hover:text-emerald-400 rounded transition cursor-pointer"
+                                  title="Geser Urutan Naik (▲)"
+                                >
+                                  <ChevronUp className="w-3 h-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSwapOrder("programs", prog, "down")}
+                                  className="p-0.5 text-slate-400 hover:text-emerald-400 rounded transition cursor-pointer"
+                                  title="Geser Urutan Turun (▼)"
+                                >
+                                  <ChevronDown className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                          <h3 className="font-extrabold text-base text-white group-hover:text-emerald-400 transition-colors mt-0.5 truncate">{prog.title}</h3>
                         </div>
                       </div>
 
@@ -4602,17 +4780,20 @@ _Tata Usaha & Keuangan Sekolah_`;
                   </p>
                 </div>
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    const targetSch = selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id;
+                    const schoolTeachers = teachersList.filter((t) => !targetSch || t.schoolId === targetSch);
+                    const maxOrder = schoolTeachers.reduce((max, t) => Math.max(max, Number(t.orderIndex) || 0), 0);
                     setEditingTeacher({
                       name: "",
                       role: "",
                       photoUrl: "/images/teacher1.png",
                       education: "S1 Pendidikan PAUD",
                       bio: "",
-                      orderIndex: teachersList.length + 1,
-                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
-                    })
-                  }
+                      orderIndex: maxOrder + 1,
+                      schoolId: targetSch,
+                    });
+                  }}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
                 >
                   <Plus className="w-4 h-4" />
@@ -4768,16 +4949,20 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">
-                        Urutan Tampilan
+                        Urutan Tampilan (No. Urut)
                       </label>
                       <input
                         type="number"
-                        value={editingTeacher.orderIndex || 0}
+                        min={1}
+                        value={editingTeacher.orderIndex || 1}
                         onChange={(e) =>
-                          setEditingTeacher({ ...editingTeacher, orderIndex: e.target.value })
+                          setEditingTeacher({ ...editingTeacher, orderIndex: Math.max(1, Number(e.target.value)) })
                         }
-                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-mono font-bold"
                       />
+                      <span className="text-[10px] text-slate-400 mt-1 block">
+                        * Otomatis digeser jika sama agar tidak kembar.
+                      </span>
                     </div>
                   </div>
 
@@ -4821,7 +5006,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
-                  {teachersList.map((teacher) => (
+                  {[...teachersList]
+                    .sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0) || a.name.localeCompare(b.name))
+                    .map((teacher) => (
                     <div
                       key={teacher.id}
                       className="bg-slate-900/80 border border-slate-800 hover:border-emerald-500/40 rounded-3xl p-6 space-y-4 flex flex-col justify-between transition-all shadow-xl group"
@@ -4853,9 +5040,32 @@ _Tata Usaha & Keuangan Sekolah_`;
                           )}
                         </div>
 
-                        <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                          {teacher.school?.name}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                          <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                            {teacher.school?.name}
+                          </span>
+                          <span className="text-[10px] font-mono font-bold text-slate-300 bg-slate-800/90 px-2 py-0.5 rounded-full border border-slate-700">
+                            Urutan: #{teacher.orderIndex || 0}
+                          </span>
+                          <div className="flex items-center bg-slate-950/80 rounded-lg border border-slate-800 p-0.5">
+                            <button
+                              type="button"
+                              onClick={() => handleSwapOrder("teachers", teacher, "up")}
+                              className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded transition cursor-pointer"
+                              title="Geser Urutan Naik (▲)"
+                            >
+                              <ChevronUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSwapOrder("teachers", teacher, "down")}
+                              className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded transition cursor-pointer"
+                              title="Geser Urutan Turun (▼)"
+                            >
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
 
                         <div>
                           <h3 className="font-extrabold text-base text-white group-hover:text-emerald-400 transition-colors">
@@ -4937,6 +5147,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                       parentPhone: "",
                       address: "",
                       attendanceRate: 0.0,
+                      dailyGrade: 0.0,
+                      semesterGrade: 0.0,
                       averageGrade: 0.0,
                       schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
                     })
@@ -5058,7 +5270,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                               studentId: editingStudent.id || "",
                               studentName: editingStudent.name || "Siswa",
                               subject: "Moral & Agama",
-                              score: 85,
+                              score: 0,
                               date: new Date().toISOString().split("T")[0],
                               notes: "",
                             })
@@ -5066,10 +5278,10 @@ _Tata Usaha & Keuangan Sekolah_`;
                           className="px-3.5 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>+ Input Nilai Harian Siswa</span>
+                          <span>Input Nilai Harian Siswa</span>
                         </button>
                         <span className="text-sm font-black text-emerald-400 bg-emerald-500/10 px-3.5 py-1.5 rounded-xl border border-emerald-500/30 shadow-sm">
-                          Nilai Akhir: {editingStudent.averageGrade ?? 88.5}
+                          Nilai Akhir: {editingStudent.averageGrade ?? 0}
                         </span>
                       </div>
                     </div>
@@ -5091,26 +5303,26 @@ _Tata Usaha & Keuangan Sekolah_`;
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-400 mb-1">
-                          📝 Rata-Rata Nilai Harian <span className="text-amber-400 font-mono">[{editingStudent.dailyGrade ?? 85}]</span>
+                          📝 Rata-Rata Nilai Harian <span className="text-amber-400 font-mono">[{editingStudent.dailyGrade ?? 0}]</span>
                         </label>
                         <input
                           type="number"
                           min="0"
                           max="100"
-                          value={editingStudent.dailyGrade ?? 85}
+                          value={editingStudent.dailyGrade ?? 0}
                           onChange={(e) => setEditingStudent({ ...editingStudent, dailyGrade: Number(e.target.value) })}
                           className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-400 mb-1">
-                          🎓 Nilai Semester / Ujian <span className="text-purple-400 font-mono">[{editingStudent.semesterGrade ?? 90}]</span>
+                          🎓 Nilai Semester / Ujian <span className="text-purple-400 font-mono">[{editingStudent.semesterGrade ?? 0}]</span>
                         </label>
                         <input
                           type="number"
                           min="0"
                           max="100"
-                          value={editingStudent.semesterGrade ?? 90}
+                          value={editingStudent.semesterGrade ?? 0}
                           onChange={(e) => setEditingStudent({ ...editingStudent, semesterGrade: Number(e.target.value) })}
                           className="w-full p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white"
                         />
@@ -5152,7 +5364,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                             {dailyGradesList.filter((g) => g.studentId === editingStudent.id).length === 0 ? (
                               <tr>
                                 <td colSpan={5} className="py-4 text-center text-slate-500 italic">
-                                  Belum ada catatan nilai harian untuk siswa ini. Klik tombol &quot;+ Input Nilai Harian Siswa&quot; di atas.
+                                  Belum ada catatan nilai harian untuk siswa ini. Klik tombol &quot;Input Nilai Harian Siswa&quot; di atas.
                                 </td>
                               </tr>
                             ) : (
@@ -5311,38 +5523,230 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </form>
               )}
 
-              {/* FILTER & SEARCH BAR SISWA (NIM/NISN & WALI KELAS) */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-3xl border border-slate-800 shadow-lg w-full">
-                <div className="relative flex-1 w-full">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    value={studentSearchQuery}
-                    onChange={(e) => setStudentSearchQuery(e.target.value)}
-                    placeholder="🔍 Cari nama siswa, NIM / NISN, atau nama orang tua..."
-                    className="w-full pl-10 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-                  />
+              {/* FILTER & SEARCH BAR SISWA (NIM/NISN, PLOTTING KELAS & WALI KELAS) */}
+              <div className="bg-slate-900/80 p-4 rounded-3xl border border-slate-800 shadow-lg w-full space-y-3">
+                <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={studentSearchQuery}
+                      onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      placeholder="🔍 Cari nama siswa, NIM / NISN, atau nama orang tua..."
+                      className="w-full pl-10 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* FILTER 1: STATUS PENEMPATAN KELAS */}
+                    <select
+                      value={selectedClassStatusFilter}
+                      onChange={(e) => setSelectedClassStatusFilter(e.target.value as any)}
+                      className="p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                      title="Filter Status Penempatan Kelas"
+                    >
+                      <option value="ALL">🏫 Semua Status ({studentsList.length})</option>
+                      <option value="UNASSIGNED">
+                        ⚠️ Belum Masuk Kelas (
+                        {
+                          studentsList.filter((s) => {
+                            const mc = classesList.find(
+                              (c) => (s.classId && c.id === s.classId) || (s.className && c.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                            );
+                            const cName = mc?.name || s.className || "";
+                            return !cName || cName === "Belum Ada Kelas" || cName === "-" || cName.toLowerCase().includes("belum") || (!s.classId && !mc);
+                          }).length
+                        }
+                        )
+                      </option>
+                      <option value="ASSIGNED">
+                        ✅ Sudah Masuk Kelas (
+                        {
+                          studentsList.filter((s) => {
+                            const mc = classesList.find(
+                              (c) => (s.classId && c.id === s.classId) || (s.className && c.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                            );
+                            const cName = mc?.name || s.className || "";
+                            return cName && cName !== "Belum Ada Kelas" && cName !== "-" && !cName.toLowerCase().includes("belum") && (s.classId || mc);
+                          }).length
+                        }
+                        )
+                      </option>
+                    </select>
+
+                    {/* FILTER 2: PLOTTING KELAS SPESIFIK */}
+                    <select
+                      value={selectedClassFilter}
+                      onChange={(e) => setSelectedClassFilter(e.target.value)}
+                      className="p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                      title="Filter Berdasarkan Plotting Kelas"
+                    >
+                      <option value="ALL">📚 Semua Plotting Kelas</option>
+                      {classesList.map((c) => {
+                        const countInClass = studentsList.filter((s) => {
+                          const mc = classesList.find(
+                            (item) => (s.classId && item.id === s.classId) || (s.className && item.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                          );
+                          return mc?.id === c.id || s.classId === c.id || s.className?.toLowerCase().trim() === c.name?.toLowerCase().trim();
+                        }).length;
+                        return (
+                          <option key={c.id} value={c.id}>
+                            🏫 {c.name} ({countInClass} Siswa)
+                          </option>
+                        );
+                      })}
+                      <option value="UNASSIGNED">
+                        ⚠️ Belum Masuk Kelas (
+                        {
+                          studentsList.filter((s) => {
+                            const mc = classesList.find(
+                              (item) => (s.classId && item.id === s.classId) || (s.className && item.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                            );
+                            const cName = mc?.name || s.className || "";
+                            return !cName || cName === "Belum Ada Kelas" || cName === "-" || cName.toLowerCase().includes("belum") || (!s.classId && !mc);
+                          }).length
+                        }
+                        )
+                      </option>
+                    </select>
+
+                    {/* FILTER 3: GURU / WALI KELAS */}
+                    <select
+                      value={selectedHomeroomFilter}
+                      onChange={(e) => setSelectedHomeroomFilter(e.target.value)}
+                      className="p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                      title="Filter Berdasarkan Guru / Wali Kelas"
+                    >
+                      <option value="ALL">👥 Semua Guru / Wali Kelas</option>
+                      {Array.from(
+                        new Set(
+                          classesList
+                            .map((c) => c.homeroomTeacherName)
+                            .filter((name): name is string => Boolean(name && name.trim()))
+                            .concat(
+                              teachersList
+                                .map((t) => t.name)
+                                .filter((name): name is string => Boolean(name && name.trim()))
+                            )
+                        )
+                      ).map((tName) => {
+                        const countForTeacher = studentsList.filter((s) => {
+                          const mc = classesList.find(
+                            (item) => (s.classId && item.id === s.classId) || (s.className && item.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                          );
+                          const tFound = mc?.homeroomTeacherName || s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "";
+                          return tFound.toLowerCase().trim() === tName.toLowerCase().trim();
+                        }).length;
+                        return (
+                          <option key={tName} value={tName}>
+                            👤 Wali: {tName} ({countForTeacher} Siswa)
+                          </option>
+                        );
+                      })}
+                    </select>
+
+                    {/* TOMBOL RESET FILTER */}
+                    {(studentSearchQuery || selectedClassStatusFilter !== "ALL" || selectedClassFilter !== "ALL" || selectedHomeroomFilter !== "ALL") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStudentSearchQuery("");
+                          setSelectedClassStatusFilter("ALL");
+                          setSelectedClassFilter("ALL");
+                          setSelectedHomeroomFilter("ALL");
+                        }}
+                        className="p-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                        title="Reset semua filter"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Reset</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <select
-                  value={selectedHomeroomFilter}
-                  onChange={(e) => setSelectedHomeroomFilter(e.target.value)}
-                  className="w-full sm:w-auto p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="ALL">👥 Semua Wali Kelas</option>
-                  {Array.from(
-                    new Set(
-                      classesList
-                        .map((c) => c.homeroomTeacherName)
-                        .filter(Boolean)
-                        .concat(teachersList.map((t) => t.name))
-                    )
-                  ).map((tName) => (
-                    <option key={tName} value={tName}>
-                      👤 Wali Kelas: {tName}
-                    </option>
-                  ))}
-                </select>
+                {/* INDIKATOR STATUS FILTER */}
+                <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-800/60">
+                  <div className="flex items-center gap-2">
+                    <span>
+                      Menampilkan{" "}
+                      <strong className="text-white font-bold">
+                        {
+                          studentsList.filter((s) => {
+                            const mc = classesList.find(
+                              (c) => (s.classId && c.id === s.classId) || (s.className && c.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                            );
+                            const studentClassName = mc?.name || s.className || "";
+                            const studentClassId = mc?.id || s.classId || "";
+                            const isUnassigned =
+                              !studentClassName ||
+                              studentClassName === "Belum Ada Kelas" ||
+                              studentClassName === "-" ||
+                              studentClassName.toLowerCase().includes("belum") ||
+                              (!s.classId && !mc);
+
+                            const studentTeacherName = (mc?.homeroomTeacherName || s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "").trim();
+
+                            const matchSearch =
+                              !studentSearchQuery ||
+                              s.name.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+                              (s.nisn && s.nisn.toLowerCase().includes(studentSearchQuery.toLowerCase())) ||
+                              (s.parentName && s.parentName.toLowerCase().includes(studentSearchQuery.toLowerCase())) ||
+                              (s.username && s.username.toLowerCase().includes(studentSearchQuery.toLowerCase()));
+
+                            if (!matchSearch) return false;
+                            if (selectedClassStatusFilter === "UNASSIGNED" && !isUnassigned) return false;
+                            if (selectedClassStatusFilter === "ASSIGNED" && isUnassigned) return false;
+
+                            if (selectedClassFilter !== "ALL") {
+                              if (selectedClassFilter === "UNASSIGNED") {
+                                if (!isUnassigned) return false;
+                              } else {
+                                const matchCls =
+                                  studentClassId === selectedClassFilter ||
+                                  studentClassName.toLowerCase().trim() === selectedClassFilter.toLowerCase().trim();
+                                if (!matchCls) return false;
+                              }
+                            }
+
+                            if (selectedHomeroomFilter !== "ALL") {
+                              const targetTeacher = selectedHomeroomFilter.toLowerCase().trim();
+                              const matchT =
+                                studentTeacherName.toLowerCase().trim() === targetTeacher ||
+                                studentTeacherName.toLowerCase().includes(targetTeacher) ||
+                                targetTeacher.includes(studentTeacherName.toLowerCase());
+                              if (!matchT) return false;
+                            }
+
+                            return true;
+                          }).length
+                        }
+                      </strong>{" "}
+                      dari <strong className="text-white font-bold">{studentsList.length}</strong> siswa
+                    </span>
+                  </div>
+
+                  {(selectedClassFilter !== "ALL" || selectedHomeroomFilter !== "ALL" || selectedClassStatusFilter !== "ALL") && (
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="text-slate-500">Filter Aktif:</span>
+                      {selectedClassStatusFilter !== "ALL" && (
+                        <span className="bg-amber-500/10 text-amber-300 px-2 py-0.5 rounded border border-amber-500/20 font-semibold">
+                          Status: {selectedClassStatusFilter === "UNASSIGNED" ? "Belum Berkelas" : "Sudah Berkelas"}
+                        </span>
+                      )}
+                      {selectedClassFilter !== "ALL" && (
+                        <span className="bg-emerald-500/10 text-emerald-300 px-2 py-0.5 rounded border border-emerald-500/20 font-semibold">
+                          Kelas: {classesList.find((c) => c.id === selectedClassFilter)?.name || selectedClassFilter}
+                        </span>
+                      )}
+                      {selectedHomeroomFilter !== "ALL" && (
+                        <span className="bg-cyan-500/10 text-cyan-300 px-2 py-0.5 rounded border border-cyan-500/20 font-semibold">
+                          Wali: {selectedHomeroomFilter}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* DAFTAR KARTU SISWA TERDAFTAR */}
@@ -5356,52 +5760,145 @@ _Tata Usaha & Keuangan Sekolah_`;
                       (s.parentName && s.parentName.toLowerCase().includes(studentSearchQuery.toLowerCase())) ||
                       (s.username && s.username.toLowerCase().includes(studentSearchQuery.toLowerCase()));
 
-                    const teacherName = s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "";
-                    const teacherId = s.classRoom?.homeroomTeacherId || s.homeroomTeacherId || "";
-                    const matchHomeroom =
-                      selectedHomeroomFilter === "ALL" ||
-                      teacherId === selectedHomeroomFilter ||
-                      teacherName === selectedHomeroomFilter;
+                    if (!matchSearch) return false;
 
-                    return matchSearch && matchHomeroom;
+                    const mc = classesList.find(
+                      (c) => (s.classId && c.id === s.classId) || (s.className && c.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                    );
+                    const studentClassName = mc?.name || s.className || "";
+                    const studentClassId = mc?.id || s.classId || "";
+                    const isUnassigned =
+                      !studentClassName ||
+                      studentClassName === "Belum Ada Kelas" ||
+                      studentClassName === "-" ||
+                      studentClassName.toLowerCase().includes("belum") ||
+                      (!s.classId && !mc);
+
+                    const studentTeacherName = (mc?.homeroomTeacherName || s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "").trim();
+
+                    if (selectedClassStatusFilter === "UNASSIGNED" && !isUnassigned) return false;
+                    if (selectedClassStatusFilter === "ASSIGNED" && isUnassigned) return false;
+
+                    if (selectedClassFilter !== "ALL") {
+                      if (selectedClassFilter === "UNASSIGNED") {
+                        if (!isUnassigned) return false;
+                      } else {
+                        const matchCls =
+                          studentClassId === selectedClassFilter ||
+                          studentClassName.toLowerCase().trim() === selectedClassFilter.toLowerCase().trim();
+                        if (!matchCls) return false;
+                      }
+                    }
+
+                    if (selectedHomeroomFilter !== "ALL") {
+                      const targetTeacher = selectedHomeroomFilter.toLowerCase().trim();
+                      const matchT =
+                        studentTeacherName.toLowerCase().trim() === targetTeacher ||
+                        studentTeacherName.toLowerCase().includes(targetTeacher) ||
+                        targetTeacher.includes(studentTeacherName.toLowerCase());
+                      if (!matchT) return false;
+                    }
+
+                    return true;
                   })
-                  .map((s) => (
-                    <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3.5 flex flex-col justify-between">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all"
-                            onClick={() => handleOpenPreview(s.avatarUrl || "https://i.pravatar.cc/150", `Avatar Siswa: ${s.name}`)}
-                            title="Klik untuk melihat foto avatar"
-                          >
-                            {s.name.charAt(0)}
-                          </div>
-                          <div>
-                            <h4
-                              onClick={() => setStudentSppHistoryModal({ isOpen: true, student: s })}
-                              className="font-bold text-white text-sm hover:text-emerald-400 hover:underline cursor-pointer transition flex items-center gap-1.5"
-                              title="Klik untuk melihat riwayat pembayaran SPP"
+                  .map((s) => {
+                    const mc = classesList.find(
+                      (c) => (s.classId && c.id === s.classId) || (s.className && c.name?.toLowerCase().trim() === s.className?.toLowerCase().trim())
+                    );
+                    const studentClassName = mc?.name || s.className || "";
+                    const isUnassigned =
+                      !studentClassName ||
+                      studentClassName === "Belum Ada Kelas" ||
+                      studentClassName === "-" ||
+                      studentClassName.toLowerCase().includes("belum") ||
+                      (!s.classId && !mc);
+
+                    const studentTeacherName = (mc?.homeroomTeacherName || s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "").trim();
+
+                    return (
+                      <div key={s.id} className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 space-y-3.5 flex flex-col justify-between">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="w-12 h-12 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all mt-1"
+                              onClick={() => handleOpenPreview(s.avatarUrl || "https://i.pravatar.cc/150", `Avatar Siswa: ${s.name}`)}
+                              title="Klik untuk melihat foto avatar"
                             >
-                              <span>{s.name}</span>
-                              <span className="text-[10px] text-emerald-400 font-normal bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                                Riwayat SPP
-                              </span>
-                            </h4>
-                            <p className="text-xs text-slate-400">
-                              NIM/NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{s.nisn}</span> • <span className="text-emerald-400 font-semibold">{s.className}</span>
-                            </p>
-                            <p className="text-[11px] text-cyan-300 font-medium mt-0.5">
-                              👤 Wali Kelas: <span className="font-bold text-white">{s.classRoom?.homeroomTeacherName || s.homeroomTeacherName || "Guru Wali"}</span>
-                            </p>
-                          <p className="text-[11px] text-slate-500">Ortu: {s.parentName} ({s.parentPhone})</p>
-                          {s.username && (
-                            <span className="inline-block text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 mt-1">
-                              User: {s.username}
-                            </span>
-                          )}
+                              {s.name.charAt(0)}
+                            </div>
+                            <div className="space-y-1">
+                              <h4
+                                onClick={() => setStudentSppHistoryModal({ isOpen: true, student: s })}
+                                className="font-bold text-white text-sm hover:text-emerald-400 hover:underline cursor-pointer transition flex items-center gap-1.5"
+                                title="Klik untuk melihat riwayat pembayaran SPP"
+                              >
+                                <span>{s.name}</span>
+                                <span className="text-[10px] text-emerald-400 font-normal bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                  Riwayat SPP
+                                </span>
+                              </h4>
+                              <p className="text-xs text-slate-400">
+                                NIM/NISN: <span className="font-mono text-emerald-300 font-bold bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60">{s.nisn}</span>
+                              </p>
+
+                              {/* BADGE PLOTTING KELAS & GURU WALI */}
+                              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                                {isUnassigned ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 font-bold bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20">
+                                    ⚠️ Belum Masuk Kelas
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-emerald-300 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                    🏫 {studentClassName}
+                                  </span>
+                                )}
+
+                                <span className="inline-flex items-center gap-1 text-[10px] text-cyan-300 font-medium bg-cyan-500/10 px-2 py-0.5 rounded-md border border-cyan-500/20">
+                                  👤 Wali: <strong className="text-white font-bold">{studentTeacherName || "Belum di-plot"}</strong>
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-slate-500 pt-0.5">Ortu: {s.parentName} ({s.parentPhone})</p>
+                              {s.username && (
+                                <span className="inline-block text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                  User: {s.username}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
+
+                        {/* QUICK PLOTTING / UBAH KELAS LANGSUNG */}
+                        <div className="bg-slate-950/90 border border-slate-800/90 rounded-2xl p-2.5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-xs text-slate-400 shrink-0">
+                            <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-[11px] font-semibold text-slate-300">Plot Kelas:</span>
+                          </div>
+                          <select
+                            value={mc?.id || (isUnassigned ? "UNASSIGNED" : s.classId || "")}
+                            onChange={async (e) => {
+                              const targetVal = e.target.value;
+                              if (targetVal === "UNASSIGNED") {
+                                await handlePlotStudent(s.id, null, "REMOVE");
+                              } else if (targetVal) {
+                                await handlePlotStudent(s.id, targetVal);
+                              }
+                            }}
+                            className="bg-slate-900 border border-slate-700/70 text-slate-200 text-xs font-semibold rounded-lg px-2 py-1 focus:outline-none focus:border-emerald-500 cursor-pointer w-full"
+                          >
+                            {isUnassigned && <option value="UNASSIGNED">⚠️ Belum Masuk Kelas</option>}
+                            {classesList.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                🏫 {c.name} (Wali: {c.homeroomTeacherName || "-"})
+                              </option>
+                            ))}
+                            {!isUnassigned && (
+                              <option value="UNASSIGNED" className="text-red-400">
+                                🚫 Keluarkan dari Kelas
+                              </option>
+                            )}
+                          </select>
+                        </div>
 
                     <div className="bg-slate-950/80 p-3 rounded-2xl border border-slate-800/80 grid grid-cols-3 gap-2 text-center text-xs">
                       <div>
@@ -5410,11 +5907,11 @@ _Tata Usaha & Keuangan Sekolah_`;
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 block">Rata Harian</span>
-                        <span className="font-extrabold text-amber-400">{s.dailyGrade ?? 85}</span>
+                        <span className="font-extrabold text-amber-400">{s.dailyGrade ?? 0}</span>
                       </div>
                       <div>
                         <span className="text-[10px] text-slate-400 block">Nilai Akhir</span>
-                        <span className="font-extrabold text-purple-400">{s.averageGrade ?? 88.5}</span>
+                        <span className="font-extrabold text-purple-400">{s.averageGrade ?? 0}</span>
                       </div>
                     </div>
 
@@ -5426,7 +5923,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                             studentId: s.id,
                             studentName: s.name,
                             subject: "Moral & Agama",
-                            score: 85,
+                            score: 0,
                             date: new Date().toISOString().split("T")[0],
                             notes: "",
                           })
@@ -5464,7 +5961,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                       </div>
                     </div>
                   </div>
-                ))}
+                );
+              })}
               </div>
             </div>
           )}
@@ -5651,6 +6149,64 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </div>
               </div>
 
+              {/* FILTER BAR PRESENSI GURU */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-3xl border border-slate-800 shadow-lg w-full">
+                <div className="flex items-center gap-2 flex-1">
+                  <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 w-full sm:w-auto">
+                    <Calendar className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <input
+                      type="date"
+                      value={teacherAttDateFilter}
+                      onChange={(e) => setTeacherAttDateFilter(e.target.value)}
+                      className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                    />
+                    {teacherAttDateFilter && (
+                      <button
+                        type="button"
+                        onClick={() => setTeacherAttDateFilter("")}
+                        className="text-[10px] text-slate-400 hover:text-white px-1 font-bold"
+                        title="Hapus filter tanggal"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  <select
+                    value={teacherAttStatusFilter}
+                    onChange={(e) => setTeacherAttStatusFilter(e.target.value)}
+                    className="p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="ALL">📋 Semua Status</option>
+                    <option value="hadir">✅ Hadir</option>
+                    <option value="izin">ℹ️ Izin</option>
+                    <option value="sakit">🤒 Sakit</option>
+                    <option value="alpa">❌ Alpa / Tanpa Keterangan</option>
+                  </select>
+                </div>
+
+                {admin?.role !== "GURU" && (
+                  <select
+                    value={teacherAttTeacherFilter}
+                    onChange={(e) => setTeacherAttTeacherFilter(e.target.value)}
+                    className="p-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="ALL">👥 Semua Guru & Pengajar</option>
+                    {Array.from(
+                      new Set(
+                        teachersList
+                          .map((t) => t.name)
+                          .concat(teacherAttendanceList.map((att) => att.teacherName).filter(Boolean))
+                      )
+                    ).map((tName) => (
+                      <option key={tName} value={tName}>
+                        👤 Guru: {tName}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
                 {teacherAttendanceList
                   .filter((att) => {
@@ -5658,12 +6214,29 @@ _Tata Usaha & Keuangan Sekolah_`;
                       const u = (admin?.username || "").toLowerCase();
                       const n = (admin?.name || "").toLowerCase();
                       const tName = (att.teacherName || "").toLowerCase();
-                      return (
+                      const matchMe =
                         (u && tName.includes(u)) ||
                         (n && (tName.includes(n) || n.includes(tName))) ||
-                        att.teacherId === admin?.id
-                      );
+                        att.teacherId === admin?.id;
+                      if (!matchMe) return false;
                     }
+
+                    if (teacherAttDateFilter && att.date !== teacherAttDateFilter) {
+                      return false;
+                    }
+
+                    if (
+                      teacherAttTeacherFilter !== "ALL" &&
+                      att.teacherId !== teacherAttTeacherFilter &&
+                      att.teacherName !== teacherAttTeacherFilter
+                    ) {
+                      return false;
+                    }
+
+                    if (teacherAttStatusFilter !== "ALL" && att.status !== teacherAttStatusFilter) {
+                      return false;
+                    }
+
                     return true;
                   })
                   .map((att) => (
@@ -5753,7 +6326,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/30 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>+ Input Manual Capaian</span>
+                    <span>Input Manual Capaian</span>
                   </button>
                 </div>
               </div>
@@ -8406,7 +8979,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                 onSubmit={handleAddGallery}
                 className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
               >
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
                       Judul Foto
@@ -8422,7 +8995,21 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
-                      Pilih File Gambar (maksimal 1 MB)
+                      Urutan (No. Urut)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      placeholder={String(galleryList.length + 1)}
+                      value={newGalleryOrder || (galleryList.length + 1)}
+                      onChange={(e) => setNewGalleryOrder(Math.max(1, Number(e.target.value)))}
+                      className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-2xl text-xs text-white font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
+                      Pilih Gambar (maks 1 MB)
                     </label>
                     <input
                       type="file"
@@ -8439,7 +9026,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                           }
                         }
                       }}
-                      className="text-xs text-slate-400"
+                      className="text-xs text-slate-400 pt-2"
                     />
                   </div>
 
@@ -8447,7 +9034,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <button
                       type="submit"
                       disabled={saving || !newGalleryImage}
-                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30"
+                      className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       <Upload className="w-4 h-4" />
                       <span>Tambahkan Ke Galeri</span>
@@ -8457,13 +9044,15 @@ _Tata Usaha & Keuangan Sekolah_`;
               </form>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-4 w-full">
-                {galleryList.map((item) => (
+                {[...galleryList]
+                  .sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0))
+                  .map((item) => (
                   <div
                     key={item.id}
-                    className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group relative shadow-xl"
+                    className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden group relative shadow-xl flex flex-col justify-between"
                   >
                     <div
-                      className="relative h-44 w-full bg-slate-950 cursor-pointer group/img"
+                      className="relative h-40 w-full bg-slate-950 cursor-pointer group/img"
                       onClick={() => handleOpenPreview(item.imageUrl, `Galeri Foto: ${item.title}`)}
                       title="Klik untuk memperbesar gambar"
                     >
@@ -8477,16 +9066,42 @@ _Tata Usaha & Keuangan Sekolah_`;
                         <Eye className="w-6 h-6 text-white drop-shadow-md" />
                       </div>
                     </div>
-                    <div className="p-3 flex items-center justify-between">
-                      <span className="text-xs text-slate-300 font-bold truncate">
-                        {item.title}
-                      </span>
-                      <button
-                        onClick={() => handleDeleteGallery(item.id)}
-                        className="p-1 text-red-400 hover:bg-red-500/20 rounded-lg"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div className="p-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-slate-300 font-bold truncate">
+                          {item.title}
+                        </span>
+                        <button
+                          onClick={() => handleDeleteGallery(item.id)}
+                          className="p-1 text-red-400 hover:bg-red-500/20 rounded-lg cursor-pointer"
+                          title="Hapus foto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-800/80 text-[10px]">
+                        <span className="font-mono text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                          #{item.orderIndex || 0}
+                        </span>
+                        <div className="flex items-center bg-slate-950/80 rounded border border-slate-800 p-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSwapOrder("gallery", item, "up")}
+                            className="p-0.5 text-slate-400 hover:text-emerald-400 rounded transition cursor-pointer"
+                            title="Geser Urutan Naik (▲)"
+                          >
+                            <ChevronUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSwapOrder("gallery", item, "down")}
+                            className="p-0.5 text-slate-400 hover:text-emerald-400 rounded transition cursor-pointer"
+                            title="Geser Urutan Turun (▼)"
+                          >
+                            <ChevronDown className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -8507,7 +9122,10 @@ _Tata Usaha & Keuangan Sekolah_`;
                   </p>
                 </div>
                 <button
-                  onClick={() =>
+                  onClick={() => {
+                    const targetSch = selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id;
+                    const schoolTestis = testimonialsList.filter((t) => !targetSch || t.schoolId === targetSch);
+                    const maxOrder = schoolTestis.reduce((max, t) => Math.max(max, Number(t.orderIndex) || 0), 0);
                     setEditingTestimonial({
                       parentName: "",
                       role: "Orang Tua Siswa",
@@ -8515,10 +9133,10 @@ _Tata Usaha & Keuangan Sekolah_`;
                       content: "",
                       rating: 5,
                       bgColor: "emerald",
-                      orderIndex: testimonialsList.length + 1,
-                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
-                    })
-                  }
+                      orderIndex: maxOrder + 1,
+                      schoolId: targetSch,
+                    });
+                  }}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 shrink-0"
                 >
                   <Plus className="w-4 h-4" />
@@ -8650,16 +9268,20 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">
-                        Urutan Tampil
+                        Urutan Tampil (No. Urut)
                       </label>
                       <input
                         type="number"
-                        value={editingTestimonial.orderIndex ?? 0}
+                        min={1}
+                        value={editingTestimonial.orderIndex ?? 1}
                         onChange={(e) =>
-                          setEditingTestimonial({ ...editingTestimonial, orderIndex: Number(e.target.value) })
+                          setEditingTestimonial({ ...editingTestimonial, orderIndex: Math.max(1, Number(e.target.value)) })
                         }
-                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500 font-mono font-bold"
                       />
+                      <span className="text-[10px] text-slate-400 mt-1 block">
+                        * Otomatis digeser jika sama agar tidak kembar.
+                      </span>
                     </div>
                   </div>
 
@@ -8730,7 +9352,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 w-full">
-                  {testimonialsList.map((testi) => (
+                  {[...testimonialsList]
+                    .sort((a, b) => (Number(a.orderIndex) || 0) - (Number(b.orderIndex) || 0))
+                    .map((testi) => (
                     <div
                       key={testi.id}
                       className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 space-y-4 flex flex-col justify-between shadow-xl relative group hover:border-slate-700 transition"
@@ -8754,6 +9378,29 @@ _Tata Usaha & Keuangan Sekolah_`;
                               <p className="text-[11px] text-slate-400">{testi.role || "Orang Tua Siswa"}</p>
                             </div>
                           </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                              Urutan: #{testi.orderIndex ?? 0}
+                            </span>
+                            <div className="flex items-center bg-slate-950/80 rounded-lg border border-slate-800 p-0.5">
+                              <button
+                                type="button"
+                                onClick={() => handleSwapOrder("testimonials", testi, "up")}
+                                className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded transition cursor-pointer"
+                                title="Geser Urutan Naik (▲)"
+                              >
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSwapOrder("testimonials", testi, "down")}
+                                className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-slate-800 rounded transition cursor-pointer"
+                                title="Geser Urutan Turun (▼)"
+                              >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="flex items-center justify-between text-xs pt-1">
@@ -8774,7 +9421,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                       </div>
 
                       <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
-                        <span className="text-[10px] text-slate-500">Urutan: #{testi.orderIndex ?? 0}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">Posisi: #{testi.orderIndex ?? 0}</span>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setEditingTestimonial(testi)}
@@ -9071,6 +9718,159 @@ _Tata Usaha & Keuangan Sekolah_`;
                   teachers={teachersList}
                   onOpenPreview={handleOpenPreview}
                 />
+              )}
+            </div>
+          )}
+
+          {/* TAB: MONITORING NILAI SISWA (PORTAL WALI MURID) */}
+          {activeTab === "student-grades" && (
+            <div className="space-y-6 w-full">
+              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+                <div>
+                  <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+                    <Award className="w-6 h-6 text-amber-400" />
+                    <span>Monitoring Nilai & Capaian Belajar</span>
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Pantau perkembangan akademik, nilai harian, dan evaluasi capaian ananda tercinta.
+                  </p>
+                </div>
+                <span className="text-xs px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/20 font-bold">
+                  Akademik & Nilai
+                </span>
+              </div>
+
+              {parentChildren.length === 0 && isParent ? (
+                <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-10 text-center space-y-3 w-full">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-800/80 text-amber-400 mx-auto flex items-center justify-center text-2xl">
+                    🎓
+                  </div>
+                  <h3 className="font-extrabold text-white text-base">Data Siswa Belum Terhubung</h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                    Akun Anda belum terhubung dengan data ananda. Silakan hubungi admin sekolah atau pastikan nomor WhatsApp/username terdaftar sesuai data siswa.
+                  </p>
+                </div>
+              ) : (
+                (isParent ? parentChildren : studentsList.slice(0, 10)).map((child) => {
+                  const childGrades = dailyGradesList.filter(
+                    (g) => g.studentId === child.id || (g.studentName && g.studentName.toLowerCase() === child.name.toLowerCase())
+                  );
+
+                  return (
+                    <div key={child.id} className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl">
+                      {/* Header Siswa */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-5">
+                        <div className="flex items-center gap-3.5">
+                          <div
+                            className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-300 flex items-center justify-center font-black text-base border border-amber-500/30 shrink-0"
+                          >
+                            {child.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-black text-white">{child.name}</h3>
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                {child.className || "Siswa"}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              NISN: <span className="font-mono text-emerald-300 font-bold">{child.nisn || "-"}</span> • Wali Kelas: <span className="text-slate-300 font-medium">{child.classRoom?.homeroomTeacherName || child.homeroomTeacherName || "Guru Wali"}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-left sm:text-right">
+                          <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">Status Evaluasi</span>
+                          <span className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20 inline-block mt-0.5">
+                            {childGrades.length > 0 ? `${childGrades.length} Catatan Penilaian` : "Nilai Awal (Default: 0)"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 4 KPI Cards Nilai */}
+                      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+                        <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-4 space-y-1">
+                          <span className="text-[11px] font-bold text-slate-400 block">Rata-rata Kumulatif</span>
+                          <div className="text-2xl font-black text-emerald-400 font-mono">
+                            {Number(child.averageGrade ?? 0).toFixed(1)}
+                          </div>
+                          <span className="text-[10px] text-slate-500">Nilai gabungan seluruh aspek</span>
+                        </div>
+
+                        <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-4 space-y-1">
+                          <span className="text-[11px] font-bold text-slate-400 block">Rata-rata Nilai Harian</span>
+                          <div className="text-2xl font-black text-blue-400 font-mono">
+                            {Number(child.dailyGrade ?? 0).toFixed(1)}
+                          </div>
+                          <span className="text-[10px] text-slate-500">Kuis & tugas harian</span>
+                        </div>
+
+                        <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-4 space-y-1">
+                          <span className="text-[11px] font-bold text-slate-400 block">Nilai Semester / UAS</span>
+                          <div className="text-2xl font-black text-purple-400 font-mono">
+                            {Number(child.semesterGrade ?? 0).toFixed(1)}
+                          </div>
+                          <span className="text-[10px] text-slate-500">Evaluasi akhir semester</span>
+                        </div>
+
+                        <div className="bg-slate-950/80 border border-slate-800/90 rounded-2xl p-4 space-y-1">
+                          <span className="text-[11px] font-bold text-slate-400 block">Tingkat Kehadiran</span>
+                          <div className="text-2xl font-black text-amber-400 font-mono">
+                            {child.attendanceRate ?? 0}%
+                          </div>
+                          <span className="text-[10px] text-slate-500">Presensi KBM di sekolah</span>
+                        </div>
+                      </div>
+
+                      {/* Riwayat Catatan Nilai Harian & Evaluasi Guru */}
+                      <div className="space-y-3 pt-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Riwayat Penilaian & Evaluasi Perkembangan</span>
+                          </h4>
+                          <span className="text-[11px] text-slate-500">{childGrades.length} Catatan</span>
+                        </div>
+
+                        {childGrades.length === 0 ? (
+                          <div className="bg-slate-950/60 border border-dashed border-slate-800/90 rounded-2xl p-6 text-center text-xs text-slate-400 space-y-1">
+                            <p className="font-semibold text-slate-300">Belum ada rincian penilaian harian yang diinput oleh guru.</p>
+                            <p className="text-[11px] text-slate-500">Nilai saat ini default 0 dan akan diperbarui otomatis ketika guru melakukan asesmen kelas.</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto rounded-2xl border border-slate-800 shadow-xl">
+                            <table className="w-full text-left text-xs text-slate-300">
+                              <thead className="bg-slate-950/90 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                                <tr>
+                                  <th className="px-4 py-3 font-bold text-center w-12">No</th>
+                                  <th className="px-4 py-3 font-bold">Mata Pelajaran / Materi</th>
+                                  <th className="px-4 py-3 font-bold">Tanggal Penilaian</th>
+                                  <th className="px-4 py-3 font-bold text-center">Nilai (0-100)</th>
+                                  <th className="px-4 py-3 font-bold">Catatan Evaluasi Guru</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/80 bg-slate-900/40">
+                                {childGrades.map((g, gIdx) => (
+                                  <tr key={g.id || gIdx} className="hover:bg-slate-800/50 transition">
+                                    <td className="px-4 py-3 text-center font-mono text-slate-400">{gIdx + 1}</td>
+                                    <td className="px-4 py-3 font-bold text-white">{g.subject}</td>
+                                    <td className="px-4 py-3 text-slate-300">{g.date || "-"}</td>
+                                    <td className="px-4 py-3 text-center font-mono font-bold text-amber-400 text-sm">
+                                      {g.score}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-300 italic">
+                                      {g.notes || <span className="text-slate-600 not-italic">-</span>}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
           )}
@@ -9839,7 +10639,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                                   Rp {teacherSpp.toLocaleString("id-ID")}
                                 </td>
                                 <td className="p-3.5 text-center">
-                                  <span className="font-mono font-black text-indigo-300 bg-indigo-950/80 border border-indigo-800/80 px-2 py-0.5 rounded-full text-[11px]">
+                                  <span className="font-mono font-black text-indigo-700 bg-indigo-50 border border-indigo-200 dark:text-indigo-300 dark:bg-indigo-950/80 dark:border-indigo-800/80 px-2.5 py-0.5 rounded-full text-[11px] inline-block shadow-xs">
                                     {sppRatio.toFixed(2)}x
                                   </span>
                                 </td>
@@ -10015,7 +10815,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                       className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1 transition cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>+ Input Capaian Baru</span>
+                      <span>Input Capaian Baru</span>
                     </button>
                   </div>
 
@@ -10043,7 +10843,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                         <div className="p-12 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400 space-y-2">
                           <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
                           <p className="font-bold text-sm">Belum ada riwayat capaian bulanan yang tersimpan</p>
-                          <p className="text-xs text-slate-500">Klik tombol "+ Input Capaian Baru" di atas untuk menambahkan data</p>
+                          <p className="text-xs text-slate-500">Klik tombol "Input Capaian Baru" di atas untuk menambahkan data</p>
                         </div>
                       );
                     }
@@ -10185,87 +10985,133 @@ _Tata Usaha & Keuangan Sekolah_`;
               </div>
             </div>
 
-            {/* Modal Body: Desain persis Gambar 1 */}
-            <div className="p-4 sm:p-8 overflow-y-auto flex-1 bg-white">
-              <div className="space-y-6">
-                {getStudentMonthlyGroups(studentSppHistoryModal.student, sppList).map((group, gIdx) => (
-                  <div key={gIdx} className="space-y-2.5">
-                    {/* Header bar bulan (pill abu-abu di tengah) */}
-                    <div className="w-full bg-[#cbd5e1] text-slate-800 text-center py-2.5 rounded-lg text-base sm:text-lg font-medium tracking-wide">
-                      {group.monthLabel}
+            {/* Modal Body: Tabel Dinamis DB */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 bg-slate-900/95 space-y-4">
+              {(() => {
+                const studentRecords = sppList.filter(
+                  (sp) =>
+                    sp.studentId === studentSppHistoryModal.student?.id ||
+                    (sp.nisn && sp.nisn === studentSppHistoryModal.student?.nisn) ||
+                    (sp.studentName && sp.studentName.toLowerCase() === studentSppHistoryModal.student?.name?.toLowerCase())
+                );
+
+                if (studentRecords.length === 0) {
+                  return (
+                    <div className="text-center py-16 bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 space-y-3">
+                      <CreditCard className="w-10 h-10 text-slate-600 mx-auto" />
+                      <div className="space-y-1">
+                        <p className="text-sm text-slate-300 font-bold">Belum Ada Riwayat Transaksi SPP</p>
+                        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                          Belum ada catatan pembayaran SPP dari database untuk ananda <strong className="text-white">{studentSppHistoryModal.student.name}</strong>.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingSpp({
+                            studentName: studentSppHistoryModal.student.name,
+                            studentId: studentSppHistoryModal.student.id,
+                            nisn: studentSppHistoryModal.student.nisn,
+                            className: studentSppHistoryModal.student.className,
+                            month: "September 2026",
+                            amount: 200000,
+                            status: "lunas",
+                            paymentDate: new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                          });
+                          setStudentSppHistoryModal({ isOpen: false, student: null });
+                        }}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl inline-flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-emerald-600/20"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Input Pembayaran Sekarang</span>
+                      </button>
                     </div>
+                  );
+                }
 
-                    {/* Table columns header */}
-                    <div className="grid grid-cols-12 gap-2 sm:gap-3 text-slate-800 text-xs sm:text-sm font-medium">
-                      <div className="col-span-1 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                        no
-                      </div>
-                      <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                        tanggal pembayaran
-                      </div>
-                      <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                        nominal
-                      </div>
-                      <div className="col-span-2 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                        metode pembayaran
-                      </div>
-                      <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                        keterangan
-                      </div>
-                    </div>
+                return (
+                  <div className="overflow-x-auto rounded-2xl border border-slate-800 shadow-xl">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-slate-950/90 text-[11px] uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                        <tr>
+                          <th className="px-4 py-3 font-bold text-center w-12">No</th>
+                          <th className="px-4 py-3 font-bold">Bulan / Tagihan</th>
+                          <th className="px-4 py-3 font-bold">Tanggal Bayar</th>
+                          <th className="px-4 py-3 font-bold">Nominal (Rp)</th>
+                          <th className="px-4 py-3 font-bold">Metode Pembayaran</th>
+                          <th className="px-4 py-3 font-bold">Status</th>
+                          <th className="px-4 py-3 font-bold text-center">Bukti</th>
+                          <th className="px-4 py-3 font-bold text-right">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/80 bg-slate-900/40">
+                        {studentRecords.map((rec, rIdx) => {
+                          let dateStr = rec.paymentDate || "";
+                          if (!dateStr && rec.createdAt) {
+                            dateStr = new Date(rec.createdAt).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+                          }
 
-                    {/* Table rows */}
-                    {group.records.length === 0 ? (
-                      <div className="w-full bg-[#cbd5e1]/40 text-slate-500 text-center py-3 rounded-lg text-xs italic">
-                        belum ada catatan transaksi untuk {group.monthLabel}
-                      </div>
-                    ) : (
-                      group.records.map((rec, rIdx) => {
-                        let dateStr = rec.paymentDate || "";
-                        if (!dateStr && rec.createdAt) {
-                          const d = new Date(rec.createdAt);
-                          dateStr = d.toLocaleDateString("id-ID", { day: "numeric", month: "long" });
-                        }
-                        dateStr = dateStr.toLowerCase().replace(/\s+\d{4}$/, "").trim();
-
-                        const nominalStr = `Rp${Number(rec.amount || 0).toLocaleString("id-ID")}`;
-
-                        let methodStr = (rec.paymentMethod || "cash").toLowerCase();
-                        if (methodStr.includes("transfer")) methodStr = "transfer";
-                        else if (methodStr.includes("qris")) methodStr = "qris";
-                        else if (methodStr.includes("cash") || methodStr.includes("tunai")) methodStr = "cash";
-
-                        let ketStr = (rec.status || "lunas").toLowerCase();
-                        if (ketStr === "menunggu_konfirmasi") ketStr = "menunggu konfirmasi";
-                        else if (ketStr === "belum_bayar" || ketStr === "belum_lunas") ketStr = "belum bayar";
-
-                        return (
-                          <div
-                            key={rec.id || rIdx}
-                            className="grid grid-cols-12 gap-2 sm:gap-3 text-slate-800 text-xs sm:text-sm font-medium"
-                          >
-                            <div className="col-span-1 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                              {rIdx + 1}
-                            </div>
-                            <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                              {dateStr}
-                            </div>
-                            <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                              {nominalStr}
-                            </div>
-                            <div className="col-span-2 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                              {methodStr}
-                            </div>
-                            <div className="col-span-3 bg-[#cbd5e1] py-2 sm:py-2.5 rounded-lg text-center flex items-center justify-center">
-                              {ketStr}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
+                          return (
+                            <tr key={rec.id || rIdx} className="hover:bg-slate-800/50 transition">
+                              <td className="px-4 py-3 text-center font-mono text-slate-400">{rIdx + 1}</td>
+                              <td className="px-4 py-3 font-bold text-white">{rec.month}</td>
+                              <td className="px-4 py-3 text-slate-300">{dateStr || "-"}</td>
+                              <td className="px-4 py-3 font-mono font-bold text-emerald-400">
+                                Rp {Number(rec.amount || 0).toLocaleString("id-ID")}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="px-2.5 py-0.5 rounded-lg bg-slate-950 border border-slate-800 font-mono text-slate-300 text-[11px]">
+                                  {rec.paymentMethod || "TUNAI"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                                    rec.status === "lunas"
+                                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                      : rec.status === "menunggu_konfirmasi"
+                                      ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                      : "bg-red-500/20 text-red-300 border-red-500/30"
+                                  }`}
+                                >
+                                  {rec.status === "lunas" ? "Lunas" : rec.status === "menunggu_konfirmasi" ? "Verifikasi" : "Belum Bayar"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {rec.proofUrl ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenPreview(rec.proofUrl, `Bukti Pembayaran SPP - ${rec.month}`)}
+                                    className="p-1 text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-lg border border-emerald-500/30 transition text-[11px] px-2 py-1 font-bold inline-flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                    <span>Lihat</span>
+                                  </button>
+                                ) : (
+                                  <span className="text-slate-600 text-[11px]">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingSpp(rec);
+                                    setStudentSppHistoryModal({ isOpen: false, student: null });
+                                  }}
+                                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-xs cursor-pointer"
+                                  title="Edit Transaksi SPP"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
 
             {/* Modal Footer */}
@@ -10292,7 +11138,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center gap-1.5 transition cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ Catat Pembayaran Baru</span>
+                  <span>Catat Pembayaran Baru</span>
                 </button>
                 <button
                   type="button"
@@ -10303,6 +11149,117 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT VIDEO YOUTUBE MODAL */}
+      {editingVideoModal && (
+        <div
+          onClick={() => setEditingVideoModal(false)}
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-900 border border-slate-700 w-full max-w-xl rounded-3xl p-6 sm:p-8 space-y-5 my-auto text-slate-200 shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-4 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/20 text-red-400 flex items-center justify-center font-black border border-red-500/30">
+                  ▶️
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">Edit Video Demonstrasi YouTube</h3>
+                  <p className="text-xs text-slate-400">Masukkan link embed atau URL video YouTube</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingVideoModal(false)}
+                className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setSaving(true);
+                try {
+                  const formatted = getYoutubeEmbedUrl(videoInputUrl);
+                  const payload = {
+                    ...siteProfile,
+                    videoUrl: formatted,
+                    schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : undefined,
+                  };
+                  const res = await fetch("/api/site-profile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                  });
+                  const data = await res.json();
+                  if (!res.ok || !data.success) throw new Error(data.error || "Gagal menyimpan link video");
+
+                  setSiteProfile((prev: any) => ({ ...prev, videoUrl: formatted }));
+                  setEditingVideoModal(false);
+                  showMessage("Link video YouTube berhasil diperbarui!", "success");
+                } catch (err: any) {
+                  showMessage(err.message, "error");
+                } finally {
+                  setSaving(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5 uppercase tracking-wider">
+                  Link Video YouTube (Watch / Embed / Short / Share URL)
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={videoInputUrl}
+                  onChange={(e) => setVideoInputUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..."
+                  className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-red-500"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Format yang didukung: URL video standar, embed link, youtu.be, atau YouTube Shorts.
+                </p>
+              </div>
+
+              {/* LIVE EMBED PREVIEW */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-slate-400">Pratinjau Video:</span>
+                <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-black aspect-video group shadow-md">
+                  <iframe
+                    src={getYoutubeEmbedUrl(videoInputUrl)}
+                    title="Pratinjau Video"
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingVideoModal(false)}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-600/30 transition cursor-pointer"
+                >
+                  {saving ? "Menyimpan..." : "Simpan Video YouTube"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

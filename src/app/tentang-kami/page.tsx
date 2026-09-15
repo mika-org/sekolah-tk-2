@@ -11,10 +11,31 @@ export default function TentangKamiPage() {
   const [schools, setSchools] = useState<any[]>([]);
   const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("sadjati");
 
+  const handleSelectSchool = (code: string) => {
+    setSelectedSchoolCode(code);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("smartkids_selected_school", code);
+        const url = new URL(window.location.href);
+        url.searchParams.set("school", code);
+        window.history.replaceState({}, "", url.toString());
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
   useEffect(() => {
     let detectedCode = "";
 
     if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("smartkids_selected_school");
+        if (stored) detectedCode = stored.toLowerCase();
+      } catch (e) {
+        // ignore
+      }
+
       const host = window.location.hostname.toLowerCase();
       const hostParts = host.split(".");
       if (hostParts.length >= 3 && hostParts[0] !== "www" && hostParts[0] !== "localhost" && hostParts[0] !== "127") {
@@ -59,7 +80,7 @@ export default function TentangKamiPage() {
         }
       })
       .catch((err) => console.error("Error loading schools:", err));
-  }, [selectedSchoolCode]);
+  }, []);
 
   const values = [
     {
@@ -89,7 +110,7 @@ export default function TentangKamiPage() {
       {/* Navbar */}
       <Navbar
         selectedSchoolCode={selectedSchoolCode}
-        onSelectSchool={setSelectedSchoolCode}
+        onSelectSchool={handleSelectSchool}
         schools={schools}
       />
 
