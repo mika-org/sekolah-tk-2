@@ -28,8 +28,15 @@ export default function ImageModal({
         onClose();
       }
     };
+    const handleCloseEvent = () => {
+      if (isOpen) onClose();
+    };
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("close-child-modals", handleCloseEvent);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("close-child-modals", handleCloseEvent);
+    };
   }, [isOpen, onClose]);
 
   useEffect(() => {

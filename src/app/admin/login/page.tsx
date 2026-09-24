@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { Lock, User, LogIn, AlertCircle, Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
 
@@ -10,6 +10,18 @@ export default function AdminLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Jika user sudah memiliki sesi login aktif, jangan tampilkan form login, langsung arahkan ke dashboard
+  useEffect(() => {
+    fetch("/api/admin/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.admin) {
+          window.location.replace("/admin/dashboard");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,8 +44,8 @@ export default function AdminLoginPage() {
         throw new Error(data.error || "Login gagal");
       }
 
-      // Perform full location replace/assign to ensure fresh cookies in Next.js App Router
-      window.location.href = "/admin/dashboard";
+      // Gunakan replace agar halaman login tidak tersimpan di riwayat back browser
+      window.location.replace("/admin/dashboard");
     } catch (err: any) {
       setError(err.message || "Terjadi kesalahan saat login");
       setLoading(false);

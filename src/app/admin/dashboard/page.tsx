@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
@@ -403,6 +403,152 @@ export default function AdminDashboardPage() {
   const [selectedDetailClass, setSelectedDetailClass] = useState<any | null>(null);
   const [addStudentToClassModal, setAddStudentToClassModal] = useState<boolean>(false);
   const [selectedStudentToAdd, setSelectedStudentToAdd] = useState<string>("");
+
+  // =========================================================================
+  // SISTEM PENGELOLAAN TOMBOL BACK UNTUK MODAL / POP-UP
+  // Mencegah navigasi keluar / logout saat modal sedang terbuka ketika tombol Back ditekan
+  // =========================================================================
+  const [isChildModalOpen, setIsChildModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleChildModalState = (e: any) => {
+      setIsChildModalOpen(Boolean(e.detail?.isOpen));
+    };
+    window.addEventListener("child-modal-state-change", handleChildModalState);
+    return () => window.removeEventListener("child-modal-state-change", handleChildModalState);
+  }, []);
+
+  const isAnyModalOpen = Boolean(
+    previewModal.isOpen ||
+    selectedPpdb ||
+    selectedDetailClass ||
+    addStudentToClassModal ||
+    selectedCredentialModal ||
+    qrModal.isOpen ||
+    teacherProgressModal.isOpen ||
+    teacherCredentialModal.isOpen ||
+    progressiveHistoryModal.isOpen ||
+    studentSppHistoryModal.isOpen ||
+    sppPaymentModal.isOpen ||
+    dailyGradeModal.isOpen ||
+    editingVideoModal ||
+    isChildModalOpen
+  );
+
+  const isAnyModalOpenRef = useRef(isAnyModalOpen);
+  isAnyModalOpenRef.current = isAnyModalOpen;
+
+  const modalHistoryPushedRef = useRef(false);
+  const isClosingViaBackRef = useRef(false);
+
+  const closeAllModals = useCallback(() => {
+    let closed = false;
+    if (previewModal.isOpen) {
+      setPreviewModal((prev) => ({ ...prev, isOpen: false, src: null }));
+      closed = true;
+    }
+    if (selectedPpdb) {
+      setSelectedPpdb(null);
+      closed = true;
+    }
+    if (selectedDetailClass) {
+      setSelectedDetailClass(null);
+      closed = true;
+    }
+    if (addStudentToClassModal) {
+      setAddStudentToClassModal(false);
+      closed = true;
+    }
+    if (selectedCredentialModal) {
+      setSelectedCredentialModal(null);
+      closed = true;
+    }
+    if (qrModal.isOpen) {
+      setQrModal((prev) => ({ ...prev, isOpen: false }));
+      closed = true;
+    }
+    if (teacherProgressModal.isOpen) {
+      setTeacherProgressModal((prev) => ({ ...prev, isOpen: false }));
+      closed = true;
+    }
+    if (teacherCredentialModal.isOpen) {
+      setTeacherCredentialModal((prev) => ({ ...prev, isOpen: false }));
+      closed = true;
+    }
+    if (progressiveHistoryModal.isOpen) {
+      setProgressiveHistoryModal((prev) => ({ ...prev, isOpen: false }));
+      closed = true;
+    }
+    if (studentSppHistoryModal.isOpen) {
+      setStudentSppHistoryModal((prev) => ({ ...prev, isOpen: false, student: null }));
+      closed = true;
+    }
+    if (sppPaymentModal.isOpen) {
+      setSppPaymentModal((prev) => ({ ...prev, isOpen: false }));
+      closed = true;
+    }
+    if (dailyGradeModal.isOpen) {
+      setDailyGradeModal((prev) => ({ ...prev, isOpen: false }));
+      closed = true;
+    }
+    if (editingVideoModal) {
+      setEditingVideoModal(false);
+      closed = true;
+    }
+
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("close-child-modals"));
+    }
+
+    return closed;
+  }, [
+    previewModal.isOpen,
+    selectedPpdb,
+    selectedDetailClass,
+    addStudentToClassModal,
+    selectedCredentialModal,
+    qrModal.isOpen,
+    teacherProgressModal.isOpen,
+    teacherCredentialModal.isOpen,
+    progressiveHistoryModal.isOpen,
+    studentSppHistoryModal.isOpen,
+    sppPaymentModal.isOpen,
+    dailyGradeModal.isOpen,
+    editingVideoModal,
+  ]);
+
+  // Sinkronisasi riwayat browser dengan modal terbuka
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      if (!modalHistoryPushedRef.current) {
+        modalHistoryPushedRef.current = true;
+        window.history.pushState({ isModal: true }, "", window.location.href);
+      }
+    } else {
+      if (modalHistoryPushedRef.current && !isClosingViaBackRef.current) {
+        // Modal ditutup via UI (klik tombol X, klik backdrop, dsb), bukan tombol Back
+        modalHistoryPushedRef.current = false;
+        if (typeof window !== "undefined" && window.history.state?.isModal) {
+          window.history.back();
+        }
+      }
+      isClosingViaBackRef.current = false;
+    }
+  }, [isAnyModalOpen]);
+
+  // Tangani event tombol Back (popstate) browser & perangkat
+  useEffect(() => {
+    const handlePopState = () => {
+      if (isAnyModalOpenRef.current || modalHistoryPushedRef.current) {
+        isClosingViaBackRef.current = true;
+        modalHistoryPushedRef.current = false;
+        closeAllModals();
+      }
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [closeAllModals]);
 
   // Helper & Memos untuk Hak Akses & Data Akun Orang Tua (ORTU / ORANG_TUA)
   const isParent = admin?.role === "ORTU" || admin?.role === "ORANG_TUA";

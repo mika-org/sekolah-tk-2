@@ -114,6 +114,21 @@ export default function LesSdParentTab({
     fetchData();
   }, []);
 
+  // Dukungan tombol Back untuk menutup modal Les SD Wali Murid tanpa keluar dari dashboard
+  useEffect(() => {
+    const handleCloseChildModals = () => {
+      setRegisterModalOpen(false);
+      setPaymentModal((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+    };
+    window.addEventListener("close-child-modals", handleCloseChildModals);
+    return () => window.removeEventListener("close-child-modals", handleCloseChildModals);
+  }, []);
+
+  useEffect(() => {
+    const isModalOpen = registerModalOpen || paymentModal.isOpen;
+    window.dispatchEvent(new CustomEvent("child-modal-state-change", { detail: { isOpen: isModalOpen } }));
+  }, [registerModalOpen, paymentModal.isOpen]);
+
   const handleOpenPayment = (reg: any) => {
     const currentMonthName = new Date().toLocaleDateString("id-ID", {
       month: "long",

@@ -125,6 +125,21 @@ export default function LesSdAdminTab({
     fetchData();
   }, [schoolFilter, gradeFilter, statusFilter, searchQuery]);
 
+  // Dukungan tombol Back untuk menutup modal Les SD Admin tanpa keluar dari dashboard
+  useEffect(() => {
+    const handleCloseChildModals = () => {
+      setAssignPicModal((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+      setManualPaymentModal((prev) => (prev.isOpen ? { ...prev, isOpen: false } : prev));
+    };
+    window.addEventListener("close-child-modals", handleCloseChildModals);
+    return () => window.removeEventListener("close-child-modals", handleCloseChildModals);
+  }, []);
+
+  useEffect(() => {
+    const isModalOpen = assignPicModal.isOpen || manualPaymentModal.isOpen;
+    window.dispatchEvent(new CustomEvent("child-modal-state-change", { detail: { isOpen: isModalOpen } }));
+  }, [assignPicModal.isOpen, manualPaymentModal.isOpen]);
+
   // Handle Quick Status Change
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     try {
