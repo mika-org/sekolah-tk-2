@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
   MAX_UPLOAD_SIZE_BYTES,
@@ -29,19 +29,21 @@ export async function POST(req: Request) {
     );
     const storedFile = await storeUpload(fileEntry, category);
 
-    try {
-      await prisma.uploadLog.create({
-        data: {
-          fileName: storedFile.fileName,
-          fileFolder: storedFile.fileFolder,
-          fileUrl: storedFile.fileUrl,
-          fileSize: storedFile.storedSize,
-          mimeType: storedFile.mimeType,
-        },
-      });
-    } catch (error) {
-      console.warn("Upload DB log warning (non-fatal):", error);
-    }
+    after(async () => {
+      try {
+        await prisma.uploadLog.create({
+          data: {
+            fileName: storedFile.fileName,
+            fileFolder: storedFile.fileFolder,
+            fileUrl: storedFile.fileUrl,
+            fileSize: storedFile.storedSize,
+            mimeType: storedFile.mimeType,
+          },
+        });
+      } catch (error) {
+        console.warn("Upload DB log warning (non-fatal):", error);
+      }
+    });
 
     return NextResponse.json(
       {

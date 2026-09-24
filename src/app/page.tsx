@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import LandingPage from "@/components/home/LandingPage";
@@ -10,6 +10,22 @@ export default function Home() {
   const [currentTab, setCurrentTab] = useState<"home" | "ppdb">("home");
   const [schools, setSchools] = useState<any[]>([]);
   const [selectedSchoolCode, setSelectedSchoolCode] = useState<string>("sadjati");
+
+  const resetPageScroll = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  };
+
+  const handleTabChange = (tab: "home" | "ppdb") => {
+    resetPageScroll();
+    setCurrentTab(tab);
+    window.requestAnimationFrame(resetPageScroll);
+  };
+
+  useLayoutEffect(() => {
+    resetPageScroll();
+  }, [currentTab]);
 
   const handleSelectSchool = (code: string) => {
     setSelectedSchoolCode(code);
@@ -112,7 +128,7 @@ export default function Home() {
       {/* Sticky Top Navbar */}
       <Navbar
         currentTab={currentTab}
-        setCurrentTab={setCurrentTab}
+        setCurrentTab={handleTabChange}
         selectedSchoolCode={selectedSchoolCode}
         onSelectSchool={handleSelectSchool}
         schools={schools}
@@ -122,13 +138,13 @@ export default function Home() {
       <main className="flex-1">
         {currentTab === "home" ? (
           <LandingPage
-            onStartRegistration={() => setCurrentTab("ppdb")}
+            onStartRegistration={() => handleTabChange("ppdb")}
             selectedSchoolCode={selectedSchoolCode}
             schools={schools}
           />
         ) : (
           <PpdbForm
-            onBackToHome={() => setCurrentTab("home")}
+            onBackToHome={() => handleTabChange("home")}
             selectedSchoolCode={selectedSchoolCode}
             schools={schools}
           />

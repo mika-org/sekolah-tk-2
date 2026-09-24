@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
@@ -93,6 +93,15 @@ export default function AdminDashboardPage() {
     | "les-sd"
     | "student-grades"
   >("overview");
+  const mainContentRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      mainContentRef.current?.scrollTo({ top: 0, behavior: "auto" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -502,6 +511,7 @@ export default function AdminDashboardPage() {
   const [newGalleryTitle, setNewGalleryTitle] = useState("");
   const [newGalleryImage, setNewGalleryImage] = useState("");
   const [newGalleryOrder, setNewGalleryOrder] = useState<number>(0);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
 
   const [testimonialsList, setTestimonialsList] = useState<any[]>([]);
   const [editingTestimonial, setEditingTestimonial] = useState<any | null>(null);
@@ -922,15 +932,28 @@ export default function AdminDashboardPage() {
     formData.append("file", file);
     formData.append("category", category);
 
-    const res = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    if (!res.ok || !data.success) {
-      throw new Error(data.error || "Gagal mengunggah file");
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 90_000);
+
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Gagal mengunggah file");
+      }
+      return data.url;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new Error("Unggahan terlalu lama. Periksa koneksi lalu coba lagi.");
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timeoutId);
     }
-    return data.url;
   };
 
   // School Handlers
@@ -2605,7 +2628,7 @@ _Tata Usaha & Keuangan Sekolah_`;
         </aside>
 
         {/* FULL-WIDTH BODY DISPLAY */}
-        <main className="flex-1 p-6 md:p-8 overflow-y-auto w-full space-y-8">
+        <main ref={mainContentRef} className="flex-1 p-4 sm:p-6 md:p-8 overflow-y-auto w-full space-y-8">
           {/* MOBILE HORIZONTAL NAVIGATION TABS */}
           <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-3 mb-2 scrollbar-none">
             {sidebarMenuGroups.flatMap((g) => g.items).map((item) => {
@@ -2930,7 +2953,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                 <>
                   {/* STAT CARDS FULL WIDTH GRID */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5 w-full">
-                <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group">
+                <button type="button" onClick={() => setActiveTab("schools")} className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group text-left cursor-pointer">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-400">Cabang Sekolah</span>
                     <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-emerald-500/20">
@@ -2939,9 +2962,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                   </div>
                   <p className="text-3xl font-black text-white tracking-tight">{schoolsList.length}</p>
                   <p className="text-[11px] text-slate-400 mt-1">Terdaftar di YAPCHI Foundation</p>
-                </div>
+                </button>
 
-                <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group">
+                <button type="button" onClick={() => setActiveTab("ppdb")} className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group text-left cursor-pointer">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-400">Total Pendaftar PPDB</span>
                     <div className="w-10 h-10 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-blue-500/20">
@@ -2950,9 +2973,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                   </div>
                   <p className="text-3xl font-black text-white tracking-tight">{ppdbList.length}</p>
                   <p className="text-[11px] text-slate-400 mt-1">Status verifikasi dokumen & bayar</p>
-                </div>
+                </button>
 
-                <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group">
+                <button type="button" onClick={() => setActiveTab("ppdb")} className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group text-left cursor-pointer">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-400">Status Menunggu</span>
                     <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-amber-500/20">
@@ -2963,9 +2986,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                     {ppdbList.filter((p) => p.status === "PENDING").length}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-1">Perlu persetujuan admin</p>
-                </div>
+                </button>
 
-                <div className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group">
+                <button type="button" onClick={() => setActiveTab("programs")} className="bg-slate-900/80 border border-slate-800/90 hover:border-emerald-500/40 rounded-3xl p-6 transition-all shadow-xl group text-left cursor-pointer">
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-xs font-black uppercase tracking-wider text-slate-400">Total Program</span>
                     <div className="w-10 h-10 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform border border-purple-500/20">
@@ -2974,7 +2997,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                   </div>
                   <p className="text-3xl font-black text-white tracking-tight">{programsList.length}</p>
                   <p className="text-[11px] text-slate-400 mt-1">Program belajar aktif</p>
-                </div>
+                </button>
 
                 {admin?.role !== "GURU" && admin?.role !== "ORTU" && admin?.role !== "ORANG_TUA" && (
                   <div 
@@ -6644,11 +6667,12 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                 <div className="flex flex-wrap items-center gap-2.5">
                   {!isParent && (
-                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-2xl border border-slate-800">
+                    <div className="grid w-full grid-cols-2 items-stretch gap-1.5 bg-slate-950 p-1 rounded-2xl border border-slate-800 sm:w-auto">
                       <button
                         type="button"
                         onClick={() => setSppViewMode("students")}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                        aria-pressed={sppViewMode === "students"}
+                        className={`min-w-0 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
                           sppViewMode === "students"
                             ? "bg-emerald-600 text-white shadow-md shadow-emerald-600/30"
                             : "text-slate-400 hover:text-white"
@@ -6660,7 +6684,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                       <button
                         type="button"
                         onClick={() => setSppViewMode("records")}
-                        className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                        aria-pressed={sppViewMode === "records"}
+                        className={`min-w-0 px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
                           sppViewMode === "records"
                             ? "bg-amber-600 text-white shadow-md shadow-amber-600/30"
                             : "text-slate-400 hover:text-white"
@@ -9009,35 +9034,49 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                   <div>
                     <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wider">
-                      Pilih Gambar (maks 1 MB)
+                      Pilih Gambar (JPG, PNG, WEBP - maks 10 MB)
                     </label>
-                    <input
-                      type="file"
-                      accept={IMAGE_UPLOAD_ACCEPT}
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
+                    <label className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-3 py-3 text-xs font-bold transition ${uploadingGallery ? "cursor-wait border-amber-500/50 bg-amber-500/10 text-amber-300" : "cursor-pointer border-slate-700 bg-slate-950 text-slate-300 hover:border-emerald-500"}`}>
+                      <RefreshCw className={`h-4 w-4 ${uploadingGallery ? "animate-spin text-amber-400" : "hidden"}`} />
+                      {!uploadingGallery && <Upload className="h-4 w-4 text-emerald-400" />}
+                      <span>{uploadingGallery ? "Mengunggah dan mengoptimalkan..." : newGalleryImage ? "Ganti gambar" : "Pilih gambar"}</span>
+                      <input
+                        type="file"
+                        accept={IMAGE_UPLOAD_ACCEPT}
+                        disabled={uploadingGallery}
+                        onChange={async (e) => {
+                          const input = e.currentTarget;
+                          const file = input.files?.[0];
+                          if (!file) return;
+
+                          setUploadingGallery(true);
                           try {
                             const url = await uploadFile(file, "gallery");
                             setNewGalleryImage(url);
-                            showMessage("Gambar berhasil diunggah!", "success");
+                            showMessage("Gambar JPG/PNG/WEBP berhasil diunggah dan siap disimpan.", "success");
                           } catch (err: any) {
-                            showMessage(err.message, "error");
+                            showMessage(err.message || "Gagal mengunggah gambar", "error");
+                          } finally {
+                            setUploadingGallery(false);
+                            input.value = "";
                           }
-                        }
-                      }}
-                      className="text-xs text-slate-400 pt-2"
-                    />
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    {newGalleryImage && !uploadingGallery && (
+                      <p className="mt-1.5 text-[11px] font-bold text-emerald-400">✓ Gambar siap ditambahkan ke galeri</p>
+                    )}
                   </div>
 
                   <div className="flex items-end">
                     <button
                       type="submit"
-                      disabled={saving || !newGalleryImage}
+                      disabled={saving || uploadingGallery || !newGalleryImage}
                       className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       <Upload className="w-4 h-4" />
-                      <span>Tambahkan Ke Galeri</span>
+                      <span>{saving ? "Menyimpan..." : uploadingGallery ? "Menunggu unggahan..." : "Tambahkan Ke Galeri"}</span>
                     </button>
                   </div>
                 </div>

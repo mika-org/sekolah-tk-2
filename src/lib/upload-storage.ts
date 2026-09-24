@@ -84,7 +84,7 @@ async function compressImage(buffer: Buffer) {
         fit: "inside",
         withoutEnlargement: true,
       })
-      .webp({ quality: attempt.quality, effort: 4, smartSubsample: true })
+      .webp({ quality: attempt.quality, effort: 1, smartSubsample: true })
       .toBuffer();
 
     if (output.length <= MAX_UPLOAD_SIZE_BYTES) return output;

@@ -417,7 +417,7 @@ export default function PpdbForm({
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 [overflow-anchor:none]">
       {/* HEADER & HERO BANNER */}
       <div className="bg-[#e8f4ec] rounded-3xl p-6 sm:p-8 border border-emerald-100 mb-8 relative overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">

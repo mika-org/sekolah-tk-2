@@ -97,6 +97,7 @@ export default function LandingPage({
   const [programs, setPrograms] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [gallery, setGallery] = useState<any[]>(DEFAULT_GALLERY);
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
   const [testimonials, setTestimonials] = useState<any[]>(DEFAULT_TESTIMONIALS);
   const [loading, setLoading] = useState(true);
 
@@ -206,6 +207,7 @@ export default function LandingPage({
   const ctaSubtitle =
     siteProfile?.ctaSubtitle ||
     `Bergabunglah bersama ${schoolName} dan berikan pengalaman belajar terbaik untuk masa depan cerah mereka`;
+  const galleryItems = gallery.length > 0 ? gallery : DEFAULT_GALLERY;
 
   return (
     <div className="flex flex-col gap-12 md:gap-16 pb-16 overflow-hidden">
@@ -657,10 +659,11 @@ export default function LandingPage({
               </p>
 
               <div className="grid grid-cols-3 gap-3">
-                {(gallery.length > 0 ? gallery : DEFAULT_GALLERY).slice(0, 3).map((g: any) => (
-                  <div
+                {galleryItems.slice(0, 3).map((g: any) => (
+                  <button
+                    type="button"
                     key={g.id}
-                    className="relative h-44 sm:h-52 rounded-2xl overflow-hidden shadow-sm bg-amber-200 cursor-pointer group/img"
+                    className="relative h-44 sm:h-52 rounded-2xl overflow-hidden shadow-sm bg-amber-200 cursor-pointer group/img touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-400"
                     onClick={() => handleOpenPreview(g.imageUrl, `Galeri: ${g.title || 'Dokumentasi Sekolah'}`)}
                     title="Klik untuk memperbesar foto"
                   >
@@ -671,16 +674,21 @@ export default function LandingPage({
                       sizes="(max-width: 768px) 33vw, 250px"
                       className="object-cover group-hover/img:scale-105 transition-transform duration-300"
                     />
-                    <div className="absolute inset-0 bg-blue-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="pointer-events-none absolute inset-0 bg-blue-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
                       <Eye className="w-6 h-6 text-white drop-shadow-md" />
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
 
             <div className="mt-8 text-center">
-              <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-6 py-2.5 rounded-full shadow-md transition-colors cursor-pointer">
+              <button
+                type="button"
+                onClick={() => setIsGalleryModalOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-6 py-2.5 rounded-full shadow-md transition-colors cursor-pointer touch-manipulation"
+                aria-haspopup="dialog"
+              >
                 Lihat Galeri Lainnya
               </button>
             </div>
@@ -771,6 +779,65 @@ export default function LandingPage({
           </button>
         </div>
       </section>
+
+      {isGalleryModalOpen && (
+        <div
+          className="fixed inset-0 z-[90] bg-slate-950/90 backdrop-blur-md p-0 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Galeri ${schoolName}`}
+          onClick={() => setIsGalleryModalOpen(false)}
+        >
+          <div
+            className="mx-auto flex h-[100dvh] w-full max-w-6xl flex-col overflow-hidden bg-white sm:h-auto sm:max-h-[92dvh] sm:rounded-3xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-4 sm:px-6">
+              <div>
+                <h3 className="text-lg font-extrabold text-slate-900">Galeri {schoolName}</h3>
+                <p className="text-xs text-slate-500">Pilih foto untuk melihat ukuran penuh.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGalleryModalOpen(false)}
+                className="flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                <span>Kembali</span>
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {galleryItems.map((item: any) => (
+                  <button
+                    type="button"
+                    key={item.id || item.imageUrl}
+                    onClick={() => {
+                      setIsGalleryModalOpen(false);
+                      handleOpenPreview(item.imageUrl, `Galeri: ${item.title || "Dokumentasi Sekolah"}`);
+                    }}
+                    className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-400"
+                  >
+                    <div className="relative aspect-square w-full bg-slate-100">
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.title || "Galeri Foto"}
+                        fill
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    </div>
+                    <span className="block truncate px-3 py-2.5 text-xs font-bold text-slate-700">
+                      {item.title || "Dokumentasi Sekolah"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Image & Document Modal Preview */}
       <ImageModal
