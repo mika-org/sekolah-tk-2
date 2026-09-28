@@ -20,6 +20,20 @@ export default function Home() {
   const handleTabChange = (tab: "home" | "ppdb") => {
     resetPageScroll();
     setCurrentTab(tab);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("smartkids_current_tab", tab);
+        const url = new URL(window.location.href);
+        if (tab === "ppdb") {
+          url.searchParams.set("tab", "ppdb");
+        } else {
+          url.searchParams.delete("tab");
+        }
+        window.history.replaceState({}, "", url.toString());
+      } catch (e) {
+        // ignore
+      }
+    }
     window.requestAnimationFrame(resetPageScroll);
   };
 
@@ -71,7 +85,13 @@ export default function Home() {
       }
 
       const qTab = params.get("tab");
-      if (qTab === "ppdb") {
+      let storedTab = "";
+      try {
+        storedTab = localStorage.getItem("smartkids_current_tab") || "";
+      } catch (e) {
+        // ignore
+      }
+      if (qTab === "ppdb" || storedTab === "ppdb") {
         setCurrentTab("ppdb");
       }
     }

@@ -10,11 +10,12 @@ const PASSWORD_MANAGER_ROLES = new Set([
   "ADMIN_CABANG",
   "ADMIN_SEKOLAH",
   "SCHOOL_ADMIN",
+  "ADMIN",
 ]);
 
 export function canManagePasswords(role: unknown): boolean {
   return (
-    typeof role === "string" && PASSWORD_MANAGER_ROLES.has(role.toUpperCase())
+    typeof role === "string" && PASSWORD_MANAGER_ROLES.has(role.toUpperCase().trim())
   );
 }
 

@@ -159,35 +159,66 @@ export async function GET() {
       // 3c. Testimonials check
       const rawTestimonials: any[] = await prisma.$queryRawUnsafe(`SELECT id FROM "testimoni" WHERE "id_sekolah" = $1`, school.id);
       if (rawTestimonials.length === 0) {
-        const defaultTestimonials = [
-          {
-            parentName: "Bunda Rayyan (Ibu Maya)",
-            role: "Orang Tua Siswa",
-            initials: "BM",
-            content: "Metode bermain sambil belajar di Smart Kids sangat menyenangkan! Rayyan jadi lebih mandiri dan berani berbicara di depan umum.",
-            rating: 5,
-            bgColor: "emerald",
-            orderIndex: 1,
-          },
-          {
-            parentName: "Bapak Hendra Pratama",
-            role: "Orang Tua Siswa",
-            initials: "BP",
-            content: "Program bimbingan belajarnya sangat intensif dan guru-gurunya sabar sekali membimbing anak. Nilai dan pemahaman anak meningkat pesat!",
-            rating: 5,
-            bgColor: "blue",
-            orderIndex: 2,
-          },
-          {
-            parentName: "Mama Alif (Ibu Dian)",
-            role: "Orang Tua Siswa",
-            initials: "MD",
-            content: "Fasilitas lengkap, kelasnya nyaman dan aman. Anak saya selalu antusias berangkat ke sekolah setiap hari.",
-            rating: 5,
-            bgColor: "amber",
-            orderIndex: 3,
-          },
-        ];
+        const isBcl = school.code?.includes("bumi") || school.name?.toLowerCase().includes("bcl");
+        const defaultTestimonials = isBcl
+          ? [
+              {
+                parentName: "Bunda Kenzo (Ibu Citra)",
+                role: "Orang Tua Siswa",
+                initials: "BK",
+                content: "Sejak sekolah di Smart Kids BCL, Kenzo jadi suka membaca buku dan aktif bercerita. Perkembangan motorik dan percaya dirinya luar biasa!",
+                rating: 5,
+                bgColor: "emerald",
+                orderIndex: 1,
+              },
+              {
+                parentName: "Bapak Dedi Kurniawan",
+                role: "Orang Tua Siswa",
+                initials: "DK",
+                content: "Guru-guru di Smart Kids BCL sangat perhatian dan komunikatif ke orang tua melalui laporan harian. Sangat merekomendasikan sekolah ini!",
+                rating: 5,
+                bgColor: "blue",
+                orderIndex: 2,
+              },
+              {
+                parentName: "Ibu Rina Wulandari",
+                role: "Orang Tua Siswa",
+                initials: "RW",
+                content: "Lingkungan sekolah BCL sangat asri, bersih, dan kegiatannya sangat kreatif. Anak selalu ceria pulang sekolah.",
+                rating: 5,
+                bgColor: "purple",
+                orderIndex: 3,
+              },
+            ]
+          : [
+              {
+                parentName: "Bunda Rayyan (Ibu Maya)",
+                role: "Orang Tua Siswa",
+                initials: "BM",
+                content: "Metode bermain sambil belajar di Smart Kids Sadjati sangat menyenangkan! Rayyan jadi lebih mandiri dan berani berbicara di depan umum.",
+                rating: 5,
+                bgColor: "emerald",
+                orderIndex: 1,
+              },
+              {
+                parentName: "Bapak Hendra Pratama",
+                role: "Orang Tua Siswa",
+                initials: "HP",
+                content: "Program bimbingan belajarnya sangat intensif dan guru-gurunya sabar sekali membimbing anak. Nilai dan pemahaman anak meningkat pesat!",
+                rating: 5,
+                bgColor: "blue",
+                orderIndex: 2,
+              },
+              {
+                parentName: "Mama Alif (Ibu Dian)",
+                role: "Orang Tua Siswa",
+                initials: "MD",
+                content: "Fasilitas lengkap, kelasnya nyaman dan aman. Anak saya selalu antusias berangkat ke sekolah setiap hari.",
+                rating: 5,
+                bgColor: "amber",
+                orderIndex: 3,
+              },
+            ];
         for (const t of defaultTestimonials) {
           await prisma.$executeRawUnsafe(
             `INSERT INTO "testimoni" ("id", "id_sekolah", "nama_orang_tua", "peran", "inisial", "konten", "penilaian", "warna_latar", "urutan", "dibuat_pada") VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7, $8, NOW())`,

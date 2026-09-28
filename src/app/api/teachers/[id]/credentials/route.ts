@@ -14,11 +14,19 @@ export async function GET(
 ) {
   try {
     const admin = await getAdminFromCookies();
-    if (!admin || !canManagePasswords(admin.role)) {
-      return NextResponse.json({ success: false, error: "Akses ditolak" }, { status: 403 });
+    if (!admin) {
+      return NextResponse.json({ success: false, error: "Silakan login terlebih dahulu" }, { status: 401 });
     }
 
     const { id } = await params;
+
+    // Check if user is an admin/manager or teacher
+    const isManager = canManagePasswords(admin.role);
+    const isTeacher = admin.role === "GURU";
+
+    if (!isManager && !isTeacher) {
+      return NextResponse.json({ success: false, error: "Akses ditolak. Hanya admin atau guru yang bersangkutan yang dapat mengakses." }, { status: 403 });
+    }
 
     const teacherList: any[] = await prisma.$queryRawUnsafe(
       `SELECT g.id, g.nama as name, g.jabatan as role, g.kelas_ditugaskan as "assignedClass", g.email, g.telepon as phone, g.kode_qr as "qrCode", g.id_sekolah as "schoolId", s.nama as "schoolName" 

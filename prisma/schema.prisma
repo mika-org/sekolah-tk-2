@@ -110,6 +110,7 @@ model SiteProfile {
   facebook      String   @default("Smart Kids") @map("facebook")
   address       String?  @default("DeKeraton, Karawang") @map("alamat")
   qrisImageUrl  String?  @default("/images/qris_default.png") @map("url_gambar_qris")
+  isQrisActive  Boolean  @default(true) @map("qris_aktif")
   helpTitle     String?  @default("Butuh Bantuan?") @map("judul_bantuan")
   helpSubtitle  String?  @default("Tim kami siap membantu anda setiap hari!") @map("subjudul_bantuan")
   helpHours     String?  @default("Senin - Sabtu | 08.00 - 17.00 WIB") @map("jam_operasional_bantuan")

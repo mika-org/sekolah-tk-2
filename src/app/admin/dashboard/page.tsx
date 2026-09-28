@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import QRCode from "qrcode";
 import { useRouter } from "next/navigation";
 import ImageModal from "@/components/common/ImageModal";
 import SearchableSelect from "@/components/common/SearchableSelect";
@@ -276,6 +277,7 @@ export default function AdminDashboardPage() {
     password: string;
     passwordAvailable: boolean;
     qrCode: string;
+    qrDataUrl?: string;
   }>({
     isOpen: false,
     loading: false,
@@ -288,6 +290,7 @@ export default function AdminDashboardPage() {
     password: "",
     passwordAvailable: false,
     qrCode: "",
+    qrDataUrl: "",
   });
   const [dailyGradesList, setDailyGradesList] = useState<any[]>([]);
   const [dailyGradeModal, setDailyGradeModal] = useState<{
@@ -330,8 +333,20 @@ export default function AdminDashboardPage() {
     parentPhone?: string;
     waUrl?: string | null;
     emailSent?: boolean;
+    qrCode?: string;
+    qrDataUrl?: string;
   } | null>(null);
   const [credentialsCopied, setCredentialsCopied] = useState<boolean>(false);
+  const [savingQrisToggle, setSavingQrisToggle] = useState<boolean>(false);
+  const [studentQrModal, setStudentQrModal] = useState<{
+    isOpen: boolean;
+    student: any | null;
+    qrDataUrl: string;
+  }>({
+    isOpen: false,
+    student: null,
+    qrDataUrl: "",
+  });
 
   const [attendanceList, setAttendanceList] = useState<any[]>([]);
   const [editingAttendance, setEditingAttendance] = useState<any | null>(null);
@@ -1195,6 +1210,44 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleOpenStudentQr = async (student: any) => {
+    const code = student.qrCode || `STUDENT:${student.nisn || student.id}`;
+    let qrDataUrl = "";
+    try {
+      qrDataUrl = await QRCode.toDataURL(code, { width: 350, margin: 2 });
+    } catch (_) {}
+    setStudentQrModal({
+      isOpen: true,
+      student,
+      qrDataUrl,
+    });
+  };
+
+  const handleToggleQrisActive = async () => {
+    const currentVal = siteProfile?.isQrisActive !== false;
+    const nextVal = !currentVal;
+    setSavingQrisToggle(true);
+    try {
+      const targetSchoolId = siteProfile?.schoolId || (selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id);
+      const resProf = await fetch("/api/site-profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          schoolId: targetSchoolId,
+          isQrisActive: nextVal,
+        }),
+      });
+      const dataProf = await resProf.json();
+      if (!resProf.ok || !dataProf.success) throw new Error(dataProf.error);
+      setSiteProfile((prev: any) => ({ ...prev, isQrisActive: nextVal }));
+      showMessage(`Metode pembayaran QRIS berhasil ${nextVal ? "diaktifkan (Tampil di PPDB & Portal)" : "dinonaktifkan (Disembunyikan)"}!`, "success");
+    } catch (err: any) {
+      showMessage(err.message || "Gagal mengubah status QRIS", "error");
+    } finally {
+      setSavingQrisToggle(false);
+    }
+  };
+
   const handleSendStudentCredentials = async (studentId: string) => {
     setSendingAccount(true);
     try {
@@ -1204,6 +1257,12 @@ export default function AdminDashboardPage() {
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
 
+      let studentQrUrl = "";
+      const codeText = data.data.student?.qrCode || `STUDENT:${data.data.username}`;
+      try {
+        studentQrUrl = await QRCode.toDataURL(codeText, { width: 300, margin: 2 });
+      } catch (_) {}
+
       setSelectedCredentialModal({
         studentName: data.data.student.name,
         username: data.data.username,
@@ -1212,6 +1271,8 @@ export default function AdminDashboardPage() {
         parentPhone: data.data.parentPhone || "",
         waUrl: data.data.waUrl,
         emailSent: data.data.emailSent,
+        qrCode: codeText,
+        qrDataUrl: studentQrUrl,
       });
       showMessage("Akun ortu berhasil dibuat & dikirim!", "success");
     } catch (err: any) {
@@ -1366,10 +1427,15 @@ export default function AdminDashboardPage() {
       const res = await fetch(`/api/teachers/${teacherId}/credentials`);
       const data = await res.json();
       if (data.success && data.data) {
+        let teacherQrUrl = "";
+        try {
+          teacherQrUrl = await QRCode.toDataURL(data.data.qrCode || `TEACHER:${teacherId}`, { width: 300, margin: 2 });
+        } catch (_) {}
         setTeacherCredentialModal({
           isOpen: true,
           loading: false,
           ...data.data,
+          qrDataUrl: teacherQrUrl,
         });
       } else {
         showMessage(data.error || "Gagal memuat akun guru", "error");
@@ -2511,7 +2577,7 @@ _Tata Usaha & Keuangan Sekolah_`;
       const teacherAtts = teacherAttendanceList.filter(
         (att) => att.teacherId === teacher.id && att.status === "hadir"
       );
-      const hadirDays = teacherAtts.length || 12;
+      const hadirDays = teacherAtts.length;
       const hoursTaught = hadirDays * 3;
       const monthlyResult = Math.round(hadirDays * 50000 * sppRatio);
 
@@ -3287,8 +3353,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                               const teacherAtts = teacherAttendanceList.filter(
                                 (att) => att.teacherId === teacher.id && att.status === "hadir"
                               );
-                              const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
-                              const hoursTaught = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+                              const hadirDays = teacherAtts.length > 0 ? teacherAtts.length : (tpRecord && Number(tpRecord.hoursTaught) > 0 ? Math.round(Number(tpRecord.hoursTaught) / 3) : 0);
+                              const hoursTaught = tpRecord && Number(tpRecord.hoursTaught) > 0 ? Number(tpRecord.hoursTaught) : hadirDays * 3;
                               const targetHours = tpRecord ? Number(tpRecord.targetHours) : 40;
                               const pct = Math.min(Math.round((hoursTaught / targetHours) * 100), 100);
 
@@ -3539,15 +3605,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
-              {/* FORM TAMBAH / EDIT MASTER KELAS */}
+              {/* MODAL TAMBAH / EDIT MASTER KELAS */}
               {editingClassRoom && (
-                <form
-                  onSubmit={handleSaveClassRoom}
-                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
-                >
-                  <h3 className="font-bold text-white text-base">
-                    {editingClassRoom.id ? "Edit Master Kelas" : "Tambah Master Kelas Baru"}
-                  </h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveClassRoom} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                            🏫
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">
+                              {editingClassRoom.id ? "Edit Master Kelas" : "Tambah Master Kelas Baru"}
+                            </h3>
+                            <p className="text-xs text-slate-400">Atur nama kelas, cabang sekolah, dan wali kelas</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingClassRoom(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
@@ -3657,12 +3739,14 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <button
                       type="submit"
                       disabled={saving}
-                      className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       Simpan Master Kelas
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {/* LIST OF MASTER CLASSES */}
@@ -3911,16 +3995,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
-              {/* EDIT / CREATE FORM CARD */}
+              {/* MODAL EDIT / CREATE CABANG SEKOLAH */}
               {editingSchool && (
-                <form
-                  onSubmit={handleSaveSchool}
-                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full"
-                >
-                  <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-                    <Building className="w-5 h-5 text-emerald-400" />
-                    {editingSchool.id ? "Edit Cabang Sekolah" : "Tambah Cabang Sekolah Baru"}
-                  </h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-6 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveSchool} className="space-y-6">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                            <Building className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-extrabold text-white text-base">
+                              {editingSchool.id ? "Edit Cabang Sekolah" : "Tambah Cabang Sekolah Baru"}
+                            </h3>
+                            <p className="text-xs text-slate-400">Atur profil cabang, kontak, dan alamat sekolah</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingSchool(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                     <div>
@@ -4016,12 +4115,14 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <button
                       type="submit"
                       disabled={saving}
-                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       {saving ? "Menyimpan..." : "Simpan Cabang Sekolah"}
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {/* SCHOOLS CARDS FULL WIDTH GRID */}
@@ -4122,16 +4223,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
-              {/* EDIT / CREATE ADMIN USER FORM CARD */}
+              {/* MODAL EDIT / CREATE ADMIN USER */}
               {editingAdminUser && (
-                <form
-                  onSubmit={handleSaveAdminUser}
-                  className="bg-slate-900/90 border border-purple-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full animate-fadeIn"
-                >
-                  <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-                    <ShieldCheck className="w-5 h-5 text-purple-400" />
-                    {editingAdminUser.id ? "Edit Akun User Admin" : "Tambah Akun User Admin Baru"}
-                  </h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 max-w-3xl w-full space-y-6 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveAdminUser} className="space-y-6">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold border border-purple-500/30">
+                            <ShieldCheck className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-extrabold text-white text-base">
+                              {editingAdminUser.id ? "Edit Akun User Admin" : "Tambah Akun User Admin Baru"}
+                            </h3>
+                            <p className="text-xs text-slate-400">Kelola akun, role, dan hak akses pengguna</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAdminUser(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                     <div>
@@ -4229,12 +4345,14 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <button
                       type="submit"
                       disabled={saving}
-                      className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/30"
+                      className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/30 cursor-pointer"
                     >
                       {saving ? "Menyimpan..." : "Simpan User Admin"}
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {/* ADMIN USERS TABLE FULL WIDTH */}
@@ -4719,14 +4837,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
+              {/* MODAL EDIT / TAMBAH PROGRAM */}
               {editingProgram && (
-                <form
-                  onSubmit={handleSaveProgram}
-                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
-                >
-                  <h3 className="font-bold text-white text-base">
-                    {editingProgram.id ? "Edit Program" : "Tambah Program Baru"}
-                  </h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-3xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveProgram} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                            🌟
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">
+                              {editingProgram.id ? "Edit Program" : "Tambah Program Baru"}
+                            </h3>
+                            <p className="text-xs text-slate-400">Atur program belajar, nominal SPP, dan rentang usia</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingProgram(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
                     <div>
@@ -4853,12 +4988,14 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <button
                       type="submit"
                       disabled={saving}
-                      className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       Simpan Program
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 w-full">
@@ -4977,14 +5114,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
+              {/* MODAL EDIT / TAMBAH GURU */}
               {editingTeacher && (
-                <form
-                  onSubmit={handleSaveTeacher}
-                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
-                >
-                  <h3 className="font-bold text-white text-base">
-                    {editingTeacher.id ? "Edit Data Guru" : "Tambah Guru Baru"}
-                  </h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-4xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveTeacher} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                            👩‍🏫
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">
+                              {editingTeacher.id ? "Edit Data Guru" : "Tambah Guru Baru"}
+                            </h3>
+                            <p className="text-xs text-slate-400">Atur profil guru, kontak, foto, dan cabang mengajar</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTeacher(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
@@ -5168,12 +5322,14 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <button
                       type="submit"
                       disabled={saving}
-                      className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30"
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer"
                     >
                       Simpan Data Guru
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {teachersList.length === 0 ? (
@@ -5336,14 +5492,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
+              {/* MODAL EDIT DATA SISWA & ORANG TUA */}
               {editingStudent && (
-                <form onSubmit={handleSaveStudent} className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h3 className="font-bold text-white text-base">{editingStudent.id ? "Edit Data Siswa & Orang Tua" : "Tambah Siswa & Orang Tua Baru"}</h3>
-                    <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                      ID: {editingStudent.id || "BARU"}
-                    </span>
-                  </div>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-4xl w-full space-y-5 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveStudent} className="space-y-5">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                            👶
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">{editingStudent.id ? "Edit Data Siswa & Orang Tua" : "Tambah Siswa & Orang Tua Baru"}</h3>
+                            <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                              ID: {editingStudent.id || "BARU"}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingStudent(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                   {/* SECTION 1: DATA SISWA */}
                   <div className="space-y-3">
@@ -5580,11 +5753,15 @@ _Tata Usaha & Keuangan Sekolah_`;
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {/* MODAL INPUT NILAI HARIAN (POPUP) */}
               {dailyGradeModal.isOpen && (
-                <form onSubmit={handleSaveDailyGrade} className="bg-slate-900/95 border border-amber-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full">
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-5 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveDailyGrade} className="space-y-5">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold border border-amber-500/30">
@@ -5697,6 +5874,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {/* FILTER & SEARCH BAR SISWA (NIM/NISN, PLOTTING KELAS & WALI KELAS) */}
@@ -6113,6 +6292,15 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                       <div className="flex items-center gap-1.5">
                         <button
+                          type="button"
+                          onClick={() => handleOpenStudentQr(s)}
+                          className="px-2.5 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                          title="Lihat / Cetak QR Presensi Siswa"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span>QR Presensi</span>
+                        </button>
+                        <button
                           onClick={() => handleSendStudentCredentials(s.id)}
                           disabled={sendingAccount}
                           className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1 transition-all disabled:opacity-50 cursor-pointer"
@@ -6200,9 +6388,67 @@ _Tata Usaha & Keuangan Sekolah_`;
                 )}
               </div>
 
+              {/* KARTU QR PRESENSI ANANDA (KHUSUS PORTAL WALI MURID) */}
+              {isParent && parentChildren.length > 0 && (
+                <div className="bg-gradient-to-r from-emerald-950/70 via-slate-900 to-slate-900 border border-emerald-500/40 rounded-3xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="space-y-2 text-center md:text-left">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold border border-emerald-500/30">
+                      <QrCode className="w-3.5 h-3.5" />
+                      <span>Kartu QR Presensi Ananda</span>
+                    </div>
+                    <h3 className="text-xl font-black text-white">
+                      {parentChildren[0]?.name}
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      NISN: <span className="font-mono text-emerald-400 font-bold">{parentChildren[0]?.nisn}</span> • Kelas: <span className="font-bold text-white">{parentChildren[0]?.className}</span>
+                    </p>
+                    <p className="text-[11px] text-slate-400 max-w-md leading-relaxed">
+                      Tunjukkan barcode QR ini kepada guru / scanner di gerbang sekolah saat ananda tiba untuk mencatat presensi kehadiran harian otomatis.
+                    </p>
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenStudentQr(parentChildren[0])}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-lg shadow-emerald-600/20 cursor-pointer mx-auto md:mx-0"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>Perbesar / Cetak Kartu QR</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="w-36 h-36 bg-white p-2.5 rounded-2xl shadow-2xl border-2 border-emerald-400 flex items-center justify-center shrink-0">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(parentChildren[0]?.qrCode || `STUDENT:${parentChildren[0]?.nisn || parentChildren[0]?.id}`)}`}
+                      alt="QR Presensi Ananda"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* MODAL INPUT PRESENSI KEHADIRAN SISWA */}
               {editingAttendance && (
-                <form onSubmit={handleSaveAttendance} className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
-                  <h3 className="font-bold text-white text-base">Input Presensi Kehadiran Siswa</h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveAttendance} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                            📋
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">Input Presensi Kehadiran Siswa</h3>
+                            <p className="text-xs text-slate-400">Catat kehadiran harian murid</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAttendance(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Murid / Siswa</label>
@@ -6254,11 +6500,13 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <label className="block text-xs font-bold text-slate-400 mb-1">Catatan / Keterangan (Opsional)</label>
                     <input type="text" placeholder="Misal: Demam, Izin acara keluarga, dll" value={editingAttendance.reason || ""} onChange={(e) => setEditingAttendance({ ...editingAttendance, reason: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                   </div>
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setEditingAttendance(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30">Simpan Presensi</button>
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onClick={() => setEditingAttendance(null)} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer">Simpan Presensi</button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
@@ -6313,13 +6561,43 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </div>
                 <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
                   {/* Scan QR Guru Button */}
-                  {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT" || admin?.role === "ADMIN_SEKOLAH") && (
+                  {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT" || admin?.role === "ADMIN_SEKOLAH" || admin?.role === "ADMIN_CABANG") && (
                     <button
                       onClick={() => setQrModal({ isOpen: true, type: "TEACHER", inputCode: "", scanning: false, result: null, error: null })}
-                      className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all"
+                      className="bg-purple-700 hover:bg-purple-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg transition-all cursor-pointer"
                     >
                       <QrCode className="w-4 h-4 text-purple-300" />
                       <span>Scan QR Guru</span>
+                    </button>
+                  )}
+                  {admin?.role === "GURU" && (
+                    <button
+                      onClick={async () => {
+                        const myTeacher = teachersList.find((t) => t.name?.toLowerCase() === admin.name?.toLowerCase() || t.id === (admin as any).nip);
+                        const code = myTeacher?.qrCode || `TEACHER:${myTeacher?.id || admin.id}`;
+                        let qrUrl = "";
+                        try {
+                          qrUrl = await QRCode.toDataURL(code, { width: 350, margin: 2 });
+                        } catch (_) {}
+                        setTeacherCredentialModal({
+                          isOpen: true,
+                          loading: false,
+                          teacherId: myTeacher?.id || admin.id,
+                          teacherName: admin.name,
+                          role: "Guru Pengajar",
+                          assignedClass: admin.assignedClass || "-",
+                          schoolName: admin.schoolName || "Smart Kids",
+                          username: admin.username,
+                          password: "",
+                          passwordAvailable: false,
+                          qrCode: code,
+                          qrDataUrl: qrUrl,
+                        });
+                      }}
+                      className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-purple-600/30 transition-all cursor-pointer"
+                    >
+                      <QrCode className="w-4 h-4 text-purple-200" />
+                      <span>Tampilkan QR Presensi Saya</span>
                     </button>
                   )}
                 </div>
@@ -6525,7 +6803,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                     (att) => att.teacherId === teacher.id && att.status === "hadir"
                   );
                   const tp = teacherProgressList.find((p) => p.teacherId === teacher.id);
-                  const hadir = teacherAtts.length || (tp ? Math.round(Number(tp.hoursTaught || 0) / 3) : 12);
+                  const hadir = teacherAtts.length > 0 ? teacherAtts.length : (tp && Number(tp.hoursTaught) > 0 ? Math.round(Number(tp.hoursTaught) / 3) : 0);
                   const hours = tp ? Number(tp.hoursTaught) : hadir * 3;
 
                   const schoolProgs = programsList.filter((p) => !p.schoolId || p.schoolId === teacher.schoolId);
@@ -6648,8 +6926,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                           const teacherAtts = teacherAttendanceList.filter(
                             (att) => att.teacherId === teacher.id && att.status === "hadir"
                           );
-                          const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
-                          const hoursTaught = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+                          const hadirDays = teacherAtts.length > 0 ? teacherAtts.length : (tpRecord && Number(tpRecord.hoursTaught) > 0 ? Math.round(Number(tpRecord.hoursTaught) / 3) : 0);
+                          const hoursTaught = tpRecord && Number(tpRecord.hoursTaught) > 0 ? Number(tpRecord.hoursTaught) : hadirDays * 3;
                           const targetHours = tpRecord ? Number(tpRecord.targetHours) : 40;
                           const pct = Math.min(Math.round((hoursTaught / targetHours) * 100), 100);
 
@@ -6995,7 +7273,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                                   { value: "TRANSFER_BCA", label: "🏦 Transfer Bank BCA" },
                                   { value: "TRANSFER_MANDIRI", label: "🏦 Transfer Bank Mandiri" },
                                 ]),
-                            { value: "QRIS", label: "📱 QRIS (Scan QR Code Resmi)" },
+                            ...(siteProfile?.isQrisActive !== false ? [{ value: "QRIS", label: "📱 QRIS (Scan QR Code Resmi)" }] : []),
                             { value: "TUNAI", label: "💵 Tunai di Kasir Sekolah" },
                           ];
                           return (
@@ -7186,10 +7464,29 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </div>
               )}
 
-              {/* ADMIN FORM EDIT SPP */}
+              {/* MODAL EDIT / TAMBAH SPP */}
               {editingSpp && (
-                <form onSubmit={handleSaveSpp} className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
-                  <h3 className="font-bold text-white text-base">{editingSpp.id ? "Edit Detail Pembayaran SPP" : "Tambah Record SPP Siswa"}</h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-amber-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveSpp} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold border border-amber-500/30">
+                            💳
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">{editingSpp.id ? "Edit Detail Pembayaran SPP" : "Tambah Record SPP Siswa"}</h3>
+                            <p className="text-xs text-slate-400">Atur nominal tagihan, bulan, dan status pembayaran SPP</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingSpp(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Murid / Siswa</label>
@@ -7250,13 +7547,15 @@ _Tata Usaha & Keuangan Sekolah_`;
                       <input type="text" value={editingSpp.paymentDate || ""} onChange={(e) => setEditingSpp({ ...editingSpp, paymentDate: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" placeholder="26 Juli 2026" />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setEditingSpp(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl cursor-pointer">Batal</button>
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onClick={() => setEditingSpp(null)} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer">Batal</button>
                     <button type="submit" disabled={saving} className="px-6 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-amber-600/30 cursor-pointer">
                       {editingSpp.id ? "Update Detail Pembayaran" : "Simpan Record SPP"}
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {/* SEARCH & WALI KELAS FILTER BAR UNTUK SPP */}
@@ -7852,22 +8151,24 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </div>
 
                 {editingFeeComponent && (
-                  <form
-                    onSubmit={handleSaveFeeComponent}
-                    className="bg-slate-950 border border-emerald-500/30 rounded-2xl p-4 space-y-4"
-                  >
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-black text-white">
-                        {editingFeeComponent.id ? "Edit Komponen Biaya" : "Komponen Biaya Baru"}
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => setEditingFeeComponent(null)}
-                        className="p-1.5 bg-slate-800 text-slate-400 rounded-lg"
+                  <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-5 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                      <form
+                        onSubmit={handleSaveFeeComponent}
+                        className="space-y-4"
                       >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                          <h4 className="text-sm font-black text-white">
+                            {editingFeeComponent.id ? "Edit Komponen Biaya" : "Komponen Biaya Baru"}
+                          </h4>
+                          <button
+                            type="button"
+                            onClick={() => setEditingFeeComponent(null)}
+                            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <input
                         required
@@ -7925,17 +8226,26 @@ _Tata Usaha & Keuangan Sekolah_`;
                         Aktif
                       </label>
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setEditingFeeComponent(null)}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
+                      >
+                        Batal
+                      </button>
                       <button
                         type="submit"
                         disabled={saving}
-                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold"
+                        className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 cursor-pointer"
                       >
                         {saving ? "Menyimpan..." : "Simpan Master Komponen"}
                       </button>
                     </div>
                   </form>
-                )}
+                </div>
+              </div>
+            )}
               </div>
 
               {/* QUICK SHORTCUT CARDS UNTUK 5 PAKET BIAYA TAMBAHAN */}
@@ -7980,10 +8290,12 @@ _Tata Usaha & Keuangan Sekolah_`;
 
               {/* FORM CREATE / EDIT ADDITIONAL FEE MODAL */}
               {editingAdditionalFee && (
-                <form
-                  onSubmit={handleSaveAdditionalFee}
-                  className="bg-slate-900/95 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full"
-                >
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-5 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form
+                      onSubmit={handleSaveAdditionalFee}
+                      className="space-y-5"
+                    >
                   <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                     <h3 className="font-bold text-white text-base">
                       {editingAdditionalFee.id ? "Edit Tagihan Biaya Tambahan" : "Buat Tagihan Biaya Tambahan Baru"}
@@ -8130,7 +8442,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-3 pt-2">
+                  <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
                     <button
                       type="button"
                       onClick={() => setEditingAdditionalFee(null)}
@@ -8147,7 +8459,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                     </button>
                   </div>
                 </form>
-              )}
+              </div>
+            </div>
+          )}
 
               {/* SEARCH & CATEGORY FILTER BAR */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/80 p-4 rounded-3xl border border-slate-800 shadow-lg w-full">
@@ -8347,16 +8661,53 @@ _Tata Usaha & Keuangan Sekolah_`;
                       <p className="text-xs text-slate-400">Gambar barcode QRIS ini akan tampil otomatis di formulir PPDB dan portal bayar wali murid.</p>
                     </div>
                   </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleQrisActive}
+                      disabled={savingQrisToggle}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer shadow-md ${
+                        siteProfile?.isQrisActive !== false
+                          ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      }`}
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full ${siteProfile?.isQrisActive !== false ? "bg-white animate-pulse" : "bg-slate-500"}`} />
+                      <span>{siteProfile?.isQrisActive !== false ? "QRIS Aktif (ON)" : "QRIS Nonaktif (OFF)"}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status Penayangan QRIS Badge Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white text-xs">Status Penayangan QRIS Pembayaran:</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black tracking-wide uppercase ${
+                        siteProfile?.isQrisActive !== false
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-red-500/20 text-red-400 border border-red-500/30"
+                      }`}>
+                        {siteProfile?.isQrisActive !== false ? "AKTIF (Tampil di PPDB & Portal)" : "NONAKTIF (Disembunyikan)"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400">
+                      Ketika toggle ON: QRIS otomatis tampil di form pendaftaran PPDB dan pilihan bayar SPP. Ketika toggle OFF: metode QRIS disembunyikan.
+                    </p>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
                   <div className="md:col-span-4 flex flex-col items-center text-center space-y-3">
                     <div className="relative w-48 h-48 bg-white rounded-2xl p-3 border-2 border-emerald-500 shadow-xl overflow-hidden group">
-                      <Image
+                      <img
                         src={siteProfile.qrisImageUrl || "/images/qris_default.png"}
                         alt="QRIS Barcode"
-                        fill
-                        className="object-contain p-2"
+                        className="w-full h-full object-contain p-1"
+                        onError={(e: any) => {
+                          e.currentTarget.src = "/images/qris_default.png";
+                        }}
                       />
                     </div>
                     <button
@@ -8403,10 +8754,12 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </div>
 
                 {editingBankAccount && (
-                  <form
-                    onSubmit={handleSaveBankAccount}
-                    className="bg-slate-900/95 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl w-full"
-                  >
+                  <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-xl w-full space-y-5 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                      <form
+                        onSubmit={handleSaveBankAccount}
+                        className="space-y-5"
+                      >
                     <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                       <h4 className="font-bold text-white text-base">
                         {editingBankAccount.id ? "Edit Rekening Bank" : "Tambah Rekening Bank Baru"}
@@ -8462,7 +8815,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-800">
                       <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
                         <input
                           type="checkbox"
@@ -8491,7 +8844,9 @@ _Tata Usaha & Keuangan Sekolah_`;
                       </div>
                     </div>
                   </form>
-                )}
+                </div>
+              </div>
+            )}
 
                 {/* BANK ACCOUNTS GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
@@ -8592,9 +8947,29 @@ _Tata Usaha & Keuangan Sekolah_`;
                 )}
               </div>
 
+              {/* MODAL TERBITKAN PENGUMUMAN */}
               {editingAnnouncement && (
-                <form onSubmit={handleSaveAnnouncement} className="bg-slate-900/90 border border-purple-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
-                  <h3 className="font-bold text-white text-base">Terbitkan Pengumuman Baru</h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-purple-500/40 rounded-3xl p-6 sm:p-8 max-w-2xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveAnnouncement} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold border border-purple-500/30">
+                            📢
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">Terbitkan Pengumuman Baru</h3>
+                            <p className="text-xs text-slate-400">Kirim pengumuman ke guru dan orang tua</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingAnnouncement(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Judul Pengumuman</label>
@@ -8617,11 +8992,13 @@ _Tata Usaha & Keuangan Sekolah_`;
                     <label className="block text-xs font-bold text-slate-400 mb-1">Isi Pengumuman</label>
                     <textarea rows={3} required value={editingAnnouncement.content} onChange={(e) => setEditingAnnouncement({ ...editingAnnouncement, content: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white" />
                   </div>
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setEditingAnnouncement(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-purple-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/30">Terbitkan</button>
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onClick={() => setEditingAnnouncement(null)} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-600/30 cursor-pointer">Terbitkan</button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
@@ -8686,9 +9063,11 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
-              {/* FORM MODAL PENGAJUAN IZIN & CUTI GURU */}
+              {/* MODAL PENGAJUAN IZIN & CUTI GURU */}
               {editingLeaveRequest && (
-                <form onSubmit={handleSaveLeaveRequest} className="bg-slate-900/95 border border-rose-500/40 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl w-full">
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-rose-500/40 rounded-3xl p-6 sm:p-8 max-w-3xl w-full space-y-6 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveLeaveRequest} className="space-y-6">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold border border-rose-500/30">
@@ -8824,11 +9203,11 @@ _Tata Usaha & Keuangan Sekolah_`;
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-3 pt-2">
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
                     <button
                       type="button"
                       onClick={() => setEditingLeaveRequest(null)}
-                      className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl hover:bg-slate-700 cursor-pointer"
+                      className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
                     >
                       Batal
                     </button>
@@ -8842,6 +9221,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                     </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {/* FILTER STATUS TAB FOR LEAVE REQUESTS */}
@@ -9035,11 +9416,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 )}
               </div>
 
+              {/* MODAL EDIT / TAMBAH JADWAL */}
               {editingSchedule && (
-                <form onSubmit={handleSaveSchedule} className="bg-slate-900/90 border border-cyan-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full">
-                  <h3 className="font-bold text-white text-base">
-                    {editingSchedule.id ? "Edit Jadwal Pelajaran" : "Tambah Jadwal Pelajaran Baru"}
-                  </h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-6 sm:p-8 max-w-3xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveSchedule} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold border border-cyan-500/30">
+                            📅
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">
+                              {editingSchedule.id ? "Edit Jadwal Pelajaran" : "Tambah Jadwal Pelajaran Baru"}
+                            </h3>
+                            <p className="text-xs text-slate-400">Atur tanggal, jam, kelas, dan materi KBM</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingSchedule(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                   <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-400 mb-1">Pilih Sekolah</label>
@@ -9106,11 +9507,13 @@ _Tata Usaha & Keuangan Sekolah_`;
                       <input type="text" required value={editingSchedule.activities} onChange={(e) => setEditingSchedule({ ...editingSchedule, activities: e.target.value })} className="w-full p-3.5 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white font-bold" placeholder="Contoh: Bernyanyi, menebalkan huruf vokal" />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-2">
-                    <button type="button" onClick={() => setEditingSchedule(null)} className="px-5 py-2.5 bg-slate-800 text-slate-300 text-xs font-bold rounded-xl">Batal</button>
-                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-cyan-600 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-600/30">Simpan Jadwal</button>
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
+                    <button type="button" onClick={() => setEditingSchedule(null)} className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer">Batal</button>
+                    <button type="submit" disabled={saving} className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-cyan-600/30 cursor-pointer">Simpan Jadwal</button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full">
@@ -9336,14 +9739,31 @@ _Tata Usaha & Keuangan Sekolah_`;
                 </button>
               </div>
 
+              {/* MODAL EDIT / TAMBAH TESTIMONI */}
               {editingTestimonial && (
-                <form
-                  onSubmit={handleSaveTestimonial}
-                  className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl w-full"
-                >
-                  <h3 className="font-bold text-white text-base">
-                    {editingTestimonial.id ? "Edit Testimoni" : "Tambah Testimoni Baru"}
-                  </h3>
+                <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+                  <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl p-6 sm:p-8 max-w-3xl w-full space-y-4 shadow-2xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                    <form onSubmit={handleSaveTestimonial} className="space-y-4">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold border border-emerald-500/30">
+                            💬
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-base">
+                              {editingTestimonial.id ? "Edit Testimoni" : "Tambah Testimoni Baru"}
+                            </h3>
+                            <p className="text-xs text-slate-400">Atur ulasan orang tua, nama, cabang, dan rating</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTestimonial(null)}
+                          className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
@@ -9493,23 +9913,25 @@ _Tata Usaha & Keuangan Sekolah_`;
                     />
                   </div>
 
-                  <div className="flex items-center gap-3 pt-2">
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white px-6 py-3 rounded-xl text-xs font-bold transition"
-                    >
-                      {saving ? "Menyimpan..." : "Simpan Testimoni"}
-                    </button>
+                  <div className="flex justify-end gap-3 pt-2 border-t border-slate-800">
                     <button
                       type="button"
                       onClick={() => setEditingTestimonial(null)}
-                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-3 rounded-xl text-xs font-bold transition"
+                      className="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold rounded-xl cursor-pointer"
                     >
                       Batal
                     </button>
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-lg shadow-emerald-600/30 cursor-pointer"
+                    >
+                      {saving ? "Menyimpan..." : "Simpan Testimoni"}
+                    </button>
                   </div>
                 </form>
+                  </div>
+                </div>
               )}
 
               {testimonialsList.length === 0 ? (
@@ -10121,6 +10543,34 @@ _Tata Usaha & Keuangan Sekolah_`;
               </div>
             )}
 
+            {(selectedCredentialModal as any).qrDataUrl && (
+              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 text-center space-y-2">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                  Kode QR Presensi Murid
+                </span>
+                <div className="w-36 h-36 mx-auto bg-white p-2.5 rounded-2xl shadow-inner flex items-center justify-center">
+                  <img
+                    src={(selectedCredentialModal as any).qrDataUrl}
+                    alt="QR Siswa"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-[10px] font-mono text-emerald-400 font-bold">
+                    {(selectedCredentialModal as any).qrCode || selectedCredentialModal.username}
+                  </span>
+                  <a
+                    href={(selectedCredentialModal as any).qrDataUrl}
+                    download={`QR_SISWA_${selectedCredentialModal.studentName.replace(/\s+/g, "_")}.png`}
+                    className="p-1 bg-slate-900 text-emerald-400 hover:text-white rounded-lg border border-slate-800"
+                    title="Download Gambar QR"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </a>
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col gap-2.5 pt-2">
               <button
                 onClick={() => {
@@ -10200,11 +10650,49 @@ _Tata Usaha & Keuangan Sekolah_`;
                 <button
                   type="submit"
                   disabled={qrModal.scanning || !qrModal.inputCode}
-                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {qrModal.scanning ? "Memproses Scan..." : "Proses Scan QR Presensi"}
                 </button>
               </form>
+
+              {/* Quick Select Buttons */}
+              <div className="pt-1 text-left space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                  Pilih Cepat Nama (Bila Kamera Tidak Tersedia):
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto p-1.5 bg-slate-950/80 rounded-xl border border-slate-800">
+                  {qrModal.type === "STUDENT"
+                    ? studentsList.slice(0, 15).map((s) => (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            const code = s.qrCode || `STUDENT:${s.nisn}`;
+                            setQrModal((prev) => ({ ...prev, inputCode: code }));
+                            handleScanQr(code, "STUDENT");
+                          }}
+                          className="px-2 py-1 bg-slate-900 hover:bg-emerald-600/30 hover:border-emerald-500/40 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-800 transition cursor-pointer"
+                        >
+                          {s.name}
+                        </button>
+                      ))
+                    : teachersList.slice(0, 15).map((t) => (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => {
+                            const code = t.qrCode || `TEACHER:${t.id}`;
+                            setQrModal((prev) => ({ ...prev, inputCode: code }));
+                            handleScanQr(code, "TEACHER");
+                          }}
+                          className="px-2 py-1 bg-slate-900 hover:bg-purple-600/30 hover:border-purple-500/40 text-slate-200 text-[10px] font-semibold rounded-lg border border-slate-800 transition cursor-pointer"
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                </div>
+              </div>
 
               {qrModal.result && (
                 <div className="p-4 bg-emerald-950/80 border border-emerald-500/40 rounded-2xl text-xs text-emerald-200 space-y-1 text-left">
@@ -10367,6 +10855,75 @@ _Tata Usaha & Keuangan Sekolah_`;
         </div>
       )}
 
+      {/* Student QR Presensi Modal Overlay */}
+      {studentQrModal.isOpen && studentQrModal.student && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-blue-500/40 rounded-3xl p-6 sm:p-8 max-w-md w-full space-y-5 shadow-2xl animate-fadeIn">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-blue-400" />
+                <h3 className="font-bold text-white text-base">Kartu QR Presensi Murid</h3>
+              </div>
+              <button
+                onClick={() => setStudentQrModal({ isOpen: false, student: null, qrDataUrl: "" })}
+                className="p-1.5 text-slate-400 hover:text-white bg-slate-800 rounded-xl"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 text-center space-y-4">
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">
+                  TK SMART KIDS PRESENSI SISWA
+                </span>
+                <h4 className="text-lg font-black text-white">{studentQrModal.student.name}</h4>
+                <p className="text-xs text-slate-400">
+                  NISN: <span className="font-mono text-emerald-400 font-bold">{studentQrModal.student.nisn}</span> • {studentQrModal.student.className}
+                </p>
+              </div>
+
+              <div className="w-48 h-48 mx-auto bg-white p-3 rounded-2xl shadow-xl border-2 border-blue-500 flex items-center justify-center">
+                {studentQrModal.qrDataUrl ? (
+                  <img
+                    src={studentQrModal.qrDataUrl}
+                    alt="QR Siswa"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="animate-pulse text-xs text-slate-400">Membuat QR...</div>
+                )}
+              </div>
+
+              <p className="text-[11px] font-mono text-slate-400">
+                Kode: <strong className="text-blue-400">{studentQrModal.student.qrCode || `STUDENT:${studentQrModal.student.nisn}`}</strong>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              {studentQrModal.qrDataUrl && (
+                <a
+                  href={studentQrModal.qrDataUrl}
+                  download={`KARTU_QR_${studentQrModal.student.name.replace(/\s+/g, "_")}.png`}
+                  className="w-full py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/30 text-center cursor-pointer"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>Unduh Gambar QR Kartu</span>
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <Printer className="w-4 h-4" />
+                <span>Cetak Kartu QR</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Teacher Account Credentials Modal Overlay */}
       {teacherCredentialModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
@@ -10426,11 +10983,23 @@ _Tata Usaha & Keuangan Sekolah_`;
                   </span>
                   <div className="w-36 h-36 mx-auto bg-white p-2.5 rounded-2xl shadow-inner flex items-center justify-center">
                     <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(teacherCredentialModal.qrCode)}`}
+                      src={(teacherCredentialModal as any).qrDataUrl || `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(teacherCredentialModal.qrCode)}`}
                       alt="QR Presensi Guru"
                       className="w-full h-full object-contain"
                     />
                   </div>
+                  {(teacherCredentialModal as any).qrDataUrl && (
+                    <div className="flex justify-center pt-1">
+                      <a
+                        href={(teacherCredentialModal as any).qrDataUrl}
+                        download={`QR_GURU_${teacherCredentialModal.teacherName.replace(/\s+/g, "_")}.png`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 rounded-xl text-[10px] font-bold transition-all cursor-pointer"
+                      >
+                        <Download className="w-3 h-3" />
+                        <span>Unduh QR Guru</span>
+                      </a>
+                    </div>
+                  )}
                   <p className="text-[10px] font-mono text-emerald-400 font-bold">
                     {teacherCredentialModal.qrCode}
                   </p>
@@ -10534,8 +11103,50 @@ _Tata Usaha & Keuangan Sekolah_`;
               </div>
             </div>
 
-            {/* Filter Bar & KPI Strip */}
-            <div className="p-4 sm:p-5 bg-slate-900/90 border-b border-slate-800/80 space-y-4 shrink-0">
+            {/* Subtabs Selector - Pinned directly under Header for instant touch response on mobile & desktop */}
+            <div className="px-4 sm:px-6 py-2.5 border-b border-slate-800 bg-slate-950/95 overflow-x-auto scrollbar-none flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "summary" }))}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-2 touch-manipulation min-h-[40px] ${
+                  progressiveHistoryModal.activeSubTab === "summary"
+                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 ring-2 ring-indigo-400/50"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+                }`}
+              >
+                <Award className="w-4 h-4 text-indigo-300" />
+                <span>Analisis Skema SPP & Rasio</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "attendance_logs" }))}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-2 touch-manipulation min-h-[40px] ${
+                  progressiveHistoryModal.activeSubTab === "attendance_logs"
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-2 ring-emerald-400/50"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+                }`}
+              >
+                <CheckCircle className="w-4 h-4 text-emerald-300" />
+                <span>Log Presensi Mengajar Harian</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "monthly_records" }))}
+                className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-2 touch-manipulation min-h-[40px] ${
+                  progressiveHistoryModal.activeSubTab === "monthly_records"
+                    ? "bg-amber-600 text-white shadow-lg shadow-amber-600/30 ring-2 ring-amber-400/50"
+                    : "bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+                }`}
+              >
+                <Calendar className="w-4 h-4 text-amber-300" />
+                <span>Riwayat Capaian Bulanan</span>
+              </button>
+            </div>
+
+            {/* Scrollable Subtab Content Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+              {/* Filter Bar & KPI Strip (Inside scrollable body so it does not squish subtabs on mobile) */}
+              <div className="p-4 sm:p-5 bg-slate-900/90 rounded-2xl border border-slate-800/80 space-y-4">
               {/* Filter Controls */}
               <div className={`grid grid-cols-1 sm:grid-cols-2 ${(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT") ? "lg:grid-cols-5" : "lg:grid-cols-4"} gap-3`}>
                 {(admin?.role === "SUPER_ADMIN" || admin?.role === "ADMIN_PUSAT") && (
@@ -10651,8 +11262,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                       (!progressiveHistoryModal.endDate || att.date <= progressiveHistoryModal.endDate)
                   );
                   const tpRecord = teacherProgressList.find((tp) => tp.teacherId === teacher.id);
-                  const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
-                  const hours = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+                  const hadirDays = teacherAtts.length > 0 ? teacherAtts.length : (tpRecord && Number(tpRecord.hoursTaught) > 0 ? Math.round(Number(tpRecord.hoursTaught) / 3) : 0);
+                  const hours = tpRecord && Number(tpRecord.hoursTaught) > 0 ? Number(tpRecord.hoursTaught) : hadirDays * 3;
 
                   const assignedCls = classesList.find((c) => c.homeroomTeacherId === teacher.id || c.id === teacher.classId);
                   const plottedClass = assignedCls?.name || teacher.assignedClass || teacher.role;
@@ -10707,49 +11318,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                 );
               })()}
 
-              {/* Subtabs Selector */}
-              <div className="flex items-center gap-2 border-b border-slate-800 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "summary" }))}
-                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
-                    progressiveHistoryModal.activeSubTab === "summary"
-                      ? "border-indigo-500 text-white bg-slate-800/60"
-                      : "border-transparent text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  <Award className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Analisis Skema SPP & Rasio</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "attendance_logs" }))}
-                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
-                    progressiveHistoryModal.activeSubTab === "attendance_logs"
-                      ? "border-indigo-500 text-white bg-slate-800/60"
-                      : "border-transparent text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Log Presensi Mengajar Harian</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProgressiveHistoryModal((prev) => ({ ...prev, activeSubTab: "monthly_records" }))}
-                  className={`px-4 py-2 text-xs font-bold rounded-t-xl transition-all cursor-pointer border-b-2 flex items-center gap-2 ${
-                    progressiveHistoryModal.activeSubTab === "monthly_records"
-                      ? "border-indigo-500 text-white bg-slate-800/60"
-                      : "border-transparent text-slate-400 hover:text-slate-200"
-                  }`}
-                >
-                  <Calendar className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Riwayat Capaian Bulanan</span>
-                </button>
               </div>
-            </div>
-
-            {/* Scrollable Subtab Content Body */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
               {/* SUBTAB 1: SKEMA SPP & RASIO GURU */}
               {progressiveHistoryModal.activeSubTab === "summary" && (
                 <div className="space-y-4">
@@ -10801,8 +11370,8 @@ _Tata Usaha & Keuangan Sekolah_`;
                               (att) => att.teacherId === teacher.id && att.status === "hadir"
                             );
                             const tpRecord = teacherProgressList.find((tp) => tp.teacherId === teacher.id);
-                            const hadirDays = teacherAtts.length || (tpRecord ? Math.round(Number(tpRecord.hoursTaught || 0) / 3) : 12);
-                            const hoursTaught = tpRecord ? Number(tpRecord.hoursTaught) : hadirDays * 3;
+                            const hadirDays = teacherAtts.length > 0 ? teacherAtts.length : (tpRecord && Number(tpRecord.hoursTaught) > 0 ? Math.round(Number(tpRecord.hoursTaught) / 3) : 0);
+                            const hoursTaught = tpRecord && Number(tpRecord.hoursTaught) > 0 ? Number(tpRecord.hoursTaught) : hadirDays * 3;
                             const monthlyResult = Math.round(hadirDays * 50000 * sppRatio);
 
                             return (
@@ -10890,16 +11459,93 @@ _Tata Usaha & Keuangan Sekolah_`;
 
                     if (filteredLogs.length === 0) {
                       return (
-                        <div className="p-12 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400 space-y-2">
-                          <CheckCircle className="w-8 h-8 text-slate-600 mx-auto" />
-                          <p className="font-bold text-sm">Belum ada log presensi yang sesuai filter</p>
-                          <p className="text-xs text-slate-500">Coba ubah rentang tanggal atau pilihan guru</p>
+                        <div className="p-8 sm:p-12 text-center bg-slate-950/60 rounded-2xl border border-slate-800 text-slate-400 space-y-3">
+                          <CheckCircle className="w-10 h-10 text-emerald-500/60 mx-auto" />
+                          <p className="font-bold text-sm text-white">Belum ada log presensi yang sesuai filter</p>
+                          <p className="text-xs text-slate-400 max-w-md mx-auto">
+                            Log presensi harian otomatis tercatat saat guru melakukan presensi atau scan QR kehadiran. Coba ubah rentang tanggal atau tampilkan seluruh guru.
+                          </p>
+                          {progressiveHistoryModal.selectedTeacherId !== "ALL" && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setProgressiveHistoryModal((prev) => ({
+                                  ...prev,
+                                  selectedTeacherId: "ALL",
+                                  searchQuery: "",
+                                }))
+                              }
+                              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition shadow-md cursor-pointer"
+                            >
+                              Tampilkan Log Semua Guru
+                            </button>
+                          )}
                         </div>
                       );
                     }
 
                     return (
-                      <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
+                      <div className="space-y-3">
+                        {/* Mobile Cards View */}
+                        <div className="block sm:hidden space-y-3">
+                          {filteredLogs.map((log) => {
+                            const tRec = teachersList.find((t) => t.id === log.teacherId || (t.name && log.teacherName && t.name.toLowerCase() === log.teacherName.toLowerCase()));
+                            const sName = schoolsList.find((s) => s.id === tRec?.schoolId)?.name || "Smart Kids Sadjati";
+                            return (
+                              <div key={log.id} className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-xs text-slate-300">
+                                    {log.date || (log.createdAt ? new Date(log.createdAt).toLocaleDateString("id-ID") : "-")}
+                                  </span>
+                                  <span
+                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                                      log.status === "hadir"
+                                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/30"
+                                        : log.status === "izin"
+                                        ? "bg-blue-500/20 text-blue-300 border-blue-500/30"
+                                        : log.status === "sakit"
+                                        ? "bg-amber-500/20 text-amber-300 border-amber-500/30"
+                                        : "bg-rose-500/20 text-rose-300 border-rose-500/30"
+                                    }`}
+                                  >
+                                    {log.status}
+                                  </span>
+                                </div>
+                                <div className="font-bold text-white text-sm">
+                                  {log.teacherName || tRec?.name || "Guru"}
+                                </div>
+                                <div className="text-[11px] text-slate-400 flex items-center justify-between">
+                                  <span className="text-emerald-400">{sName}</span>
+                                  <span className="font-mono">{log.checkInTime || "07:30"} - {log.checkOutTime || "14:00"}</span>
+                                </div>
+                                {log.notes && (
+                                  <p className="text-xs text-slate-300 bg-slate-900/60 p-2 rounded-xl border border-slate-800/80">
+                                    {log.notes}
+                                  </p>
+                                )}
+                                {log.photoUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setPreviewModal({
+                                        isOpen: true,
+                                        src: log.photoUrl,
+                                        title: `Presensi Guru: ${log.teacherName || "Guru"}`,
+                                      })
+                                    }
+                                    className="w-full mt-1 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    <span>Lihat Foto Presensi</span>
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Desktop Table View */}
+                        <div className="hidden sm:block overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60">
                         <table className="w-full text-left text-xs text-slate-300">
                           <thead className="bg-slate-950 text-slate-400 font-bold uppercase text-[10px] tracking-wider border-b border-slate-800">
                             <tr>
@@ -10975,6 +11621,7 @@ _Tata Usaha & Keuangan Sekolah_`;
                             })}
                           </tbody>
                         </table>
+                      </div>
                       </div>
                     );
                   })()}

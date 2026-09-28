@@ -156,6 +156,7 @@ export default function PpdbForm({
     agreedTerms: false,
   });
 
+
   const [programsList, setProgramsList] = useState<any[]>([]);
 
   // Package definitions come from the database; selected values are stored per registration.
@@ -243,6 +244,9 @@ export default function PpdbForm({
           if (data.data.qrisImageUrl) {
             setQrisImageUrl(data.data.qrisImageUrl);
           }
+          if (data.data.isQrisActive === false) {
+            setPaymentMethod((prev) => (prev === "qris" ? "bank" : prev));
+          }
         }
       })
       .catch((err) => console.error("Error fetching site profile:", err));
@@ -280,6 +284,62 @@ export default function PpdbForm({
   const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
   const [regId, setRegId] = useState<string>("PPDB-2026-8821");
   const [submitting, setSubmitting] = useState<boolean>(false);
+
+  const [draftLoaded, setDraftLoaded] = useState(false);
+
+  // Restore draft on mount
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const savedDraft = localStorage.getItem("smartkids_ppdb_draft");
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed.formData) {
+            setFormData((prev) => ({ ...prev, ...parsed.formData }));
+          }
+          if (parsed.step && typeof parsed.step === "number") {
+            setStep(parsed.step);
+          }
+          if (parsed.currentSchoolCode) {
+            setCurrentSchoolCode(parsed.currentSchoolCode);
+          }
+          if (Array.isArray(parsed.selectedPackageIds) && parsed.selectedPackageIds.length > 0) {
+            setSelectedPackageIds(parsed.selectedPackageIds);
+          }
+          if (parsed.paymentMethod) {
+            setPaymentMethod(parsed.paymentMethod);
+          }
+          if (parsed.selectedBankId) {
+            setSelectedBankId(parsed.selectedBankId);
+          }
+        }
+      } catch (e) {
+        console.error("Error restoring ppdb draft:", e);
+      } finally {
+        setDraftLoaded(true);
+      }
+    }
+  }, []);
+
+  // Save draft whenever inputs change
+  useEffect(() => {
+    if (!draftLoaded || typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        "smartkids_ppdb_draft",
+        JSON.stringify({
+          step,
+          formData,
+          selectedPackageIds,
+          currentSchoolCode,
+          paymentMethod,
+          selectedBankId,
+        })
+      );
+    } catch (e) {
+      // ignore
+    }
+  }, [draftLoaded, step, formData, selectedPackageIds, currentSchoolCode, paymentMethod, selectedBankId]);
 
   // Image Modal State for document previews
   const [previewModal, setPreviewModal] = useState<{
@@ -407,6 +467,13 @@ export default function PpdbForm({
         spread: 70,
         origin: { y: 0.6 },
       });
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("smartkids_ppdb_draft");
+        } catch (e) {
+          // ignore
+        }
+      }
       setShowSuccessModal(true);
     } catch (err: any) {
       console.error("Error submitting PPDB:", err);
@@ -1278,7 +1345,7 @@ export default function PpdbForm({
                 </div>
 
                 {/* Payment Methods Selector */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className={`grid ${siteProfile?.isQrisActive !== false ? "grid-cols-3" : "grid-cols-2"} gap-3`}>
                   <button
                     onClick={() => setPaymentMethod("bank")}
                     className={`p-4 rounded-2xl border text-center font-bold text-xs transition-all ${
@@ -1291,17 +1358,19 @@ export default function PpdbForm({
                     <span>Bank Transfer</span>
                   </button>
 
-                  <button
-                    onClick={() => setPaymentMethod("qris")}
-                    className={`p-4 rounded-2xl border text-center font-bold text-xs transition-all ${
-                      paymentMethod === "qris"
-                        ? "bg-[#057a44] text-white border-[#057a44] shadow-md"
-                        : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300"
-                    }`}
-                  >
-                    <QrCode className="w-5 h-5 mx-auto mb-1.5 opacity-90" />
-                    <span>QRIS Image</span>
-                  </button>
+                  {siteProfile?.isQrisActive !== false && (
+                    <button
+                      onClick={() => setPaymentMethod("qris")}
+                      className={`p-4 rounded-2xl border text-center font-bold text-xs transition-all ${
+                        paymentMethod === "qris"
+                          ? "bg-[#057a44] text-white border-[#057a44] shadow-md"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-emerald-300"
+                      }`}
+                    >
+                      <QrCode className="w-5 h-5 mx-auto mb-1.5 opacity-90" />
+                      <span>QRIS Image</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => setPaymentMethod("tunai")}

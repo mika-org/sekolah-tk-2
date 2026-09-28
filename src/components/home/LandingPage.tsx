@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import ImageModal from "@/components/common/ImageModal";
 import LesSdRegistrationModal from "@/components/les-sd/LesSdRegistrationModal";
@@ -147,6 +147,16 @@ export default function LandingPage({
     src: null,
     title: "Pratinjau Foto",
   });
+
+  // Gallery Horizontal Slider Ref & Handlers
+  const galleryScrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScrollGallery = (direction: "left" | "right") => {
+    if (galleryScrollRef.current) {
+      const scrollAmount = direction === "left" ? -280 : 280;
+      galleryScrollRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
 
   const handleOpenPreview = (src: string | null, title: string = "Pratinjau Foto") => {
     if (src) setPreviewModal({ isOpen: true, src, title });
@@ -649,21 +659,55 @@ export default function LandingPage({
       {/* 4. GALERI & TESTIMONI SECTION (CLEAN WHITE BACKGROUND WITH YELLOW & BLUE CARDS) */}
       <section id="galeri" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-4">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-7 bg-[#fffbeb] rounded-3xl p-6 sm:p-8 border-2 border-amber-300 flex flex-col justify-between shadow-md">
+          <div className="lg:col-span-7 bg-[#fffbeb] rounded-3xl p-6 sm:p-8 border-2 border-amber-300 flex flex-col justify-between shadow-md relative overflow-hidden">
             <div>
-              <h2 className="text-3xl font-extrabold text-slate-900 text-center mb-1">
-                Galeri {schoolName}
-              </h2>
-              <p className="text-xs text-slate-600 text-center mb-6">
-                Lihat dokumentasi dari kegiatan kami
-              </p>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <div>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900">
+                    Galeri {schoolName}
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Geser ke kiri / kanan untuk melihat seluruh dokumentasi
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-amber-900 bg-amber-200/80 px-2.5 py-1 rounded-full">
+                    {galleryItems.length} Foto
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handleScrollGallery("left")}
+                      className="w-8 h-8 rounded-full bg-white hover:bg-amber-100 text-slate-700 flex items-center justify-center border border-amber-300 shadow-xs transition-colors cursor-pointer touch-manipulation"
+                      aria-label="Geser galeri ke kiri"
+                      title="Geser ke kiri"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleScrollGallery("right")}
+                      className="w-8 h-8 rounded-full bg-white hover:bg-amber-100 text-slate-700 flex items-center justify-center border border-amber-300 shadow-xs transition-colors cursor-pointer touch-manipulation"
+                      aria-label="Geser galeri ke kanan"
+                      title="Geser ke kanan"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                {galleryItems.slice(0, 3).map((g: any) => (
+              {/* HORIZONTAL SWIPEABLE / DRAGGABLE GALLERY CONTAINER */}
+              <div
+                ref={galleryScrollRef}
+                className="flex gap-3.5 overflow-x-auto scrollbar-none snap-x snap-mandatory py-3 px-1 scroll-smooth"
+                style={{ WebkitOverflowScrolling: "touch" }}
+              >
+                {galleryItems.map((g: any) => (
                   <button
                     type="button"
                     key={g.id}
-                    className="relative h-44 sm:h-52 rounded-2xl overflow-hidden shadow-sm bg-amber-200 cursor-pointer group/img touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-400"
+                    className="shrink-0 w-44 sm:w-52 h-48 sm:h-60 rounded-2xl overflow-hidden shadow-md bg-amber-100 cursor-pointer group/img snap-start relative touch-manipulation focus:outline-none focus-visible:ring-4 focus-visible:ring-blue-400 border border-amber-200 text-left transition-transform hover:-translate-y-1"
                     onClick={() => handleOpenPreview(g.imageUrl, `Galeri: ${g.title || 'Dokumentasi Sekolah'}`)}
                     title="Klik untuk memperbesar foto"
                   >
@@ -671,25 +715,32 @@ export default function LandingPage({
                       src={g.imageUrl}
                       alt={g.title || "Galeri Foto"}
                       fill
-                      sizes="(max-width: 768px) 33vw, 250px"
+                      sizes="(max-width: 640px) 176px, 208px"
                       className="object-cover group-hover/img:scale-105 transition-transform duration-300"
                     />
-                    <div className="pointer-events-none absolute inset-0 bg-blue-950/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
-                      <Eye className="w-6 h-6 text-white drop-shadow-md" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                      <div className="flex items-center gap-1.5 text-white text-xs font-bold drop-shadow-md">
+                        <Eye className="w-4 h-4 text-amber-300 shrink-0" />
+                        <span className="truncate">{g.title || "Dokumentasi Kegiatan"}</span>
+                      </div>
                     </div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="mt-8 text-center">
+            <div className="mt-4 pt-3 border-t border-amber-200/80 flex items-center justify-between flex-wrap gap-2">
+              <span className="text-[11px] text-slate-500 font-medium">
+                👆 Geser ke samping untuk melihat foto lainnya
+              </span>
               <button
                 type="button"
                 onClick={() => setIsGalleryModalOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-6 py-2.5 rounded-full shadow-md transition-colors cursor-pointer touch-manipulation"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-full shadow-md transition-colors cursor-pointer touch-manipulation flex items-center gap-1.5 ml-auto"
                 aria-haspopup="dialog"
               >
-                Lihat Galeri Lainnya
+                <span>Lihat Semua ({galleryItems.length})</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
