@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buku Manual Panduan Penggunaan Sistem Smart Kids - YAPCHI Foundation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #065f46;
+            --primary-dark: #047857;
+            --primary-light: #ecfdf5;
+            --secondary: #0f766e;
+            --accent: #10b981;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-body: #f8fafc;
+            --bg-card: #ffffff;
+            --border-color: #e2e8f0;
+            --sidebar-width: 320px;
+        }
+        [data-theme="dark"] {
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --primary-light: #064e3b;
+            --secondary: #2dd4bf;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --border-color: #334155;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.65;
+            font-size: 15px;
+        }
+        /* Layout */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        /* Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+        }
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--primary);
+            color: #ffffff;
+        }
+        .sidebar-header h1 {
+            font-size: 16px;
+            font-weight: 800;
+            letter-spacing: -0.3px;
+        }
+        .sidebar-header p {
+            font-size: 12px;
+            opacity: 0.85;
+            margin-top: 4px;
+        }
+        .sidebar-search {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .sidebar-search input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 13px;
+            background: var(--bg-body);
+            color: var(--text-main);
+            outline: none;
+        }
+        .sidebar-search input:focus {
+            border-color: var(--primary);
+        }
+        .toc-list {
+            flex: 1;
+            padding: 12px 8px;
+            overflow-y: auto;
+        }
+        .toc-link {
+            display: block;
+            padding: 7px 12px;
+            color: var(--text-muted);
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 13px;
+            line-height: 1.4;
+            transition: all 0.15s ease;
+            margin-bottom: 2px;
+        }
+        .toc-link:hover {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+        }
+        .toc-level-1 {
+            font-weight: 700;
+            color: var(--text-main);
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        .toc-level-2 {
+            padding-left: 22px;
+            font-size: 12.5px;
+        }
+        .sidebar-footer {
+            padding: 14px 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 8px;
+        }
+        .btn {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .btn:hover {
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            border-color: var(--primary);
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #ffffff;
+            border-color: var(--primary);
+        }
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            color: #ffffff;
+        }
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            flex: 1;
+            padding: 40px 60px;
+            max-width: 1000px;
+        }
+        /* Header Hero */
+        .doc-hero {
+            background: linear-gradient(135deg, #065f46 0%, #0f766e 100%);
+            color: #ffffff;
+            padding: 36px 40px;
+            border-radius: 16px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 25px -5px rgba(6, 95, 70, 0.25);
+        }
+        .doc-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(8px);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .doc-hero h1 {
+            font-size: 26px;
+            font-weight: 800;
+            line-height: 1.3;
+            margin-bottom: 8px;
+        }
+        .doc-hero p {
+            font-size: 15px;
+            opacity: 0.9;
+        }
+        /* Typography */
+        .chapter-h1 {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 40px 0 16px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .h1-badge {
+            font-size: 12px;
+            background: var(--primary-light);
+            color: var(--primary-dark);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 800;
+        }
+        .section-h2 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--secondary);
+            margin: 28px 0 12px 0;
+        }
+        .step-h3 {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin: 18px 0 8px 0;
+        }
+        .manual-p {
+            margin-bottom: 12px;
+            color: var(--text-main);
+        }
+        .manual-bullet {
+            margin-left: 24px;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+        .section-divider {
+            height: 1px;
+            background: var(--border-color);
+            margin: 36px 0 20px 0;
+        }
+        /* Callout Box */
+        .callout-box {
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin: 18px 0;
+            border-left: 4px solid #059669;
+            background: var(--primary-light);
+        }
+        .callout-title {
+            font-weight: 700;
+            font-size: 13.5px;
+            color: var(--primary-dark);
+            margin-bottom: 4px;
+        }
+        .callout-body {
+            font-size: 13.5px;
+            color: var(--text-main);
+            line-height: 1.55;
+        }
+        .callout-warning {
+            background: #fffbeb;
+            border-left-color: #d97706;
+        }
+        .callout-warning .callout-title {
+            color: #b45309;
+        }
+        /* Image Placeholder Card */
+        .img-placeholder-card {
+            border: 2px dashed #059669;
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin: 20px 0;
+            transition: transform 0.15s ease;
+        }
+        .img-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .img-icon {
+            font-size: 18px;
+        }
+        .img-title {
+            font-weight: 700;
+            font-size: 14.5px;
+            color: var(--primary);
+        }
+        .img-details {
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .img-row {
+            margin-bottom: 4px;
+        }
+        .img-label {
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-right: 6px;
+        }
+        .route-badge {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-body);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--secondary);
+            font-weight: 600;
+        }
+        .tips-text {
+            color: #047857;
+            font-style: italic;
+        }
+        .img-dropzone {
+            text-align: center;
+            padding: 14px;
+            margin-top: 12px;
+            background: var(--bg-body);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+        }
+        .dropzone-text {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        /* Table */
+        .table-responsive {
+            overflow-x: auto;
+            margin: 20px 0;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+        }
+        .manual-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: left;
+        }
+        .manual-table th {
+            background: var(--primary);
+            color: #ffffff;
+            font-weight: 700;
+            padding: 12px 14px;
+            font-size: 13px;
+        }
+        .manual-table td {
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+        .manual-table tr:nth-child(even) {
+            background: var(--bg-body);
+        }
+        .manual-table tr:hover {
+            background: var(--primary-light);
+        }
+        /* Print Styles */
+        @media print {
+            .sidebar, .sidebar-footer, .sidebar-search, .btn {
+                display: none !important;
+            }
+            .main-content {
+                margin-left: 0 !important;
+                padding: 0 !important;
+                max-width: 100% !important;
+            }
+            body {
+                background: #ffffff;
+                color: #000000;
+                font-size: 11pt;
+            }
+            .chapter-h1 {
+                page-break-before: always;
+            }
+            .img-placeholder-card {
+                break-inside: avoid;
+            }
+            .manual-table {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Smart Kids CMS</h1>
+                <p>Buku Panduan Penggunaan Sistem v2.0</p>
+            </div>
+            <div class="sidebar-search">
+                <input type="text" id="searchInput" placeholder="Cari topik atau fitur..." onkeyup="filterTOC()">
+            </div>
+            <nav class="toc-list" id="tocNav">
+                <a href="#section-1" class="toc-link toc-level-1">SISTEM INFORMASI MANAJEMEN
+MULTI-SEKOLAH & PPDB ONLINE</a><a href="#section-2" class="toc-link toc-level-1">KATA PENGANTAR</a><a href="#section-3" class="toc-link toc-level-1">RINGKASAN DAFTAR ISI</a><a href="#section-4" class="toc-link toc-level-1">BAB 1: PENGENALAN SISTEM & ARSITEKTUR MULTI-SEKOLAH</a><a href="#sub-1" class="toc-link toc-level-2">1.1 Latar Belakang & Visi Digitalisasi Smart Kids</a><a href="#sub-2" class="toc-link toc-level-2">1.2 Konsep Arsitektur Multi-Sekolah (One Foundation - Multi Branch)</a><a href="#sub-3" class="toc-link toc-level-2">1.3 Matriks Peran Pengguna & Hak Akses (Role Matrix)</a><a href="#sub-4" class="toc-link toc-level-2">1.4 Kebutuhan Perangkat & Kompatibilitas Browser</a><a href="#sub-5" class="toc-link toc-level-2">1.5 Aturan Penyimpanan & Batas Unggah Berkas</a><a href="#section-5" class="toc-link toc-level-1">BAB 2: PORTAL PUBLIK & PENDAFTARAN ONLINE</a><a href="#sub-6" class="toc-link toc-level-2">2.1 Mengakses Halaman Utama & Memilih Cabang Sekolah</a><a href="#sub-7" class="toc-link toc-level-2">2.2 Eksplorasi Program Belajar, Galeri & Video Profil</a><a href="#sub-8" class="toc-link toc-level-2">2.3 Panduan Lengkap Pendaftaran PPDB Online (Langkah 1 s/d 6)</a><a href="#sub-9" class="toc-link toc-level-2">2.4 Panduan Pendaftaran Bimbingan Belajar Les SD Online</a><a href="#sub-10" class="toc-link toc-level-2">2.5 Layanan Bantuan & Integrasi Kontak Sekolah</a><a href="#section-6" class="toc-link toc-level-1">BAB 3: PANDUAN AUTENTIKASI & KEAMANAN AKUN</a><a href="#sub-11" class="toc-link toc-level-2">3.1 Mengakses Portal Login Terpadu</a><a href="#sub-12" class="toc-link toc-level-2">3.2 Prosedur Masuk Sistem (Multi-Identifier Login)</a><a href="#sub-13" class="toc-link toc-level-2">3.3 Fitur Beralih Tema Tampilan (Dark Mode & Light Mode)</a><a href="#sub-14" class="toc-link toc-level-2">3.4 Tombol Pintasan 'Lihat Website'</a><a href="#sub-15" class="toc-link toc-level-2">3.5 Prosedur Keluar Akun (Logout) & Keamanan Sesi</a><a href="#section-7" class="toc-link toc-level-1">BAB 4: PANDUAN LENGKAP PENGELOLA (SUPER ADMIN & ADMIN CABANG)</a><a href="#sub-16" class="toc-link toc-level-2">4.1 Dashboard Utama & Pemantauan Statistik (Overview)</a><a href="#sub-17" class="toc-link toc-level-2">4.2 Penggantian Konteks Cabang Sekolah (Branch Switcher)</a><a href="#sub-18" class="toc-link toc-level-2">4.3 Manajemen Multi-Sekolah / Cabang (Khusus Super Admin)</a><a href="#sub-19" class="toc-link toc-level-2">4.4 Manajemen Pengguna & Hak Akses Akun (Khusus Super Admin)</a><a href="#sub-20" class="toc-link toc-level-2">4.5 Pengelolaan Master Kelas & Plotting Siswa</a><a href="#sub-21" class="toc-link toc-level-2">4.6 Pengelolaan Pendaftaran PPDB & Verifikasi Berkas</a><a href="#sub-22" class="toc-link toc-level-2">4.7 Manajemen Data Siswa Aktif & Kartu QR Code</a><a href="#sub-23" class="toc-link toc-level-2">4.8 Pengelolaan Presensi Siswa (Scan QR & Manual)</a><a href="#sub-24" class="toc-link toc-level-2">4.9 Manajemen Tenaga Pendidik / Guru</a><a href="#sub-25" class="toc-link toc-level-2">4.10 Pemantauan Presensi Guru</a><a href="#sub-26" class="toc-link toc-level-2">4.11 Pusat Progresif Fitur Guru & Ekspor Laporan CSV</a><a href="#sub-27" class="toc-link toc-level-2">4.12 Pengelolaan Persetujuan Izin & Cuti Guru</a><a href="#sub-28" class="toc-link toc-level-2">4.13 Penjadwalan Kegiatan Belajar Mengajar (KBM)</a><a href="#sub-29" class="toc-link toc-level-2">4.14 Pengelolaan Keuangan SPP TK & Verifikasi Pembayaran</a><a href="#sub-30" class="toc-link toc-level-2">4.15 Pengelolaan Tagihan Biaya Tambahan Siswa</a><a href="#sub-31" class="toc-link toc-level-2">4.16 Pengaturan Metode Pembayaran (Master Rekening & QRIS)</a><a href="#sub-32" class="toc-link toc-level-2">4.17 Pengelolaan Bimbingan Belajar Les SD (Admin)</a><a href="#sub-33" class="toc-link toc-level-2">4.18 Publikasi Pengumuman & Edaran Sekolah</a><a href="#sub-34" class="toc-link toc-level-2">4.19 Pengelolaan Konten Website (CMS: Program, Galeri & Testimoni)</a><a href="#sub-35" class="toc-link toc-level-2">4.20 Kustomisasi Profil Website Sekolah</a><a href="#section-8" class="toc-link toc-level-1">BAB 5: PANDUAN GURU / TENAGA PENDIDIK</a><a href="#sub-36" class="toc-link toc-level-2">5.1 Dashboard Guru & Tinjauan Aktivitas Harian</a><a href="#sub-37" class="toc-link toc-level-2">5.2 Pencatatan Presensi Siswa Kelas (Scan QR & Manual)</a><a href="#sub-38" class="toc-link toc-level-2">5.3 Penginputan Nilai Harian & Catatan Perkembangan Anak</a><a href="#sub-39" class="toc-link toc-level-2">5.4 Memeriksa Jadwal Mengajar KBM Harian</a><a href="#sub-40" class="toc-link toc-level-2">5.5 Presensi Mandiri Mengajar Guru</a><a href="#sub-41" class="toc-link toc-level-2">5.6 Pengajuan Permohonan Izin / Cuti Online</a><a href="#sub-42" class="toc-link toc-level-2">5.7 Tugas Bimbingan Belajar Les SD (Khusus Guru PIC)</a><a href="#sub-43" class="toc-link toc-level-2">5.8 Mengakses Pusat Pengumuman Sekolah</a><a href="#section-9" class="toc-link toc-level-1">BAB 6: PANDUAN ORANG TUA / WALI MURID</a><a href="#sub-44" class="toc-link toc-level-2">6.1 Beranda Ananda: Memantau Profil & Ringkasan Pendidikan</a><a href="#sub-45" class="toc-link toc-level-2">6.2 Monitoring Nilai Harian & Rapor Perkembangan Ananda</a><a href="#sub-46" class="toc-link toc-level-2">6.3 Memantau Catatan Presensi Kehadiran Anak</a><a href="#sub-47" class="toc-link toc-level-2">6.4 Mengetahui Jadwal Kegiatan Belajar Mengajar (KBM)</a><a href="#sub-48" class="toc-link toc-level-2">6.5 Panduan Pembayaran SPP TK Online & Cetak Kwitansi Digital</a><a href="#sub-49" class="toc-link toc-level-2">6.6 Pendaftaran & Pemantauan Program Les SD Ananda</a><a href="#sub-50" class="toc-link toc-level-2">6.7 Membaca Pengumuman & Agenda Penting Sekolah</a><a href="#section-10" class="toc-link toc-level-1">BAB 7: TANYA JAWAB (FAQ) & PANDUAN PEMECAHAN MASALAH</a><a href="#sub-51" class="toc-link toc-level-2">7.1 Lupa Kata Sandi Akun / Akun Terkunci</a><a href="#sub-52" class="toc-link toc-level-2">7.2 Gagal Mengunggah Berkas / Dokumen Pendaftaran</a><a href="#sub-53" class="toc-link toc-level-2">7.3 Kamera Pemindai QR Code Tidak Aktif di Browser</a><a href="#sub-54" class="toc-link toc-level-2">7.4 Bukti Pembayaran SPP Belum Terverifikasi</a><a href="#sub-55" class="toc-link toc-level-2">7.5 Halaman Aplikasi Terasa Lambat atau Tampilan Tidak Berubah</a><a href="#sub-56" class="toc-link toc-level-2">7.6 Layanan Bantuan & Kontak Dukungan Teknis</a><a href="#section-11" class="toc-link toc-level-1">BAB 8: LAMPIRAN STANDAR OPERASIONAL PROSEDUR (SOP) & DAFTAR PERIKSA</a><a href="#sub-57" class="toc-link toc-level-2">8.1 SOP Alur Penerimaan Peserta Didik Baru (PPDB) Online & Verifikasi</a><a href="#sub-58" class="toc-link toc-level-2">8.2 SOP Siklus Penagihan, Pembayaran & Rekonsiliasi SPP Bulanan</a><a href="#sub-59" class="toc-link toc-level-2">8.3 SOP Prosedur Absensi Harian Siswa & Guru Berbasis QR Code</a><a href="#sub-60" class="toc-link toc-level-2">8.4 SOP Penginputan Nilai & Penerbitan Rapor Perkembangan PAUD</a><a href="#sub-61" class="toc-link toc-level-2">8.5 Checklist Pemeliharaan & Operasional Petugas Administrator</a><a href="#sub-62" class="toc-link toc-level-2">8.6 Checklist Rutin Harian Tenaga Pendidik (Guru Kelas)</a><a href="#sub-63" class="toc-link toc-level-2">8.7 Glosarium Terminologi Sistem & Singkatan Teknis</a>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="btn btn-primary" onclick="window.print()">🖨️ Cetak / PDF</button>
+                <button class="btn" onclick="toggleTheme()" id="themeBtn">🌙 Gelap</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="doc-hero">
+                <div class="doc-badge">DOKUMEN RESMI PANDUAN PENGGUNA</div>
+                <h1>Buku Manual Panduan Penggunaan Sistem Smart Kids</h1>
+                <p>Sistem Informasi Manajemen Multi-Sekolah & Pendaftaran Online (PPDB) — YAPCHI Foundation</p>
+            </div>
+
+            <div class="cover-badge">DOKUMEN RESMI PANDUAN PENGGUNA (USER MANUAL)</div><div class="section-divider"></div><h2 id="section-1" class="chapter-h1"><span class="h1-badge">BAB 1</span> SISTEM INFORMASI MANAJEMEN
+MULTI-SEKOLAH & PPDB ONLINE</h2><p class="manual-p">Panduan Operasional Terlengkap untuk Administrator, Tenaga Pendidik (Guru),
+Orang Tua / Wali Murid, dan Pengunjung Publik</p><p class="manual-p">━━━━━━━━━━━━━━━━━━━ ◆ ━━━━━━━━━━━━━━━━━━━</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Nama Platform</th><th>Smart Kids Cloud Management System (CMS)</th></tr></thead><tbody><tr><td>Naungan Yayasan</td><td>YAPCHI Foundation (Yayasan Pendidikan Anak Indonesia)</td></tr><tr><td>Cabang Sekolah Terpadu</td><td>Smart Kids Sadjati, Smart Kids BCL & Cabang Afiliasi</td></tr><tr><td>Versi Rilis Dokumen</td><td>Versi 2.0 (Edisi Lengkap Multi-Sekolah)</td></tr><tr><td>Tahun Akademik</td><td>Tahun Ajaran 2026 / 2027</td></tr><tr><td>Status Dokumen</td><td>Buku Panduan Standar Operasional Prosedur (SOP)</td></tr></tbody></table></div><p class="manual-p">Pusat Layanan & Pengembangan Teknologi Pendidikan — YAPCHI Foundation
+Karawang, Jawa Barat - Indonesia</p><div class="section-divider"></div><h2 id="section-2" class="chapter-h1"><span class="h1-badge">BAB 2</span> KATA PENGANTAR</h2><p class="manual-p"><strong>Salam Pendidikan Bermutu, </strong>Puji dan syukur kami panjatkan ke hadirat Tuhan Yang Maha Esa atas selesainya penyusunan Buku Panduan Penggunaan (User Manual) Sistem Informasi Manajemen Multi-Sekolah dan Pendaftaran Peserta Didik Baru (PPDB) Online Smart Kids di bawah naungan Yayasan Pendidikan Anak Indonesia (YAPCHI Foundation).</p><p class="manual-p">Buku manual ini disusun sebagai pedoman operasional standar yang komprehensif bagi seluruh pemangku kepentingan (stakeholders) yang berinteraksi dengan ekosistem digital Smart Kids. Platform ini dirancang khusus guna menyatukan administrasi multi-cabang sekolah, mengotomatisasi proses pendaftaran siswa baru, memfasilitasi transparansi pembayaran SPP, mencatat presensi digital berbasis QR Code, hingga menyajikan laporan penilaian perkembangan anak secara interaktif kepada orang tua.</p><p class="manual-p">Dokumen ini memuat langkah-langkah terperinci untuk setiap hak akses (peran), mulai dari Pengunjung Publik, Calon Wali Murid, Super Administrator Yayasan, Administrator Cabang Sekolah, Tenaga Pendidik (Guru), hingga Orang Tua / Wali Murid aktif. Diharapkan buku ini dapat mempercepat adaptasi pengguna serta menjaga kelancaran operasional pendidikan di lingkungan Smart Kids.</p>
+                    <div class="callout-box callout-info">
+                        <div class="callout-title">ℹ️ PETUNJUK PENGGUNAAN BUKU MANUAL BAGI PENYUSUN DOKUMEN</div>
+                        <div class="callout-body">Setiap bab dalam buku panduan ini telah dilengkapi dengan kotak penanda gambar (Image Placeholder) bersimbol 🖼️. Bagi penyusun atau staf dokumentasi, silakan letakkan tangkapan layar (screenshot) aplikasi sesuai petunjuk dan deskripsi yang tercantum pada masing-masing kotak.</div>
+                    </div>
+                    <div class="section-divider"></div><h2 id="section-3" class="chapter-h1"><span class="h1-badge">BAB 3</span> RINGKASAN DAFTAR ISI</h2><div class="table-responsive"><table class="manual-table"><thead><tr><th>Bab</th><th>Judul Bab</th><th>Cakupan Materi Pokok</th></tr></thead><tbody><tr><td>BAB 1</td><td>PENGENALAN SISTEM & ARSITEKTUR MULTI-SEKOLAH</td><td>Latar belakang, konsep yayasan multi-cabang, matriks peran, spesifikasi sistem</td></tr><tr><td>BAB 2</td><td>PORTAL PUBLIK & PENDAFTARAN ONLINE</td><td>Navigasi landing page, selector cabang, alur pendaftaran PPDB TK (Langkah 1-6), pendaftaran Les SD</td></tr><tr><td>BAB 3</td><td>AUTENTIKASI & KEAMANAN AKUN</td><td>Portal login terpadu multi-role, mode gelap/terang, keamanan sesi JWT & pergantian akun</td></tr><tr><td>BAB 4</td><td>PANDUAN LENGKAP ADMINISTRATOR</td><td>Dashboard stats, master cabang, manajemen user, kelas & plotting, verifikasi PPDB, siswa, presensi QR, progresif guru, SPP, QRIS & CMS</td></tr><tr><td>BAB 5</td><td>PANDUAN GURU / TENAGA PENDIDIK</td><td>Dashboard guru, presensi kelas, input nilai perkembangan anak, jadwal mengajar, cuti online, PIC bimbingan Les SD</td></tr><tr><td>BAB 6</td><td>PANDUAN ORANG TUA / WALI MURID</td><td>Beranda ananda, monitoring nilai rapor, presensi kehadiran, pembayaran SPP online via transfer/QRIS, kwitansi digital</td></tr><tr><td>BAB 7</td><td>TANYA JAWAB (FAQ) & PEMECAHAN MASALAH</td><td>Panduan pemulihan akun, troubleshooting upload berkas 1 MB, pemindai kamera QR, konfirmasi pembayaran</td></tr><tr><td>BAB 8</td><td>LAMPIRAN SOP & DAFTAR PERIKSA OPERASIONAL</td><td>SOP PPDB, siklus penagihan SPP, presensi QR, penilaian rapor PAUD, checklist rutin admin/guru, glosarium teknis</td></tr></tbody></table></div><div class="section-divider"></div><h2 id="section-4" class="chapter-h1"><span class="h1-badge">BAB 4</span> BAB 1: PENGENALAN SISTEM & ARSITEKTUR MULTI-SEKOLAH</h2><h3 id="sub-1" class="section-h2">1.1 Latar Belakang & Visi Digitalisasi Smart Kids</h3><p class="manual-p">Smart Kids merupakan institusi pendidikan usia dini dan bimbingan belajar anak di bawah naungan YAPCHI Foundation (Yayasan Pendidikan Anak Indonesia). Seiring dengan bertambahnya cabang operasional sekolah dan tingginya animo masyarakat, diperlukan transformasi tata kelola dari sistem konvensional menjadi ekosistem digital modern yang terpusat, cepat, transparan, dan akuntabel.</p><p class="manual-p">Platform Smart Kids Cloud Management System dibangun untuk menghadirkan pengalaman terpadu, mulai dari pencitraan lembaga di ranah publik, kemudahan pendaftaran peserta didik baru (PPDB) tanpa harus datang langsung ke lokasi, hingga integrasi operasional akademik dan keuangan harian.</p><h3 id="sub-2" class="section-h2">1.2 Konsep Arsitektur Multi-Sekolah (One Foundation - Multi Branch)</h3><p class="manual-p">Sistem ini dirancang menggunakan konsep arsitektur Multi-Sekolah (Multi-Tenant Architecture) pada tingkat database terpadu. Satu yayasan menaungi banyak unit sekolah atau cabang (misalnya Cabang Sadjati dan Cabang BCL), dengan keunggulan sebagai berikut:</p><li class="manual-bullet"><strong>Otonomi Cabang: </strong>Setiap cabang sekolah memiliki profil mandiri, nomor telepon, alamat, program belajar, struktur biaya SPP, dan nomor rekening pembayaran yang independen.</li><li class="manual-bullet"><strong>Sentralisasi Pengawasan: </strong>Super Administrator Yayasan memiliki kemampuan pengawasan menyeluruh (helicopter view), dapat beralih konteks antar cabang secara instan, serta memantau ringkasan statistik yayasan.</li><li class="manual-bullet"><strong>Isolasi Data Aman: </strong>Administrator Cabang hanya memiliki hak akses pada data siswa, guru, kelas, dan keuangan di cabang sekolahnya sendiri tanpa dapat melihat cabang lain.</li><li class="manual-bullet"><strong>Fleksibilitas Akses Publik: </strong>Pengunjung website dapat memilih cabang sekolah melalui pemilih cabang di bilah navigasi, atau secara otomatis diarahkan melalui subdomain resmi sekolah.</li><h3 id="sub-3" class="section-h2">1.3 Matriks Peran Pengguna & Hak Akses (Role Matrix)</h3><p class="manual-p">Keamanan dan pembagian tugas dalam sistem Smart Kids diatur melalui 5 (lima) peran pengguna utama dengan wewenang sebagai berikut:</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Peran Pengguna (Role)</th><th>Cakupan Akses</th><th>Wewenang & Deskripsi Tanggung Jawab</th></tr></thead><tbody><tr><td>Super Admin (Yayasan)</td><td>Semua Cabang</td><td>Hak akses penuh ke seluruh modul sistem, kelola cabang sekolah, kelola akun pengguna admin, pemantauan seluruh data akademik & keuangan yayasan.</td></tr><tr><td>Admin Cabang (Sekolah)</td><td>1 Cabang Tertentu</td><td>Kelola PPDB cabang, master kelas & plotting siswa, data guru & presensi guru, presensi siswa, jadwal KBM, verifikasi SPP cabang, rekening & profil web cabang.</td></tr><tr><td>Guru / Tenaga Pendidik</td><td>Kelas Binaan / PIC</td><td>Presensi harian siswa kelas binaan, input nilai perkembangan anak, cek jadwal KBM, absensi mengajar mandiri, pengajuan cuti, serta kelola murid bimbingan Les SD bagi PIC.</td></tr><tr><td>Orang Tua / Wali Murid</td><td>Data Ananda Sendiri</td><td>Melihat profil ananda, pantau nilai & catatan guru, pantau presensi kehadiran anak, bayar tagihan SPP online (upload bukti/QRIS), unduh kwitansi, pendaftaran Les SD.</td></tr><tr><td>Pengunjung Publik</td><td>Landing Page</td><td>Melihat profil sekolah, fasilitas, video profil, galeri, testimoni, mengisi formulir pendaftaran PPDB online, mengisi formulir pendaftaran Les SD online.</td></tr></tbody></table></div><h3 id="sub-4" class="section-h2">1.4 Kebutuhan Perangkat & Kompatibilitas Browser</h3><p class="manual-p">Aplikasi web Smart Kids dibangun dengan teknologi Next.js terkini yang responsif di berbagai resolusi layar, baik komputer desktop, laptop, tablet, hingga smartphone Android dan iOS.</p><li class="manual-bullet"><strong>Peramban Web: </strong>Browser yang Didukung: Google Chrome (versi 100+), Mozilla Firefox (versi 100+), Microsoft Edge (versi 100+), dan Apple Safari (versi 15+).</li><li class="manual-bullet"><strong>Konektivitas: </strong>Koneksi Internet: Minimal 1 Mbps untuk akses umum; disarankan minimal 5 Mbps untuk fitur pemindaian kamera QR Code dan unggah dokumen berkas.</li><li class="manual-bullet"><strong>Perangkat Kamera: </strong>Perangkat Keras Tambahan: Kamera webcam pada laptop atau kamera smartphone yang berfungsi normal untuk pemindaian kartu QR Code presensi siswa.</li><h3 id="sub-5" class="section-h2">1.5 Aturan Penyimpanan & Batas Unggah Berkas</h3><p class="manual-p">Seluruh berkas dokumen pendaftaran PPDB, pas foto, slip bukti transfer SPP, dan lampiran surat dokter disimpan pada struktur direktori penyimpanan aman berbasis kategori tanggal unggahan.</p>
+                    <div class="callout-box callout-warning">
+                        <div class="callout-title">⚠️ KETENTUAN UPLOAD DOKUMEN & UKURAN BERKAS</div>
+                        <div class="callout-body">Batas ukuran berkas yang diperbolehkan untuk diunggah oleh sistem adalah MAKSIMAL 1 MB per berkas. Format file yang didukung mencakup gambar (JPG, JPEG, PNG, WEBP) serta dokumen PDF untuk Kartu Keluarga dan Akta Kelahiran. Sistem akan menolak secara otomatis apabila file melebihi kapasitas 1 MB demi menjaga performa server.</div>
+                    </div>
+                    <div class="section-divider"></div><h2 id="section-5" class="chapter-h1"><span class="h1-badge">BAB 5</span> BAB 2: PORTAL PUBLIK & PENDAFTARAN ONLINE</h2><p class="manual-p">Portal publik merupakan gerbang informasi digital bagi masyarakat umum, orang tua calon siswa, maupun pihak sponsor. Halaman ini dirancang menarik, interaktif, serta menyajikan informasi program pendidikan secara transparan.</p><h3 id="sub-6" class="section-h2">2.1 Mengakses Halaman Utama & Memilih Cabang Sekolah</h3><p class="manual-p">Pengguna dapat membuka peramban web dan memasukkan alamat domain resmi sekolah (contoh: https://smartkids.elevore.web.id). Pada bagian atas bilah navigasi (Navbar), terdapat tombol pemilih cabang (School Selector). Pengguna dapat berpindah antara Smart Kids Sadjati dan Smart Kids BCL. Saat cabang dipilih, seluruh konten program belajar, galeri foto, nomor telepon, dan lokasi sekolah akan otomatis disesuaikan dengan cabang yang dipilih.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 01: Halaman Beranda Utama Website Publik Smart Kids]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/ (Root Homepage)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan landing page utama menampilkan logo Smart Kids, tombol navigasi, lencana pendaftaran PPDB dibuka, judul hero, dan maskot sekolah.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka halaman utama website pada komputer/laptop, pastikan bilah navigasi dan hero section terlihat lengkap dengan pencahayaan jelas.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 02: Dropdown Pemilih Cabang Sekolah pada Navbar]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/ (Root Homepage - Navbar)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan dropdown pemilih cabang (Smart Kids Sadjati dan Smart Kids BCL) pada bilah navigasi bagian atas.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik tombol pemilih cabang di header hingga menu pilihan cabang muncul, lalu ambil screenshot area navbar.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-7" class="section-h2">2.2 Eksplorasi Program Belajar, Galeri & Video Profil</h3><p class="manual-p">Halaman depan menyajikan beragam komponen interaktif untuk mengenal ekosistem sekolah lebih dalam:</p><li class="manual-bullet"><strong>Daftar Program: </strong>Program Belajar: Kartu program yang menampilkan jenjang usia (3-8 tahun), fasilitas belajar sentra, dan estimasi biaya SPP bulanan.</li><li class="manual-bullet"><strong>Video Edukasi: </strong>Video Profil Interaktif: Tautan video YouTube resmi sekolah yang dapat diputar langsung di halaman tanpa harus beralih aplikasi.</li><li class="manual-bullet"><strong>Galeri Fasilitas: </strong>Galeri Dokumentasi: Foto kegiatan harian siswa, sarana bermain, kegiatan luar ruangan (outing), dan pentas seni.</li><li class="manual-bullet"><strong>Testimoni Orang Tua: </strong>Ulasan & Testimoni: Kutipan testimoni nyata dari para orang tua murid mengenai perkembangan putra-putrinya di Smart Kids.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 03: Bagian Program Belajar TK & Fitur Unggulan]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/ (Homepage - Section Program)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan bagian 'Program Belajar' yang menampilkan pilihan program Daycare, Playgroup, TK A, dan TK B beserta kartu fitur dan tarif SPP.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Gulir halaman ke bagian 'Program Pilihan', ambil screenshot yang memperlihatkan kartu program dengan tombol 'Daftar Sekarang'.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 04: Galeri Foto Kegiatan & Fasilitas Sekolah]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/ (Homepage - Section Galeri)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan grid galeri foto kegiatan bermain dan belajar anak di Smart Kids.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Gulir halaman ke bagian galeri, ambil screenshot grid foto yang rapi.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-8" class="section-h2">2.3 Panduan Lengkap Pendaftaran PPDB Online (Langkah 1 s/d 6)</h3><p class="manual-p">Untuk mendaftarkan putra-putri secara online, calon wali murid cukup mengklik tombol 'Daftar Sekarang' atau tab 'PPDB' pada navigasi atas. Formulir PPDB dirancang dalam 6 langkah (wizard) sistematis agar orang tua dapat mengisi formulir dengan nyaman:</p><h4 class="step-h3">Langkah 1: Pengisian Data Calon Siswa</h4><p class="manual-p">Pada langkah pertama, orang tua mengisi identitas dasar calon peserta didik baru. Kolom yang wajib diisi meliputi:</p><li class="manual-bullet"><strong>Nama Anak: </strong>Nama Lengkap Anak (sesuai Akta Kelahiran)</li><li class="manual-bullet"><strong>Jenis Kelamin: </strong>Pilihan Jenis Kelamin (Laki-laki / Perempuan)</li><li class="manual-bullet"><strong>Agama: </strong>Agama yang dianut calon siswa</li><li class="manual-bullet"><strong>Tempat & Tgl Lahir: </strong>Tempat Lahir dan Tanggal Lahir (menggunakan date picker)</li><li class="manual-bullet"><strong>Usia: </strong>Usia anak saat mendaftar (terhitung otomatis atau diisi)</li><li class="manual-bullet"><strong>Program: </strong>Pilihan Program Belajar yang dituju (misal: Sentra TK A, Playgroup, atau Daycare)</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 05: Formulir Pendaftaran PPDB - Langkah 1 (Data Calon Siswa)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/?tab=ppdb (Langkah 1)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Formulir langkah 1 menampilkan kolom Nama Anak, Jenis Kelamin, Agama, Tempat & Tanggal Lahir, serta Pilihan Program Belajar.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik tab PPDB di halaman utama, pastikan indikator langkah 1 aktif, ambil screenshot formulir data siswa.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h4 class="step-h3">Langkah 2: Pengisian Data Orang Tua / Wali Murid</h4><p class="manual-p">Pada langkah kedua, orang tua memasukkan informasi kontak penanggung jawab siswa. Nomor WhatsApp sangat krusial karena seluruh notifikasi pendaftaran dan nomor registrasi akan dikirimkan ke nomor ini:</p><li class="manual-bullet"><strong>Nama Orang Tua: </strong>Nama Lengkap Ayah / Ibu / Wali</li><li class="manual-bullet"><strong>No. WhatsApp: </strong>Nomor WhatsApp aktif diawali dengan angka 08 (misal: 081234567890)</li><li class="manual-bullet"><strong>Email: </strong>Alamat email aktif untuk penerimaan dokumen digital</li><li class="manual-bullet"><strong>Alamat Rumah: </strong>Alamat domisili tempat tinggal lengkap saat ini</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 06: Formulir Pendaftaran PPDB - Langkah 2 (Data Orang Tua / Kontak)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/?tab=ppdb (Langkah 2)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Formulir langkah 2 menampilkan kolom Nama Orang Tua, Nomor WhatsApp, Email, dan Alamat Rumah.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Lanjutkan ke langkah 2, ambil screenshot formulir data kontak orang tua.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h4 class="step-h3">Langkah 3: Unggah Berkas Persyaratan Administrasi</h4><p class="manual-p">Orang tua diminta mengunggah dokumen administrasi dalam bentuk foto atau dokumen scan digital. Masing-masing berkas memiliki batas maksimal 1 MB:</p><li class="manual-bullet"><strong>Kartu Keluarga: </strong>Scan Kartu Keluarga (KK) yang masih berlaku</li><li class="manual-bullet"><strong>Akta Kelahiran: </strong>Scan Akta Kelahiran resmi anak</li><li class="manual-bullet"><strong>Pas Foto 3x4: </strong>Pas foto berwarna terbaru calon anak (latar belakang bebas rapi)</li><li class="manual-bullet"><strong>KTP Orang Tua: </strong>Foto KTP salah satu orang tua / wali</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 07: Formulir Pendaftaran PPDB - Langkah 3 (Unggah Berkas Persyaratan)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/?tab=ppdb (Langkah 3)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Formulir langkah 3 menampilkan empat area upload file dokumen (KK, Akta Kelahiran, Pas Foto, dan KTP Ortu).</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Lanjutkan ke langkah 3, ambil screenshot tampilan kolom unggah dokumen persyaratan.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h4 class="step-h3">Langkah 4: Rincian Biaya & Pemilihan Komponen Biaya Tambahan</h4><p class="manual-p">Sistem secara transparan menghitung estimasi biaya pendaftaran. Biaya awal meliputi SPP bulan pertama dari program yang dipilih. Selain itu, orang tua dapat memilih komponen tambahan opsional (seperti Seragam Sekolah, Buku Paket Tematik, atau Outing Class). Total tagihan pembayaran akan terkalkulasi secara otomatis secara real-time di layar.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 08: Formulir Pendaftaran PPDB - Langkah 4 (Rincian Biaya & Komponen)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/?tab=ppdb (Langkah 4)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan rincian biaya pendaftaran, checkbox pemilihan seragam/buku, serta total nominal pembayaran.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Lanjutkan ke langkah 4, ambil screenshot rincian biaya beserta kotak pilihan komponen tambahan.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h4 class="step-h3">Langkah 5: Metode Pembayaran & Unggah Bukti Transfer</h4><p class="manual-p">Orang tua memilih metode pembayaran pendaftaran resmi sekolah:</p><li class="manual-bullet"><strong>Transfer Bank: </strong>Transfer Bank Resmi: Sistem menampilkan nomor rekening resmi cabang sekolah (misal: BCA, Mandiri, BRI) beserta nama pemilik rekening.</li><li class="manual-bullet"><strong>QRIS Instan: </strong>Scan QRIS: Sistem menyajikan kode QRIS resmi yang dapat dipindai langsung melalui aplikasi mobile banking atau e-wallet apa saja (GoPay, OVO, Dana, ShopeePay).</li><p class="manual-p">Setelah melakukan transfer, orang tua mengunggah foto / screenshot struk bukti pembayaran pada kolom yang disediakan, lalu menekan tombol 'Kirim Pendaftaran'.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 09: Formulir Pendaftaran PPDB - Langkah 5 (Pembayaran & Bukti Transfer)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/?tab=ppdb (Langkah 5)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan informasi rekening bank, gambar QRIS sekolah, dan kolom unggah foto bukti transfer.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Lanjutkan ke langkah 5, pilih metode bayar bank/QRIS, lalu ambil screenshot tampilan pembayaran dan kolom upload bukti.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h4 class="step-h3">Langkah 6: Bukti Registrasi & Nomor Pendaftaran</h4><p class="manual-p">Setelah data terkirim, sistem menghasilkan tanda terima pendaftaran online yang memuat:</p><li class="manual-bullet"><strong>Nomor Registrasi: </strong>Nomor Registrasi Unik Resmi (contoh format: REG-2026-0812)</li><li class="manual-bullet"><strong>Ringkasan Data: </strong>Rincian biodata anak dan kontak orang tua yang telah didaftarkan</li><li class="manual-bullet"><strong>Status Berkas: </strong>Status pendaftaran: PENDING (Menunggu Verifikasi Pembayaran & Berkas oleh Admin)</li><li class="manual-bullet"><strong>Konfirmasi WhatsApp: </strong>Tombol 'Konfirmasi WhatsApp' untuk membuka chat WhatsApp langsung ke admin pendaftaran sekolah dengan pesan otomatis.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 10: Tanda Bukti Pendaftaran PPDB Berhasil]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/?tab=ppdb (Langkah 6 / Sukses)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan layar sukses pendaftaran dengan Nomor Registrasi, badge PENDING, rincian biaya, dan tombol konfirmasi WhatsApp.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Ambil screenshot kartu bukti pendaftaran sukses yang memuat nomor registrasi unik.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-9" class="section-h2">2.4 Panduan Pendaftaran Bimbingan Belajar Les SD Online</h3><p class="manual-p">Selain jenjang TK dan Playgroup, Smart Kids menyediakan unit Bimbingan Belajar Les SD bagi siswa kelas 1 hingga kelas 6 SD. Masyarakat dapat mendaftarkan siswa SD melalui modal khusus 'Daftar Les SD' yang tersedia di beranda:</p><li class="manual-bullet"><strong>Data Siswa: </strong>Identitas Siswa SD: Nama lengkap anak, jenis kelamin, kelas SD saat ini (Kelas 1 - 6 SD), dan nama sekolah asal SD.</li><li class="manual-bullet"><strong>Paket Bimbingan: </strong>Pilihan Paket Belajar: Frekuensi pertemuan (misal: 1 Minggu 3x Pertemuan - Semua Mata Pelajaran).</li><li class="manual-bullet"><strong>Jadwal Les: </strong>Pilihan Waktu Belajar: Hari dan jam les yang diinginkan (misal: Senin, Rabu, Jumat pukul 14:00 - 15:30 WIB).</li><li class="manual-bullet"><strong>Kontak Wali: </strong>Data Orang Tua: Nama orang tua, nomor WhatsApp, email, dan alamat rumah.</li><li class="manual-bullet"><strong>Nomor Registrasi Les: </strong>Setelah formulir disubmit, sistem akan menerbitkan nomor registrasi les SD (misal: LSD-2026-0045) dan diteruskan ke tim pengajar.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 11: Modal Formulir Pendaftaran Bimbingan Belajar Les SD]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">Homepage -> Modal Pendaftaran Les SD</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Pop-up modal pendaftaran Les SD dengan pilihan kelas SD 1-6, pilihan paket belajar, hari les, dan informasi orang tua.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik tombol 'Daftar Les SD' di beranda hingga modal pop-up muncul, lalu ambil screenshot modal pendaftaran.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-10" class="section-h2">2.5 Layanan Bantuan & Integrasi Kontak Sekolah</h3><p class="manual-p">Pada bagian bawah halaman website (Footer), sekolah menyajikan informasi lengkap mencakup alamat fisik sekolah, jam operasional layanan (Senin - Sabtu | 08.00 - 17.00 WIB), serta tautan media sosial resmi (Instagram, Facebook). Terdapat pula tombol pintas WhatsApp yang memungkinkan orang tua berkomunikasi langsung dengan petugas penerimaan siswa.</p><div class="section-divider"></div><h2 id="section-6" class="chapter-h1"><span class="h1-badge">BAB 6</span> BAB 3: PANDUAN AUTENTIKASI & KEAMANAN AKUN</h2><p class="manual-p">Keamanan sistem informasi Smart Kids dilindungi dengan mekanisme autentikasi terpusat berbasis JSON Web Token (JWT) yang disimpan di peramban secara aman melalui cookie terenkripsi. Modul ini menjadi pintu masuk tunggal bagi seluruh pemegang akun.</p><h3 id="sub-11" class="section-h2">3.1 Mengakses Portal Login Terpadu</h3><p class="manual-p">Untuk masuk ke dalam sistem, buka tautan resmi: /admin/login (atau klik tombol 'Masuk Portal' pada bilah navigasi website). Pengguna tidak perlu memilih halaman terpisah antara guru, wali murid, maupun admin sekolah. Sistem secara otomatis mendeteksi tingkat hak akses (role) pengguna berdasarkan kredensial yang dimasukkan.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 12: Halaman Portal Login Akun Terpadu Smart Kids]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/login</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan form login elegan dengan logo Smart Kids, kolom input Username/WhatsApp/Email, kolom Kata Sandi, dan tombol Masuk.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka rute /admin/login di peramban dalam keadaan belum login (incognito), ambil screenshot form login di tengah layar.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-12" class="section-h2">3.2 Prosedur Masuk Sistem (Multi-Identifier Login)</h3><p class="manual-p">Sistem Smart Kids mendukung kemudahan login dengan multi-identifier. Pengguna dapat mengisi kolom nama pengguna dengan salah satu opsi:</p><li class="manual-bullet"><strong>Username: </strong>Username resmi yang didaftarkan oleh administrator (misal: 'admin_pusat', 'guru_ayu', 'budi_sadjati').</li><li class="manual-bullet"><strong>Nomor WhatsApp: </strong>Nomor WhatsApp yang terdaftar pada profil akun (misal: '081234567890').</li><li class="manual-bullet"><strong>Email: </strong>Alamat email aktif yang terdaftar di sistem (misal: 'orangtua@gmail.com').</li><p class="manual-p">Langkah-langkah login:</p><li class="manual-bullet"><strong>1. Masukkan Identitas: </strong>Ketik kredensial login (Username / WhatsApp / Email) pada kolom pertama.</li><li class="manual-bullet"><strong>2. Masukkan Kata Sandi: </strong>Ketik kata sandi (password). Klik ikon 'Mata' jika ingin memeriksa ketepatan karakter yang diketik.</li><li class="manual-bullet"><strong>3. Konfirmasi Masuk: </strong>Klik tombol 'Masuk ke Portal'. Jika berhasil, sistem akan mengarahkan pengguna secara otomatis ke halaman dashboard sesuai perannya.</li><h3 id="sub-13" class="section-h2">3.3 Fitur Beralih Tema Tampilan (Dark Mode & Light Mode)</h3><p class="manual-p">Untuk kenyamanan visual pengguna saat bekerja di berbagai kondisi pencahayaan, sistem Smart Kids menyediakan fitur tema ganda:</p><li class="manual-bullet"><strong>Dark Theme: </strong>Mode Gelap (Dark Mode): Dirancang dengan nuansa slate modern yang nyaman untuk mata saat bekerja di malam hari atau ruangan redup.</li><li class="manual-bullet"><strong>Light Theme: </strong>Mode Terang (Light Mode): Dirancang dengan latar bersih dan kontras tinggi yang sangat cocok saat digunakan di siang hari atau saat presentasi.</li><p class="manual-p">Pengguna dapat berpindah tema kapan saja dengan mengklik tombol ikon 'Matahari' / 'Bulan' pada sudut kanan atas bilah header aplikasi. Pilihan tema disimpan otomatis di peramban.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 13: Perbandingan Tampilan Antarmuka Dark Mode vs Light Mode]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard (Header Area)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan header dan menu dashboard dalam mode gelap (gelap slate) dan mode terang (putih abu-abu terang).</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Ambil screenshot area header dashboard saat mode gelap aktif, lalu beralih ke mode terang dan ambil perbandingannya.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-14" class="section-h2">3.4 Tombol Pintasan 'Lihat Website'</h3><p class="manual-p">Pada bilah header dashboard administrator maupun pengguna, tersedia tombol 'Lihat Website' dengan ikon tautan eksternal. Tombol ini mempermudah pengguna untuk membuka halaman depan website sekolah di tab baru peramban tanpa harus logout dari sesi administrasi.</p><h3 id="sub-15" class="section-h2">3.5 Prosedur Keluar Akun (Logout) & Keamanan Sesi</h3><p class="manual-p">Setelah menyelesaikan seluruh tugas administrasi atau monitoring, pengguna SANGAT DIANJURKAN untuk keluar dari sistem:</p><li class="manual-bullet"><strong>Langkah Logout: </strong>Klik tombol 'Keluar' (berwarna merah dengan ikon LogOut) di pojok kanan atas header.</li><li class="manual-bullet"><strong>Penghapusan Sesi: </strong>Sistem akan menghapus token otentikasi di cookie dan segera mengalihkan layar kembali ke halaman login.</li><div class="table-responsive"><table class="manual-table"><thead><tr><th>⚠️ PERINGATAN KEAMANAN INFORMASI
+Hindari menggunakan fitur 'Simpan Kata Sandi' otomatis pada peramban bersama (seperti komputer kantor atau warnet) untuk mencegah penyalahgunaan hak akses data siswa dan keuangan.</th></tr></thead><tbody></tbody></table></div><div class="section-divider"></div><h2 id="section-7" class="chapter-h1"><span class="h1-badge">BAB 7</span> BAB 4: PANDUAN LENGKAP PENGELOLA (SUPER ADMIN & ADMIN CABANG)</h2><p class="manual-p">Bab ini memuat panduan komprehensif bagi Administrator Pusat Yayasan (Super Admin) dan Administrator Cabang Sekolah (Admin Cabang). Modul pengelolaan mencakup seluruh operasional dari akademik, data siswa, presensi digital, kepegawaian, hingga tata kelola keuangan.</p><h3 id="sub-16" class="section-h2">4.1 Dashboard Utama & Pemantauan Statistik (Overview)</h3><p class="manual-p">Saat login sebagai Administrator, layar pertama yang tampil adalah Ringkasan Dashboard (Overview). Modul ini menyajikan ringkasan metrik penting:</p><li class="manual-bullet"><strong>Total Siswa: </strong>Kartu Total Siswa Aktif: Jumlah seluruh anak yang berstatus aktif di cabang yang dipilih.</li><li class="manual-bullet"><strong>Pendaftar PPDB: </strong>Kartu Pendaftar PPDB Baru: Jumlah pendaftar baru yang memerlukan verifikasi administrasi.</li><li class="manual-bullet"><strong>Total Guru: </strong>Kartu Tenaga Pendidik & Staf: Jumlah guru aktif yang bertugas di sekolah.</li><li class="manual-bullet"><strong>Penerimaan SPP: </strong>Kartu Penerimaan SPP Bulan Berjalan: Total akumulasi pembayaran SPP yang telah lunas bulan ini.</li><li class="manual-bullet"><strong>Grafik Analitik: </strong>Grafik Tren Kehadiran & Status Pembayaran: Visualisasi rasio presensi siswa dan grafik pelunasan tagihan SPP.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 14: Dashboard Utama Administrator (Overview & Statistik)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'overview'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan layar penuh overview dashboard dengan kartu metrik statistik, grafik tren, dan daftar aktivitas terbaru.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka tab Ringkasan & Stats di dashboard admin, pastikan seluruh kartu angka statistik terlihat jelas.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-17" class="section-h2">4.2 Penggantian Konteks Cabang Sekolah (Branch Switcher)</h3><p class="manual-p">Khusus bagi Super Admin Yayasan, pada bagian tengah header aplikasi terdapat dropdown 'School Branch Switcher' dengan ikon gedung. Super Admin dapat memilih 'Semua Sekolah (Yayasan Level)' untuk melihat agregat seluruh data, atau memilih cabang spesifik (Smart Kids Sadjati atau Smart Kids BCL). Seluruh data tabel pada tab-tab lainnya akan langsung tersaring otomatis mengikuti cabang terpilih.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 15: Dropdown Pemilih Konteks Cabang Sekolah di Header Admin]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard (Header Tengah)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Dropdown interaktif di header yang menampilkan daftar cabang sekolah di bawah yayasan beserta opsi 'Semua Sekolah'.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik dropdown pemilih cabang di header hingga daftar cabang terbuka, lalu ambil screenshot.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-18" class="section-h2">4.3 Manajemen Multi-Sekolah / Cabang (Khusus Super Admin)</h3><p class="manual-p">Menu 'Kelola Sekolah / Cabang' (Tab 'schools') digunakan oleh Super Admin Yayasan untuk menambah, mengubah, atau menonaktifkan unit sekolah binaan yayasan:</p><li class="manual-bullet"><strong>Tambah Cabang: </strong>Menambah Cabang Baru: Klik tombol 'Tambah Sekolah', isi Kode unik (huruf kecil tanpa spasi, misal: 'sadjati'), Nama Sekolah, Jenjang (TK/KB), Alamat fisik, Nomor Telepon resmi, Urutan tampil, dan unggah Logo Sekolah.</li><li class="manual-bullet"><strong>Perbarui Cabang: </strong>Mengedit Profil Cabang: Mengubah kontak atau alamat sekolah yang berpindah lokasi.</li><li class="manual-bullet"><strong>Hapus Cabang: </strong>Menghapus Cabang: Menghapus cabang sekolah (hanya dapat dilakukan jika tidak ada data siswa atau transaksi yang tertaut).</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 16: Halaman Manajemen Sekolah / Cabang Yayasan]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'schools'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel daftar cabang sekolah (Sadjati, BCL) lengkap dengan kode cabang, jenjang, alamat, kontak, dan tombol aksi edit/hapus.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Kelola Sekolah / Cabang' dengan akun Super Admin, ambil screenshot tabel daftar cabang.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-19" class="section-h2">4.4 Manajemen Pengguna & Hak Akses Akun (Khusus Super Admin)</h3><p class="manual-p">Menu 'User Admin & Akses' (Tab 'users') mengelola seluruh akun pengguna di dalam sistem Smart Kids:</p><li class="manual-bullet"><strong>1. Tambah Akun: </strong>Klik tombol 'Tambah Pengguna Baru'.</li><li class="manual-bullet"><strong>2. Tetapkan Peran: </strong>Pilih Peran Akun (Role): SUPER_ADMIN, ADMIN_SEKOLAH (Admin Cabang), GURU, atau ORANG_TUA.</li><li class="manual-bullet"><strong>3. Cabang Sekolah: </strong>Pilih Penempatan Cabang Sekolah: Mengunci akses akun admin atau guru ke cabang tertentu.</li><li class="manual-bullet"><strong>4. Penugasan Kelas: </strong>Pilih Kelas Binaan: Khusus untuk guru wali kelas, tentukan kelas yang diampu.</li><li class="manual-bullet"><strong>5. Kredensial: </strong>Isi Username, Password Baru, Nama Lengkap, Nomor Telepon/WhatsApp, dan Email pengguna.</li><li class="manual-bullet"><strong>Reset Password: </strong>Fitur Reset Sandi: Admin dapat mereset kata sandi pengguna sewaktu-waktu jika pengguna lupa kata sandi.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 17: Halaman Manajemen User & Formulir Penugasan Hak Akses]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'users'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel daftar user admin, guru, dan ortu beserta modal pembuatan user baru dengan pilihan peran (role) dan cabang sekolah.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'User Admin & Akses', klik tombol 'Tambah Pengguna' hingga modal input terbuka, lalu ambil screenshot.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-20" class="section-h2">4.5 Pengelolaan Master Kelas & Plotting Siswa</h3><p class="manual-p">Menu 'Master Kelas & Plotting' (Tab 'classes') mengatur rombongan belajar (rombel) di sekolah:</p><li class="manual-bullet"><strong>Master Kelas: </strong>Membuat Kelas Baru: Klik 'Tambah Kelas', masukkan Nama Kelas (misal: 'TK A - Sentra Imtaq'), Tingkat (TK A / TK B / Daycare), Tahun Ajaran (misal: '2026/2027'), Kapasitas Maksimal Siswa (misal: 20 anak), serta pilih Guru Wali Kelas dari daftar guru.</li><li class="manual-bullet"><strong>Plotting Siswa: </strong>Plotting Siswa ke Kelas: Pada bagian bawah tabel kelas, terdapat daftar siswa yang 'Belum Memiliki Kelas'. Admin cukup memilih siswa dan menentukan kelas tujuan dengan 1 klik agar siswa masuk ke rombel yang sesuai.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 18: Halaman Master Kelas & Fitur Plotting Pembagian Siswa]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'classes'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan kartu/tabel daftar kelas, informasi kapasitas & wali kelas, serta antarmuka penempatan siswa ke dalam kelas.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Master Kelas & Plotting', ambil screenshot yang memperlihatkan daftar kelas dan area plotting siswa.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-21" class="section-h2">4.6 Pengelolaan Pendaftaran PPDB & Verifikasi Berkas</h3><p class="manual-p">Menu 'Pendaftaran PPDB' (Tab 'ppdb') merupakan pusat pengolahan calon peserta didik baru:</p><li class="manual-bullet"><strong>Filter Cepat: </strong>Penyaringan & Pencarian: Filter pendaftar berdasarkan cabang sekolah, status pendaftaran (Semua, Menunggu Verifikasi, Diterima, Ditolak), dan pencarian nama/nomor registrasi.</li><li class="manual-bullet"><strong>Verifikasi Dokumen: </strong>Pratinjau Dokumen Berkas: Klik baris pendaftar untuk membuka modal rincian lengkap. Admin dapat mengeklik tombol pratinjau untuk melihat dokumen KK, Akta Kelahiran, Pas Foto, KTP, dan bukti transfer pembayaran dengan modal resolusi tinggi.</li><li class="manual-bullet"><strong>Ubah Status: </strong>Pembaruan Status Pendaftaran: Ubah status menjadi 'Diterima' (ACCEPTED) setelah berkas dan pembayaran valid, atau 'Ditolak' (REJECTED) dengan menuliskan catatan alasan kekurangan berkas.</li><li class="manual-bullet"><strong>Notifikasi WhatsApp: </strong>Konfirmasi WhatsApp Otomatis: Klik tombol WhatsApp dengan logo hijau untuk mengirim pesan template resmi ke nomor orang tua siswa yang mengabarkan status penerimaan berkas.</li><li class="manual-bullet"><strong>Aktivasi Siswa: </strong>Konversi Menjadi Siswa Aktif: Saat pendaftar disetujui, admin dapat menekan tombol 'Jadikan Siswa Aktif' untuk mengenerate NISN dan akun portal siswa/wali murid secara otomatis.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 19: Tabel Data Pendaftaran PPDB & Filter Status]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'ppdb'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel pendaftar PPDB menampilkan Nomor Registrasi, Nama Anak, Pilihan Program, Status Pembayaran, Status Berkas, dan tombol aksi.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Pendaftaran PPDB', ambil screenshot tabel data pendaftar.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 20: Modal Detail Verifikasi Dokumen & Bukti Bayar PPDB]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'ppdb' (Modal Detail)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Pop-up rincian pendaftar PPDB menampilkan biodata anak, orang tua, pratinjau gambar bukti transfer, dan dokumen persyaratan.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik salah satu baris pendaftar PPDB hingga modal detail terbuka, lalu ambil screenshot modal verifikasi berkas.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-22" class="section-h2">4.7 Manajemen Data Siswa Aktif & Kartu QR Code</h3><p class="manual-p">Menu 'Kelola Data Siswa' (Tab 'students') mengelola basis data seluruh siswa yang sedang menempuh pendidikan di sekolah:</p><li class="manual-bullet"><strong>Tambah Siswa: </strong>Input Siswa Manual: Menambahkan data siswa baru lengkap dengan NISN unik, username login wali murid, nama orang tua, nomor telepon, alamat, dan foto avatar.</li><li class="manual-bullet"><strong>Bobot Nilai: </strong>Pengaturan Bobot Penilaian: Admin dapat mengatur persentase pembobotan penilaian akhir siswa: Bobot Kehadiran (%), Bobot Nilai Harian (%), dan Bobot Nilai Semester/Rapor (%). Default sistem: 20% Kehadiran, 40% Harian, 40% Semester.</li><li class="manual-bullet"><strong>Kartu Pelajar QR: </strong>Generate & Cetak Kartu Pelajar QR Code: Sistem secara otomatis menghasilkan barcode QR Code unik berbasis NISN siswa. Admin dapat mengklik tombol 'Cetak Kartu QR' untuk mencetak kartu fisik yang dapat dikalungkan oleh siswa saat hadir ke sekolah.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 21: Halaman Manajemen Data Siswa & Pengaturan Bobot Penilaian]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'students'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel siswa aktif dengan kolom NISN, Nama, Kelas, Kontak Ortu, Persentase Kehadiran, Nilai Rata-rata, dan tombol aksi.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Kelola Data Siswa', ambil screenshot tabel siswa.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 22: Tampilan Cetak Kartu Pelajar Siswa dengan QR Code]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'students' (Modal Kartu Pelajar)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Desain kartu pelajar siswa lengkap dengan logo Smart Kids, foto anak, nama, NISN, kelas, dan QR Code presensi.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik tombol cetak kartu QR pada salah satu siswa hingga modal pratinjau kartu pelajar terbuka, lalu ambil screenshot.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-23" class="section-h2">4.8 Pengelolaan Presensi Siswa (Scan QR & Manual)</h3><p class="manual-p">Menu 'Presensi Siswa' (Tab 'attendance') menyediakan 2 (dua) metode pencatatan kehadiran yang sangat praktis:</p><li class="manual-bullet"><strong>Metode Scanner QR: </strong>Pemindai Kamera QR Code (Live Scanner): Nyalakan kamera laptop atau HP dengan mengklik tombol 'Buka Kamera Scanner'. Arahkan kartu QR Code siswa ke lensa kamera. Dalam hitungan detik, sistem akan berbunyi beep dan langsung mencatat kehadiran siswa sebagai 'Hadir' lengkap dengan jam kedatangan.</li><li class="manual-bullet"><strong>Metode Input Manual: </strong>Pencatatan Presensi Manual: Admin atau guru dapat memilih tanggal dan kelas, lalu mencentang status kehadiran setiap anak: Hadir, Izin, Sakit, atau Alpa. Jika memilih Izin atau Sakit, kolom catatan keterangan dapat diisi.</li><li class="manual-bullet"><strong>Rekap Presensi: </strong>Rekapitulasi Kehadiran: Tinjau total kehadiran kelas per hari atau per bulan untuk laporan bulanan.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 23: Fitur Presensi Siswa & Pemindai Kamera QR Code Terintegrasi]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'attendance'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan antarmuka presensi siswa dengan kotak kamera pemindai QR Code di atas dan tabel rekapan kehadiran di bawahnya.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Presensi Siswa', klik tombol buka pemindai QR Code, lalu ambil screenshot tampilan scanner dan tabel presensi.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-24" class="section-h2">4.9 Manajemen Tenaga Pendidik / Guru</h3><p class="manual-p">Menu 'Kelola Guru & Pengajar' (Tab 'teachers') memuat profil seluruh pengajar dan staf sekolah:</p><li class="manual-bullet"><strong>Data Guru: </strong>Tambah Guru Baru: Isi Nama Lengkap, Jabatan (Kepala Sekolah, Guru Kelas, Guru Sentra, Guru Pendamping), Penugasan Cabang, Penugasan Kelas Binaan, Email, Telepon/WhatsApp, Pendidikan Terakhir, Bio profil, dan unggah Foto Profil.</li><li class="manual-bullet"><strong>QR Guru: </strong>Kartu Identitas QR Guru: Menghasilkan barcode QR Code untuk presensi mengajar guru secara mandiri.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 24: Halaman Manajemen Tenaga Pendidik / Guru]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'teachers'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel daftar guru pengajar lengkap dengan foto, nama, jabatan, kelas ditugaskan, kontak, dan tombol cetak QR.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Kelola Guru & Pengajar', ambil screenshot tabel profil guru.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-25" class="section-h2">4.10 Pemantauan Presensi Guru</h3><p class="manual-p">Menu 'Presensi Guru' (Tab 'teacher-attendance') memantau kedisiplinan kehadiran staf pengajar. Admin dapat memfilter catatan presensi berdasarkan tanggal tertentu, memilih nama guru spesifik, serta melihat status kehadiran (Hadir, Izin, Sakit, Terlambat, Alpa) beserta catatan alasan ketidakhadiran.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 25: Halaman Pemantauan Rekapitulasi Presensi Mengajar Guru]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'teacher-attendance'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel catatan presensi kehadiran guru lengkap dengan tanggal, jam hadir, status kehadiran, dan catatan keterangan.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Presensi Guru', ambil screenshot tabel presensi guru dengan filter tanggal.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-26" class="section-h2">4.11 Pusat Progresif Fitur Guru & Ekspor Laporan CSV</h3><p class="manual-p">Menu 'Pusat Progresif Fitur' (Tab 'teacher-progress') merupakan sistem evaluasi kinerja profesional guru berbasis metrik kuantitatif terpadu:</p><li class="manual-bullet"><strong>Akumulasi Jam: </strong>Perhitungan Jam Mengajar: Menghitung akumulasi hari hadir guru dikalikan standar jam mengajar (3 jam/hari).</li><li class="manual-bullet"><strong>Rasio Program: </strong>Rasio SPP Program Belajar: Menghitung bobot rasio program kelas yang diampu guru terhadap tarif dasar SPP cabang.</li><li class="manual-bullet"><strong>Evaluasi Bulanan: </strong>Modal Evaluasi Kinerja Bulanan: Kepala sekolah/admin dapat membuka modal evaluasi untuk menginput target jam, jumlah siswa yang dievaluasi perkembangannya, poin progresif, dan catatan apresiasi/pembinaan.</li><li class="manual-bullet"><strong>Ekspor Laporan CSV: </strong>Ekspor Laporan CSV ke Excel: Klik tombol 'Unduh Riwayat CSV' untuk mengekspor seluruh rekapan kinerja progresif guru ke dalam berkas berformat .CSV (kompatibel penuh dengan Microsoft Excel) untuk pelaporan kepada pimpinan Yayasan YAPCHI.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 26: Halaman Pusat Progresif Kinerja Guru & Tombol Ekspor CSV]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'teacher-progress'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan tabel metrik jam mengajar guru, rasio SPP, evaluasi siswa, dan tombol ekspor data ke format CSV.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Pusat Progresif Fitur', ambil screenshot tabel progresif beserta tombol ekspor CSV di sudut kanan.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-27" class="section-h2">4.12 Pengelolaan Persetujuan Izin & Cuti Guru</h3><p class="manual-p">Menu 'Izin & Cuti Guru' (Tab 'leave-requests') menampung permohonan dispensasi tidak mengajar yang diajukan oleh guru:</p><li class="manual-bullet"><strong>Verifikasi Cuti: </strong>Admin memeriksa tanggal cuti, jenis izin (Sakit, Cuti Tahunan, Keperluan Pribadi, Cuti Melahirkan), dan alasan yang tertulis.</li><li class="manual-bullet"><strong>Pratinjau Surat: </strong>Admin dapat mengeklik tombol pratinjau lampiran untuk memeriksa keabsahan surat keterangan dokter atau dokumen pendukung.</li><li class="manual-bullet"><strong>Keputusan Approval: </strong>Admin memutuskan persetujuan dengan mengklik 'Setujui' (Approved) atau 'Tolak' (Rejected) disertai catatan.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 27: Halaman Pengelolaan Permohonan Izin & Cuti Guru]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'leave-requests'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel permohonan izin/cuti guru dengan tombol pratinjau surat lampiran serta tombol aksi Setujui / Tolak.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Izin & Cuti Guru', ambil screenshot tabel daftar permohonan izin guru.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-28" class="section-h2">4.13 Penjadwalan Kegiatan Belajar Mengajar (KBM)</h3><p class="manual-p">Menu 'Jadwal KBM' (Tab 'schedules') menyusun kalender pembelajaran kelas:</p><li class="manual-bullet"><strong>1. Pilih Kelas: </strong>Klik 'Tambah Jadwal Baru', pilih Cabang Sekolah dan Kelas tujuan.</li><li class="manual-bullet"><strong>2. Waktu & Ruang: </strong>Tentukan Hari / Tanggal, Rentang Waktu (misal: 08:00 - 09:30 WIB), dan Nama Ruangan (misal: Ruang Sentra Imtaq).</li><li class="manual-bullet"><strong>3. Tema Pelajaran: </strong>Ketik Tema / Mata Pelajaran (misal: 'Pengenalan Huruf Hijaiyah & Praktik Berdoa').</li><li class="manual-bullet"><strong>4. Rencana Aktivitas: </strong>Tuliskan Deskripsi Rencana Kegiatan / RPP ringkas yang akan dilaksanakan bersama anak.</li><li class="manual-bullet"><strong>5. Status KBM: </strong>Fitur Centang Selesai: Guru atau admin dapat menandai jadwal yang telah terlaksana.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 28: Halaman Pengaturan Jadwal Kegiatan Belajar Mengajar (KBM)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'schedules'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel jadwal KBM menampilkan Hari, Jam, Kelas, Ruang, Mata Pelajaran, Rencana Aktivitas, dan status selesai.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Jadwal KBM', ambil screenshot tabel jadwal kegiatan belajar.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-29" class="section-h2">4.14 Pengelolaan Keuangan SPP TK & Verifikasi Pembayaran</h3><p class="manual-p">Menu 'SPP Siswa' (Tab 'spp') merupakan modul penatausahaan tagihan iuran bulanan siswa:</p><li class="manual-bullet"><strong>Daftar Tagihan: </strong>Matriks Tagihan Bulanan: Menyajikan daftar tagihan siswa untuk 12 bulan (Juli hingga Juni).</li><li class="manual-bullet"><strong>Indikator Status: </strong>Status Tagihan: Tiga status utama: 'Lunas' (hijau), 'Belum Bayar' (merah), dan 'Menunggu Verifikasi' (kuning).</li><li class="manual-bullet"><strong>Verifikasi Transfer: </strong>Verifikasi Slip Transfer Ortu: Saat orang tua mengunggah bukti bayar melalui portal wali murid, status berubah menjadi 'Menunggu Verifikasi'. Admin membuka modal verifikasi, memeriksa foto bukti transfer, lalu mengklik 'Konfirmasi Pembayaran Lunas'.</li><li class="manual-bullet"><strong>Bayar Tunai: </strong>Pembayaran Tunai di Kasir Sekolah: Jika orang tua membayar langsung secara tunai ke bendahara sekolah, admin dapat mencatat pembayaran dengan metode 'TUNAI' dan langsung menandai lunas.</li><li class="manual-bullet"><strong>Kwitansi Digital: </strong>Cetak Kwitansi Digital Resmi: Sistem menyediakan tombol 'Cetak Kwitansi' dengan nomor transaksi unik, stempel digital sekolah, dan rincian nominal pembayaran yang siap dicetak atau disimpan sebagai PDF.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 29: Halaman Manajemen Tagihan SPP Siswa & Modal Verifikasi Bukti Bayar]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'spp'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel tagihan SPP bulanan siswa beserta modal verifikasi slip bukti transfer bank yang diunggah orang tua.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'SPP Siswa', klik salah satu data pembayaran hingga modal verifikasi terbuka, lalu ambil screenshot.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 30: Tampilan Pratinjau Kwitansi Digital Resmi Pembayaran SPP]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'spp' (Modal Kwitansi)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Format cetak kwitansi resmi Smart Kids lengkap dengan nomor bukti bayar, nama siswa, NISN, bulan tagihan, dan nominal lunas.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik tombol 'Cetak Kwitansi' pada siswa yang telah lunas, ambil screenshot tampilan kwitansi resmi.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-30" class="section-h2">4.15 Pengelolaan Tagihan Biaya Tambahan Siswa</h3><p class="manual-p">Menu 'Biaya Tambahan' (Tab 'additional-fees') digunakan untuk membebankan tagihan non-SPP, seperti:</p><li class="manual-bullet"><strong>Seragam: </strong>Pembelian Paket Seragam Sekolah (Batik, Olahraga, Muslim).</li><li class="manual-bullet"><strong>Buku & Modul: </strong>Buku Paket Modul Belajar dan Buku Gambar Siswa.</li><li class="manual-bullet"><strong>Outing Class: </strong>Biaya Kegiatan Outing Class, Field Trip, atau Kunjungan Edukatif.</li><li class="manual-bullet"><strong>Pentas Seni: </strong>Pentas Seni Akhir Tahun dan Wisuda Kelulusan.</li><p class="manual-p">Admin dapat membuat tagihan perorangan atau secara kolektif (massal) untuk satu kelas sekaligus lengkap dengan tanggal jatuh tempo (due date). Siswa dan wali murid akan melihat tagihan ini di portal mereka.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 31: Halaman Pengelolaan Tagihan Biaya Tambahan Siswa]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'additional-fees'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel tagihan biaya tambahan menampilkan nama siswa, jenis biaya, nominal, tenggat waktu, status bayar, dan aksi.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Biaya Tambahan', ambil screenshot tabel data tagihan biaya tambahan.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-31" class="section-h2">4.16 Pengaturan Metode Pembayaran (Master Rekening & QRIS)</h3><p class="manual-p">Menu 'Metode Pembayaran' (Tab 'payment-settings') mengatur saluran transaksi pembayaran resmi cabang sekolah:</p><li class="manual-bullet"><strong>Rekening Bank: </strong>Master Rekening Bank: Menambahkan akun bank sekolah (Nama Bank, Nomor Rekening, Atas Nama Pemilik Rekening, Logo Bank, serta toggle Aktif/Nonaktif).</li><li class="manual-bullet"><strong>Master QRIS: </strong>Master QRIS Cabang: Mengunggah gambar barcode QRIS resmi sekolah dan mengaktifkan statusnya agar tampil di formulir PPDB dan portal SPP.</li><li class="manual-bullet"><strong>Master Komponen: </strong>Komponen Biaya Sekolah: Menentukan daftar tarif pendaftaran PPDB wajib maupun biaya tambahan opsional.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 32: Halaman Pengaturan Rekening Bank Resmi & Gambar QRIS]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'payment-settings'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan kartu rekening bank resmi (BCA, Mandiri) dan area unggah barcode QRIS resmi sekolah.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Metode Pembayaran', ambil screenshot kartu rekening dan area barcode QRIS.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-32" class="section-h2">4.17 Pengelolaan Bimbingan Belajar Les SD (Admin)</h3><p class="manual-p">Menu 'Kelola Les SD' (Tab 'les-sd') terbagi menjadi 2 subtab penting:</p><li class="manual-bullet"><strong>Pendaftaran & Penunjukan PIC: </strong>Subtab Pendaftaran Siswa Les: Menampilkan seluruh anak SD yang mendaftar. Admin dapat menugaskan Guru PIC (Penanggung Jawab) yang akan membimbing anak tersebut, serta mengaktifkan status siswa menjadi AKTIF.</li><li class="manual-bullet"><strong>SPP Les SD: </strong>Subtab SPP Les SD: Memantau tagihan bulanan les SD (Rp 200.000 / paket), memeriksa slip bukti bayar transfer dari orang tua, dan memverifikasi pelunasan.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 33: Halaman Manajemen Pendaftaran & Guru PIC Bimbingan Les SD]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'les-sd'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel peserta les SD menampilkan Nama Anak, Kelas SD, Sekolah Asal, Pilihan Paket, Guru PIC yang ditugaskan, dan status pendaftaran.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Kelola Les SD', ambil screenshot tabel data pendaftar les SD.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-33" class="section-h2">4.18 Publikasi Pengumuman & Edaran Sekolah</h3><p class="manual-p">Menu 'Pengumuman' (Tab 'announcements') memfasilitasi siaran edaran digital resmi sekolah:</p><li class="manual-bullet"><strong>1. Buat Pengumuman: </strong>Klik tombol 'Buat Pengumuman Baru'.</li><li class="manual-bullet"><strong>2. Judul Edaran: </strong>Ketik Judul Pengumuman (misal: 'Pemberitahuan Libur Hari Raya Idul Fitri 1447 H').</li><li class="manual-bullet"><strong>3. Target Sasaran: </strong>Pilih Sasaran Penerima (Target Role): 'Semua Pengguna', 'Khusus Guru', atau 'Khusus Orang Tua'.</li><li class="manual-bullet"><strong>4. Konten Edaran: </strong>Tuliskan Isi Pengumuman secara lengkap dan cantumkan Nama Pengirim (misal: 'Kepala Sekolah Smart Kids Sadjati').</li><li class="manual-bullet"><strong>5. Siaran Langsung: </strong>Pengumuman akan langsung tampil di dashboard guru dan dashboard wali murid sesuai target sasaran.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 34: Formulir Publikasi Pengumuman & Penentuan Target Role Penerima]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'announcements'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Modal pembuatan pengumuman baru dengan pilihan target role (Semua / Guru / Orang Tua) dan tabel riwayat pengumuman aktif.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Pengumuman', klik tombol buat pengumuman hingga modal terbuka, lalu ambil screenshot.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-34" class="section-h2">4.19 Pengelolaan Konten Website (CMS: Program, Galeri & Testimoni)</h3><p class="manual-p">Administrator dapat memperbarui konten publik tanpa perlu memahami kode pemrograman:</p><li class="manual-bullet"><strong>Program Belajar: </strong>Kelola Program Belajar (Tab 'programs'): Mengubah nama program, rentang usia, fasilitas unggulan, dan tarif SPP default.</li><li class="manual-bullet"><strong>Galeri Foto: </strong>Kelola Galeri (Tab 'gallery'): Mengunggah dokumentasi foto kegiatan baru, menentukan judul dan kategori album.</li><li class="manual-bullet"><strong>Testimoni Ortu: </strong>Kelola Testimoni (Tab 'testimonials'): Memasukkan kutipan kepuasan orang tua, nama wali murid, rating bintang (1-5), dan warna latar kartu.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 35: Halaman Pengelolaan Konten Program Belajar, Galeri & Testimoni]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'programs' / 'gallery'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan antarmuka CMS untuk mengedit kartu program belajar, mengunggah foto galeri, dan menambah ulasan testimoni.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Kelola Program Belajar' atau 'Kelola Galeri', ambil screenshot antarmuka pengelolaan konten.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-35" class="section-h2">4.20 Kustomisasi Profil Website Sekolah</h3><p class="manual-p">Menu 'Pengaturan Website' (Tab 'profile') menyesuaikan profil fisik dan digital cabang sekolah:</p><li class="manual-bullet"><strong>Hero Section: </strong>Teks Hero Banner: Lencana teks, judul utama banner hero, dan subjudul ajakan belajar.</li><li class="manual-bullet"><strong>Video Profil: </strong>Tautan Video YouTube: Memperbarui link video profil YouTube resmi cabang sekolah.</li><li class="manual-bullet"><strong>Kontak & Alamat: </strong>Informasi Kontak & Medsos: Nomor telepon, nomor WhatsApp, akun Instagram, akun Facebook, dan alamat lengkap fisik sekolah.</li><li class="manual-bullet"><strong>Jam Operasional: </strong>Layanan Bantuan & Jam Operasional: Judul dan jam operasional layanan orang tua yang tampil di footer website.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 36: Halaman Pengaturan Profil Website & Teks Informasi Sekolah]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'profile'</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Formulir pengaturan website mencakup teks hero, URL video YouTube, nomor WhatsApp, Instagram, dan alamat sekolah.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu 'Pengaturan Website', ambil screenshot formulir konfigurasi profil website.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <div class="section-divider"></div><h2 id="section-8" class="chapter-h1"><span class="h1-badge">BAB 8</span> BAB 5: PANDUAN GURU / TENAGA PENDIDIK</h2><p class="manual-p">Portal Guru dirancang khusus untuk memfasilitasi aktivitas belajar-mengajar harian para tenaga pendidik. Guru memiliki antarmuka khusus yang bersih dan fokus pada kegiatan kelas, presensi anak, penilaian perkembangan, dan absensi mengajar.</p><h3 id="sub-36" class="section-h2">5.1 Dashboard Guru & Tinjauan Aktivitas Harian</h3><p class="manual-p">Saat guru login ke dalam sistem, dashboard menyajikan ringkasan tugas hari ini:</p><li class="manual-bullet"><strong>Kelas Binaan: </strong>Nama Kelas Binaan yang diampu (misal: 'Wali Kelas: TK A Sentra Imtaq').</li><li class="manual-bullet"><strong>Jadwal Hari Ini: </strong>Jadwal Mengajar Hari Ini beserta tema pembelajaran dan ruangan kelas.</li><li class="manual-bullet"><strong>Status Absensi: </strong>Status Presensi Mengajar Diri Sendiri hari ini (apakah sudah absen atau belum).</li><li class="manual-bullet"><strong>Pengumuman: </strong>Pusat Pengumuman Sekolah terbaru dari yayasan atau kepala sekolah.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 37: Tampilan Dashboard Khusus Guru & Agenda Mengajar Harian]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard (Login Akun Guru)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Dashboard guru menampilkan kartu informasi kelas binaan, jadwal mengajar hari ini, status presensi guru, dan pengumuman.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Login menggunakan akun dengan role GURU, ambil screenshot tampilan beranda guru.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-37" class="section-h2">5.2 Pencatatan Presensi Siswa Kelas (Scan QR & Manual)</h3><p class="manual-p">Guru kelas bertugas mencatat kehadiran anak didiknya setiap pagi:</p><li class="manual-bullet"><strong>Scan QR Siswa: </strong>Pencatatan Cepat Scan QR: Buka tab 'Presensi Siswa', klik 'Buka Kamera Scanner', lalu scan kartu QR anak saat anak memasuki ruangan kelas.</li><li class="manual-bullet"><strong>Catatan Sakit/Izin: </strong>Pencatatan Manual: Guru dapat menandai anak yang izin atau sakit dan menyertakan keterangan (misal: 'Demam sejak semalam').</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 38: Antarmuka Presensi Siswa oleh Guru Kelas]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'attendance' (Akun Guru)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan presensi siswa di akun guru dengan daftar anak kelas binaan dan opsi status kehadiran Hadir/Sakit/Izin/Alpa.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Pada akun guru, buka menu 'Presensi Siswa', ambil screenshot formulir absensi harian kelas binaan.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-38" class="section-h2">5.3 Penginputan Nilai Harian & Catatan Perkembangan Anak</h3><p class="manual-p">Pendidikan anak usia dini mengutamakan evaluasi perkembangan karakter, motorik, dan kognitif. Guru menginput nilai harian dan catatan deskriptif pada menu 'Master Kelas & Siswa' / 'Catatan Nilai':</p><li class="manual-bullet"><strong>Nilai Moral & Agama: </strong>Aspek Nilai Agama & Moral: Perkembangan ibadah, doa harian, dan akhlak santun anak.</li><li class="manual-bullet"><strong>Nilai Kognitif: </strong>Aspek Kognitif & Berpikir: Daya nalar, pengenalan bentuk, angka, dan pemecahan masalah sederhana.</li><li class="manual-bullet"><strong>Nilai Motorik: </strong>Aspek Fisik & Motorik: Keterampilan motorik halus (menggunting, menggambar) dan motorik kasar (berlari, melompat).</li><li class="manual-bullet"><strong>Nilai Bahasa: </strong>Aspek Bahasa & Komunikasi: Kemampuan berbicara, mengungkapkan ide, dan menyimak cerita.</li><li class="manual-bullet"><strong>Sosial Emosional: </strong>Aspek Sosial Emosional: Kemandirian, kerja sama antarteman, dan empati.</li><li class="manual-bullet"><strong>Catatan Rapor: </strong>Catatan Evaluasi Guru: Guru menuliskan rangkuman catatan positif dan arahan stimulasi bagi orang tua di rumah.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 39: Halaman Input Nilai Harian & Evaluasi Perkembangan Anak]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'classes' / 'student-grades' (Akun Guru)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Formulir pengisian skor nilai harian berdasarkan aspek perkembangan serta kolom catatan narasi perkembangan anak oleh guru.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka formulir input nilai siswa di akun guru, ambil screenshot tampilan input nilai per aspek perkembangan.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-39" class="section-h2">5.4 Memeriksa Jadwal Mengajar KBM Harian</h3><p class="manual-p">Guru dapat membuka menu 'Jadwal Mengajar KBM' untuk meninjau materi pelajaran, ruangan, dan rencana kegiatan yang telah disusun. Setelah jam mengajar selesai, guru dapat mencentang status 'Selesai' sebagai laporan terlaksananya KBM.</p><h3 id="sub-40" class="section-h2">5.5 Presensi Mandiri Mengajar Guru</h3><p class="manual-p">Guru wajib melakukan absensi kedatangan dan kepulangan pada menu 'Presensi Mengajar Guru'. Sistem mencatat waktu (jam dan menit) kedatangan guru yang secara otomatis akan diakumulasikan ke dalam laporan pusat progresif bulanan.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 40: Antarmuka Presensi Kehadiran Mandiri Guru]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'teacher-attendance' (Akun Guru)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Layar presensi mengajar guru dengan tombol presensi kehadiran harian dan riwayat absensi mengajar pribadi.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu presensi guru pada akun pengajar, ambil screenshot tampilan presensi mandiri.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-41" class="section-h2">5.6 Pengajuan Permohonan Izin / Cuti Online</h3><p class="manual-p">Bila guru berhalangan mengajar karena sakit atau ada keperluan mendesak, guru tidak perlu membuat surat fisik manual:</p><li class="manual-bullet"><strong>1. Buka Menu: </strong>Buka tab 'Pengajuan Izin & Cuti', klik 'Ajukan Cuti Baru'.</li><li class="manual-bullet"><strong>2. Jenis Cuti: </strong>Pilih Jenis Permohonan: Izin Sakit, Cuti Tahunan, Keperluan Pribadi, atau Cuti Melahirkan.</li><li class="manual-bullet"><strong>3. Tanggal Cuti: </strong>Pilih Tanggal Mulai dan Tanggal Selesai permohonan dispensasi.</li><li class="manual-bullet"><strong>4. Alasan: </strong>Tuliskan Alasan Ketidakhadiran secara jelas.</li><li class="manual-bullet"><strong>5. Unggah Surat: </strong>Unggah Berkas Bukti (misal: Surat Keterangan Istirahat dari Dokter) dengan batas maksimal 1 MB.</li><li class="manual-bullet"><strong>6. Pantau Status: </strong>Klik 'Kirim Pengajuan'. Guru dapat memantau status persetujuan (Pending, Disetujui, Ditolak) secara langsung di tabel.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 41: Formulir Pengajuan Izin / Cuti Online oleh Guru]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'leave-requests' (Akun Guru)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Modal permohonan izin/cuti dengan input tanggal mulai-selesai, jenis izin, alasan, dan kolom upload surat dokter.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu izin & cuti pada akun guru, klik tombol ajukan cuti hingga formulir modal muncul, lalu ambil screenshot.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-42" class="section-h2">5.7 Tugas Bimbingan Belajar Les SD (Khusus Guru PIC)</h3><p class="manual-p">Bagi guru yang ditunjuk sebagai Penanggung Jawab (PIC) Bimbingan Belajar Les SD, akan muncul tab 'Bimbingan Les SD (PIC)'. Guru PIC dapat memantau nama-nama anak SD asuhannya, jadwal les mingguan, kontak WhatsApp orang tua siswa les, serta mencatat kemajuan belajar mata pelajaran sekolah dasar anak asuhannya.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 42: Halaman Pembimbingan Les SD Khusus Guru PIC]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'les-sd' (Akun Guru PIC)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan dashboard pembimbingan les SD bagi guru PIC memuat daftar murid asuhan, paket bimbingan, dan jadwal pertemuan.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu bimbingan les SD pada akun guru yang bertindak sebagai PIC, ambil screenshot tabel anak bimbingan.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-43" class="section-h2">5.8 Mengakses Pusat Pengumuman Sekolah</h3><p class="manual-p">Pada menu 'Pengumuman Sekolah', guru dapat membaca surat edaran penting dari yayasan dan manajemen sekolah. Pengumuman disajikan lengkap dengan tanggal rilis, nama pengirim, dan isi edaran resmi.</p><div class="section-divider"></div><h2 id="section-9" class="chapter-h1"><span class="h1-badge">BAB 9</span> BAB 6: PANDUAN ORANG TUA / WALI MURID</h2><p class="manual-p">Portal Wali Murid dirancang khusus untuk memberikan ketenangan pikiran dan transparansi bagi para orang tua. Orang tua dapat memantau perkembangan ananda tercinta, memastikan kehadiran di sekolah, membayar tagihan SPP online tanpa harus mengantre, hingga mengunduh bukti kwitansi resmi kapan saja dan di mana saja.</p><h3 id="sub-44" class="section-h2">6.1 Beranda Ananda: Memantau Profil & Ringkasan Pendidikan</h3><p class="manual-p">Saat orang tua berhasil login, halaman utama menampilkan 'Beranda Ananda' dengan kartu informasi ramah keluarga:</p><li class="manual-bullet"><strong>Identitas Anak: </strong>Foto dan Nama Lengkap Ananda beserta NISN resmi.</li><li class="manual-bullet"><strong>Kelas & Cabang: </strong>Cabang Sekolah dan Kelas saat ini (misal: 'TK A - Sentra Imtaq | Smart Kids Sadjati').</li><li class="manual-bullet"><strong>Wali Kelas: </strong>Nama Guru Wali Kelas beserta nomor kontak yang dapat dihubungi.</li><li class="manual-bullet"><strong>Kartu Ringkasan: </strong>Ringkasan Cepat: Persentase kehadiran bulan ini, status pembayaran SPP bulan berjalan (Lunas / Belum Bayar), dan rata-rata perkembangan belajar.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 43: Tampilan Beranda Ananda pada Portal Wali Murid]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'overview' (Login Akun Ortu)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Layar beranda portal ortu menampilkan profil ananda, foto anak, wali kelas, kartu status SPP, dan ringkasan kehadiran.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Login menggunakan akun dengan role ORANG_TUA, ambil screenshot beranda ananda yang memuat data siswa.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-45" class="section-h2">6.2 Monitoring Nilai Harian & Rapor Perkembangan Ananda</h3><p class="manual-p">Orang tua dapat membuka menu 'Monitoring Nilai Ananda' (Tab 'student-grades') untuk melihat evaluasi belajar secara mendalam:</p><li class="manual-bullet"><strong>Grafik Perkembangan: </strong>Grafik Capaian Aspek: Nilai Moral & Agama, Kognitif, Fisik-Motorik, Bahasa, dan Sosial Emosional.</li><li class="manual-bullet"><strong>Catatan Ibu Guru: </strong>Catatan Harian Guru: Guru menuliskan catatan deskriptif mengenai kemajuan anak (misal: 'Ananda hari ini sangat percaya diri saat bercerita di depan kelas').</li><li class="manual-bullet"><strong>Rapor Digital: </strong>Nilai Rapor Akhir Semester: Akumulasi nilai akhir berbobot yang dapat dijadikan bahan evaluasi orang tua di rumah.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 44: Tampilan Monitoring Nilai & Catatan Perkembangan Anak (Portal Ortu)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'student-grades' (Akun Ortu)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Layar nilai siswa di portal wali murid menampilkan grafik batang capaian aspek perkembangan anak dan catatan narasi guru.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu monitoring nilai pada akun orang tua, ambil screenshot tampilan grafik nilai dan catatan guru.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-46" class="section-h2">6.3 Memantau Catatan Presensi Kehadiran Anak</h3><p class="manual-p">Pada menu 'Presensi Kehadiran' (Tab 'attendance'), orang tua dapat melihat kalender kehadiran ananda. Setiap kali ananda melakukan scan QR di gerbang sekolah, catatan waktu hadir otomatis tercatat di halaman ini, sehingga orang tua merasa aman dan yakin bahwa anak telah tiba di sekolah dengan selamat.</p>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 45: Riwayat Presensi Kehadiran Ananda pada Akun Orang Tua]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'attendance' (Akun Ortu)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tabel catatan kehadiran anak menampilkan tanggal, jam kedatangan di sekolah, status (Hadir/Sakit/Izin), dan persentase kehadiran.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu presensi pada akun orang tua, ambil screenshot tabel riwayat kehadiran anak.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-47" class="section-h2">6.4 Mengetahui Jadwal Kegiatan Belajar Mengajar (KBM)</h3><p class="manual-p">Menu 'Jadwal Belajar KBM' (Tab 'schedules') menyajikan kalender aktivitas belajar ananda. Orang tua dapat mengetahui tema pelajaran esok hari, perlengkapan yang perlu dipersiapkan dari rumah, hingga jadwal kegiatan luar ruangan atau cooking class.</p><h3 id="sub-48" class="section-h2">6.5 Panduan Pembayaran SPP TK Online & Cetak Kwitansi Digital</h3><p class="manual-p">Menu 'Pembayaran SPP TK' (Tab 'spp') mempermudah pembayaran SPP bulanan tanpa perlu datang ke kasir sekolah:</p><li class="manual-bullet"><strong>1. Pilih Bulan Tagihan: </strong>Buka tab 'Pembayaran SPP TK'. Di layar tersaji 12 kartu bulan tagihan (Juli hingga Juni).</li><li class="manual-bullet"><strong>2. Klik Bayar: </strong>Pilih bulan yang berstatus 'Belum Bayar' (ditandai warna merah/kuning). Klik tombol 'Bayar Sekarang'.</li><li class="manual-bullet"><strong>3. Info Rekening / QRIS: </strong>Layar akan menampilkan informasi nomor rekening resmi sekolah (misal: BCA 123-456-7890 atas nama Smart Kids) atau Gambar Kode QRIS Sekolah.</li><li class="manual-bullet"><strong>4. Lakukan Transfer: </strong>Lakukan transfer dana melalui Mobile Banking, ATM, atau scan QRIS melalui dompet digital.</li><li class="manual-bullet"><strong>5. Upload Struk: </strong>Ambil foto atau screenshot struk bukti transfer yang berhasil, lalu unggah pada kolom 'Unggah Bukti Pembayaran' (maks 1 MB).</li><li class="manual-bullet"><strong>6. Verifikasi Admin: </strong>Klik 'Kirim Konfirmasi Pembayaran'. Status tagihan akan berubah menjadi 'Menunggu Konfirmasi' (kuning).</li><li class="manual-bullet"><strong>7. Status Lunas: </strong>Setelah diverifikasi oleh pihak bendahara sekolah, status tagihan otomatis berubah menjadi 'LUNAS' (hijau).</li><li class="manual-bullet"><strong>8. Kwitansi Digital: </strong>Orang tua dapat mengklik tombol 'Unduh Kwitansi' untuk mencetak bukti pelunasan SPP berstempel digital resmi.</li>
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 46: Halaman Pembayaran SPP Online & Unggah Bukti Bayar (Wali Murid)]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'spp' (Akun Ortu)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Tampilan kartu tagihan SPP bulanan di portal ortu lengkap dengan tombol bayar, rincian rekening, dan form unggah struk transfer.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Buka menu pembayaran SPP pada akun orang tua, klik tombol bayar hingga modal transfer muncul, lalu ambil screenshot.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    
+                    <div class="img-placeholder-card">
+                        <div class="img-header">
+                            <span class="img-icon">🖼️</span>
+                            <span class="img-title">🖼️ [TEMPAT GAMBAR 47: Tampilan Kwitansi Resmi Pembayaran SPP di Portal Wali Murid]</span>
+                        </div>
+                        <div class="img-details">
+                            <div class="img-row"><span class="img-label">📍 Rute / Lokasi:</span> <code class="route-badge">/admin/dashboard -> Tab 'spp' (Unduh Kwitansi Ortu)</code></div>
+                            <div class="img-row"><span class="img-label">📝 Deskripsi:</span> <span>Pratinjau kwitansi digital pembayaran SPP yang siap diunduh atau dicetak oleh orang tua.</span></div>
+                            <div class="img-row"><span class="img-label">💡 Tips Screenshot:</span> <span class="tips-text">Klik tombol kwitansi pada bulan yang telah lunas di akun orang tua, ambil screenshot kwitansi resmi.</span></div>
+                        </div>
+                        <div class="img-dropzone">
+                            <span class="dropzone-text">▼ TEMPELKAN TANGKAPAN LAYAR DI SINI ▼</span>
+                        </div>
+                    </div>
+                    <h3 id="sub-49" class="section-h2">6.6 Pendaftaran & Pemantauan Program Les SD Ananda</h3><p class="manual-p">Bagi orang tua yang memiliki kakak atau ananda yang telah memasuki usia sekolah dasar, orang tua dapat langsung mendaftarkan bimbingan belajar pada tab 'Program Les SD'. Di halaman ini, orang tua dapat memantau perkembangan belajar les SD anak dan membayar iuran les SD secara terintegrasi.</p><h3 id="sub-50" class="section-h2">6.7 Membaca Pengumuman & Agenda Penting Sekolah</h3><p class="manual-p">Menu 'Pengumuman Sekolah' memastikan orang tua tidak tertinggal informasi penting, seperti tanggal pembagian rapor, jadwal outing class, surat edaran hari libur nasional, hingga agenda parenting school bersama para pakar pendidikan anak.</p><div class="section-divider"></div><h2 id="section-10" class="chapter-h1"><span class="h1-badge">BAB 10</span> BAB 7: TANYA JAWAB (FAQ) & PANDUAN PEMECAHAN MASALAH</h2><p class="manual-p">Bab ini menyajikan solusi praktis terhadap kendala operasional yang paling sering ditemui oleh pengguna sistem:</p><h3 id="sub-51" class="section-h2">7.1 Lupa Kata Sandi Akun / Akun Terkunci</h3><p class="manual-p"><strong>Gejala: </strong>Kendala: Pengguna tidak dapat masuk karena lupa kata sandi atau salah memasukkan kata sandi.</p><p class="manual-p"><strong>Solusi Perbaikan: </strong>Solusi: Orang tua atau guru dapat menghubungi pihak Administrator Sekolah melalui nomor WhatsApp layanan bantuan resmi. Administrator Cabang atau Super Admin dapat membuka menu 'User Admin & Akses' (Tab 'users'), mencari nama pengguna, dan melakukan reset kata sandi menjadi kata sandi sementara.</p><h3 id="sub-52" class="section-h2">7.2 Gagal Mengunggah Berkas / Dokumen Pendaftaran</h3><p class="manual-p"><strong>Gejala: </strong>Kendala: Muncul pesan kesalahan 'Ukuran file melebihi batas maksimal' atau file tidak dapat diproses saat pendaftaran PPDB atau upload bukti bayar.</p><p class="manual-p"><strong>Solusi Perbaikan: </strong>Solusi: Sistem membatasi ukuran berkas maksimal sebesar 1 MB (1024 KB). Pastikan file foto atau dokumen PDF Anda tidak melebihi 1 MB. Jika foto diambil dengan kamera HP resolusi tinggi yang menghasilkan file 3-5 MB, silakan kompres foto terlebih dahulu (dapat menggunakan aplikasi kompres foto, kirim foto ke WhatsApp sendiri lalu unduh kembali, atau menggunakan web kompresi online). Pastikan pula format file adalah JPG, PNG, atau PDF.</p><h3 id="sub-53" class="section-h2">7.3 Kamera Pemindai QR Code Tidak Aktif di Browser</h3><p class="manual-p"><strong>Gejala: </strong>Kendala: Kotak pemindai kamera QR Code di menu presensi berwarna hitam atau muncul peringatan 'Izin kamera ditolak'.</p><p class="manual-p"><strong>Solusi Perbaikan: </strong>Solusi: 1) Periksa izin akses kamera pada peramban web Anda (klik ikon gembok di bilah alamat browser, lalu aktifkan opsi Camera: Allow). 2) Pastikan kamera tidak sedang digunakan oleh aplikasi lain (seperti Zoom, Google Meet, atau Camera App). 3) Muat ulang (Refresh) halaman peramban.</p><h3 id="sub-54" class="section-h2">7.4 Bukti Pembayaran SPP Belum Terverifikasi</h3><p class="manual-p"><strong>Gejala: </strong>Kendala: Orang tua sudah mengunggah slip bukti transfer, namun status tagihan masih bertuliskan 'Menunggu Konfirmasi'.</p><p class="manual-p"><strong>Solusi Perbaikan: </strong>Solusi: Proses verifikasi pembayaran dilakukan secara manual oleh bendahara sekolah pada jam kerja operasional (Senin - Sabtu pukul 08.00 - 17.00 WIB). Jika transfer dilakukan di luar jam kerja atau hari libur, verifikasi akan diproses pada hari kerja berikutnya. Bila mendesak, orang tua dapat mengirim konfirmasi ke WhatsApp bendahara sekolah.</p><h3 id="sub-55" class="section-h2">7.5 Halaman Aplikasi Terasa Lambat atau Tampilan Tidak Berubah</h3><p class="manual-p"><strong>Gejala: </strong>Kendala: Perubahan data atau gambar yang baru diunggah belum tampil sempurna di layar.</p><p class="manual-p"><strong>Solusi Perbaikan: </strong>Solusi: Lakukan pembersihan cache peramban dengan menekan kombinasi tombol Ctrl + F5 (pada Windows) atau Cmd + Shift + R (pada Mac) untuk memaksa browser memuat versi terbaru aplikasi tanpa menggunakan cache lama.</p><h3 id="sub-56" class="section-h2">7.6 Layanan Bantuan & Kontak Dukungan Teknis</h3><p class="manual-p">Apabila Anda menemui kendala teknis yang belum tercantum dalam buku panduan ini, silakan menghubungi tim pusat bantuan Smart Kids:</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Unit Layanan</th><th>Penanggung Jawab</th><th>Kontak Telepon / WA</th><th>Email Resmi</th></tr></thead><tbody><tr><td>Helpdesk IT & Sistem</td><td>Pusat Teknologi YAPCHI Foundation</td><td>0812 3456 7890</td><td>it-support@yapchi.or.id</td></tr><tr><td>Administrasi Cabang Sadjati</td><td>Smart Kids Cabang Sadjati</td><td>0812 3456 7891</td><td>sadjati@smartkids.sch.id</td></tr><tr><td>Administrasi Cabang BCL</td><td>Smart Kids Cabang BCL</td><td>0812 3456 7892</td><td>bcl@smartkids.sch.id</td></tr><tr><td>Jam Operasional Layanan</td><td>Senin s/d Sabtu (08:00 - 17:00 WIB)</td><td>Respons Cepat WhatsApp</td><td>Hari Minggu / Libur Nasional Tutup</td></tr></tbody></table></div><div class="section-divider"></div><h2 id="section-11" class="chapter-h1"><span class="h1-badge">BAB 11</span> BAB 8: LAMPIRAN STANDAR OPERASIONAL PROSEDUR (SOP) & DAFTAR PERIKSA</h2><p class="manual-p">Bab penutup ini memuat protokol operasional standar (SOP), jadwal siklus administrasi, daftar periksa kepatuhan kerja harian/bulanan bagi administrator maupun guru, serta glosarium terminologi sistem Smart Kids.</p><h3 id="sub-57" class="section-h2">8.1 SOP Alur Penerimaan Peserta Didik Baru (PPDB) Online & Verifikasi</h3><p class="manual-p">Standar operasional prosedur pengelolaan pendaftaran siswa baru dirancang untuk menjamin kecepatan layanan serta validitas dokumen calon peserta didik:</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Tahap</th><th>Aktivitas SOP</th><th>Pelaksana</th><th>Uraian Prosedur</th><th>Batas Waktu / SLA</th></tr></thead><tbody><tr><td>Tahap 1</td><td>Pengisian Formulir Online</td><td>Calon Wali Murid</td><td>Melengkapi biodata siswa, data orang tua, mengunggah KK, Akta Kelahiran, Pas Foto, serta bukti transfer biaya formulir.</td><td>Maks. 1x24 jam sejak draf dibuat</td></tr><tr><td>Tahap 2</td><td>Verifikasi Berkas Dokumen</td><td>Admin Cabang</td><td>Memeriksa keterbacaan berkas KK/Akta, kecocokan NIK, validasi transfer ke rekening yayasan, dan cek komponen biaya.</td><td>Maks. 2x24 jam kerja</td></tr><tr><td>Tahap 3</td><td>Penetapan Status PPDB</td><td>Admin Cabang</td><td>Mengubah status pendaftaran menjadi 'Diterima' atau 'Ditolak' disertai catatan perbaikan jika dokumen buram.</td><td>Seketika verifikasi selesai</td></tr><tr><td>Tahap 4</td><td>Pengiriman Akun Otomatis</td><td>Sistem / Admin</td><td>Menekan tombol 'Kirim Akun WhatsApp' untuk mengirim kredensial (NISN & password sementara) langsung ke WA orang tua.</td><td>Maks. 1 jam setelah berstatus Diterima</td></tr><tr><td>Tahap 5</td><td>Plotting Rombel Siswa</td><td>Admin Cabang</td><td>Menempatkan siswa baru yang diterima ke dalam rombongan belajar (kelas) yang sesuai pada menu 'Master Kelas & Plotting'.</td><td>H-7 sebelum tahun ajaran baru dimulai</td></tr></tbody></table></div><h3 id="sub-58" class="section-h2">8.2 SOP Siklus Penagihan, Pembayaran & Rekonsiliasi SPP Bulanan</h3><p class="manual-p">Alur tata kelola keuangan SPP bulanan dirancang transparan dan tertib administrasi dengan siklus bulanan sebagai berikut:</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Siklus Waktu</th><th>Aktivitas Finansial</th><th>Penanggung Jawab</th><th>Uraian Prosedur</th><th>Keluaran / Output</th></tr></thead><tbody><tr><td>Tanggal 01</td><td>Penerbitan Tagihan Otomatis</td><td>Sistem Otomatis</td><td>Sistem menerbitkan draf tagihan SPP untuk seluruh siswa aktif di setiap cabang sesuai besaran iuran cabang masing-masing.</td><td>Tersedia di portal ortu</td></tr><tr><td>Tgl 01 - 10</td><td>Masa Pembayaran Rutin</td><td>Wali Murid</td><td>Orang tua melakukan pembayaran melalui transfer bank resmi sekolah atau scan QRIS dinamis, lalu mengunggah slip bukti transfer.</td><td>Batas pembayaran reguler</td></tr><tr><td>Tgl 01 - 12</td><td>Verifikasi & Rekonsiliasi</td><td>Bendahara / Admin</td><td>Petugas mencocokkan mutasi rekening bank dengan slip unggahan wali murid. Jika valid, klik 'Verifikasi / Lunas'.</td><td>Maks. 1x24 jam sejak bukti diunggah</td></tr><tr><td>Real-time</td><td>Penerbitan Kwitansi Digital</td><td>Sistem Smart Kids</td><td>Kwitansi digital bertanda tangan dan stempel resmi instansi otomatis terbit dan dapat diunduh/dicetak langsung oleh orang tua.</td><td>Seketika status berubah Lunas</td></tr><tr><td>Tgl 11 - 15</td><td>Notifikasi Pengingat Tagihan</td><td>Admin Cabang</td><td>Pengiriman pesan pengingat sopan melalui WhatsApp resmi kepada wali murid yang belum melakukan pembayaran melewati tempo tanggal 10.</td><td>Sebelum tanggal 15 setiap bulan</td></tr></tbody></table></div><h3 id="sub-59" class="section-h2">8.3 SOP Prosedur Absensi Harian Siswa & Guru Berbasis QR Code</h3><p class="manual-p">Presensi digital menggunakan kartu QR Code siswa dirancang cepat dan akurat dengan ketentuan berikut:</p><li class="manual-bullet"><strong>1. Jam Kedatangan: </strong>Kamera scanner gerbang atau kelas diaktifkan mulai pukul 06.45 WIB. Setiap siswa memperlihatkan kartu QR Code ke kamera.</li><li class="manual-bullet"><strong>2. Toleransi Keterlambatan: </strong>Siswa yang memindai QR Code di atas pukul 07.45 WIB secara sistem akan tercatat dengan status 'Terlambat'.</li><li class="manual-bullet"><strong>3. Presensi Manual Darurat: </strong>Apabila kartu tertinggal atau kamera scanner mengalami gangguan teknis, guru wali kelas wajib melakukan presensi manual melalui akun guru sebelum pukul 08.30 WIB.</li><li class="manual-bullet"><strong>4. Kepulangan Siswa: </strong>Saat penjemputan anak (pukul 11.00 - 12.30 WIB), pemindaian QR kepulangan dicatat untuk memastikan keamanan penjemputan.</li><li class="manual-bullet"><strong>5. Presensi Kehadiran Guru: </strong>Guru melakukan presensi kehadiran mandiri di menu 'Presensi Guru' setiap hari kerja sebelum kegiatan belajar mengajar dimulai.</li><h3 id="sub-60" class="section-h2">8.4 SOP Penginputan Nilai & Penerbitan Rapor Perkembangan PAUD</h3><p class="manual-p">Penilaian perkembangan anak usia dini di Smart Kids mengacu pada standar PAUD terpadu:</p><li class="manual-bullet"><strong>6 Aspek Perkembangan: </strong>Penilaian harian/mingguan mencakup 6 bidang: Nilai Agama & Moral (NAM), Fisik Motorik (FM), Kognitif (KOG), Bahasa (BHS), Sosial Emosional (SOSEM), dan Seni (SN).</li><li class="manual-bullet"><strong>Skala Penilaian: </strong>Skala capaian menggunakan kriteria resmi: BB (Belum Berkembang), MB (Mulai Berkembang), BSH (Berkembang Sesuai Harapan), dan BSB (Berkembang Sangat Baik).</li><li class="manual-bullet"><strong>Catatan Guru: </strong>Guru wajib menambahkan catatan narasi personal mengenai perkembangan unik, bakat, serta area pendampingan yang disarankan kepada orang tua.</li><li class="manual-bullet"><strong>Batas Akhir Rapor: </strong>Seluruh nilai semester wajib diselesaikan dan diverifikasi oleh Kepala Sekolah paling lambat 7 hari kalender sebelum jadwal pembagian rapor.</li><h3 id="sub-61" class="section-h2">8.5 Checklist Pemeliharaan & Operasional Petugas Administrator</h3><p class="manual-p">Tabel checklist berikut menjadi panduan harian, mingguan, dan bulanan bagi Administrator Cabang dan Super Admin:</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Frekuensi</th><th>Aktivitas Pengawasan Administrasi</th><th>Target SLA / Waktu</th><th>Modul Sistem</th></tr></thead><tbody><tr><td>Harian</td><td>Cek pendaftar PPDB baru dan verifikasi berkas yang masuk</td><td>Maks. 2x24 Jam</td><td>Menu PPDB</td></tr><tr><td>Harian</td><td>Cek unggahan bukti transfer SPP dan lakukan rekonsiliasi bank</td><td>Pukul 09.00 & 15.00 WIB</td><td>Menu SPP</td></tr><tr><td>Harian</td><td>Pantau rekap kehadiran harian siswa dan guru</td><td>Pukul 08.30 WIB</td><td>Menu Presensi</td></tr><tr><td>Mingguan</td><td>Periksa permohonan izin/cuti guru yang tertunda</td><td>Setiap Jumat</td><td>Menu Pengajuan Cuti</td></tr><tr><td>Mingguan</td><td>Perbarui galeri kegiatan belajar & pengumuman agenda sekolah</td><td>Setiap Sabtu</td><td>Menu Galeri & Pengumuman</td></tr><tr><td>Bulanan</td><td>Ekspor laporan penerimaan SPP dan rekap presensi (CSV/Excel)</td><td>Akhir Bulan</td><td>Menu SPP / Guru Progress</td></tr><tr><td>Bulanan</td><td>Kirim pesan pengingat tagihan SPP bagi yang menunggak</td><td>Tanggal 11 setiap bulan</td><td>Menu SPP WhatsApp</td></tr><tr><td>Semester</td><td>Audit kelengkapan plotting siswa dan penerbitan rapor</td><td>Akhir Semester</td><td>Menu Kelas & Nilai</td></tr></tbody></table></div><h3 id="sub-62" class="section-h2">8.6 Checklist Rutin Harian Tenaga Pendidik (Guru Kelas)</h3><p class="manual-p">Checklist kegiatan operasional digital bagi setiap guru wali kelas:</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Waktu Pelaksanaan</th><th>Aktivitas Guru</th><th>Ketentuan</th><th>Lokasi Menu</th></tr></thead><tbody><tr><td>Pagi (07.00 - 07.45)</td><td>Lakukan presensi kehadiran mandiri guru di portal</td><td>Wajib setiap hari kerja</td><td>Menu Presensi Guru</td></tr><tr><td>Pagi (07.15 - 08.00)</td><td>Buka kamera scanner presensi siswa atau absensi manual di kelas binaan</td><td>Sebelum KBM dimulai</td><td>Menu Presensi Siswa</td></tr><tr><td>Siang (11.00 - 12.00)</td><td>Catat absensi kepulangan siswa saat ananda dijemput wali murid</td><td>Saat jam kepulangan</td><td>Menu Presensi Siswa</td></tr><tr><td>Siang (12.00 - 13.00)</td><td>Input catatan observasi harian atau skor aspek capaian pembelajaran</td><td>Berkala setiap minggu</td><td>Menu Nilai Siswa</td></tr><tr><td>Jumat Sore</td><td>Cek agenda jadwal mengajar KBM untuk minggu berikutnya</td><td>Jumat pukul 14.00</td><td>Menu Jadwal KBM</td></tr><tr><td>Insidental</td><td>Ajukan surat permohonan izin/sakit online jika berhalangan</td><td>H-1 atau pagi hari H</td><td>Menu Pengajuan Cuti</td></tr></tbody></table></div><h3 id="sub-63" class="section-h2">8.7 Glosarium Terminologi Sistem & Singkatan Teknis</h3><p class="manual-p">Daftar istilah dan singkatan yang digunakan di dalam sistem Smart Kids:</p><div class="table-responsive"><table class="manual-table"><thead><tr><th>Istilah / Singkatan</th><th>Definisi & Penjelasan Teknis</th></tr></thead><tbody><tr><td>PPDB Online</td><td>Penerimaan Peserta Didik Baru secara daring melalui website resmi.</td></tr><tr><td>Multi-Tenant / Multi-Sekolah</td><td>Arsitektur perangkat lunak yang melayani banyak unit sekolah dalam 1 basis data terpusat yayasan dengan pemisahan data aman.</td></tr><tr><td>NISN</td><td>Nomor Induk Siswa Nasional, kode pengenal unik siswa yang digunakan sekaligus sebagai ID login portal siswa/ortu.</td></tr><tr><td>QRIS</td><td>Quick Response Code Indonesian Standard, standar kode QR nasional untuk pembayaran non-tunai dari seluruh dompet digital/m-banking.</td></tr><tr><td>Plotting Siswa</td><td>Proses penempatan atau pembagian siswa baru ke dalam rombongan belajar (rombel) kelas tertentu.</td></tr><tr><td>PIC Les SD</td><td>Person in Charge, guru yang ditugaskan khusus membimbing dan mengelola data murid bimbingan belajar Les SD.</td></tr><tr><td>Sentra Belajar</td><td>Metode pembelajaran tematik PAUD (contoh: Sentra Balok, Sentra Seni, Sentra Imtaq, Sentra Bahan Alam).</td></tr><tr><td>NAM / FM / KOG / BHS / SOSEM / SN</td><td>Enam aspek perkembangan anak: Nilai Agama Moral, Fisik Motorik, Kognitif, Bahasa, Sosial Emosional, Seni.</td></tr><tr><td>BB / MB / BSH / BSB</td><td>Tingkat capaian nilai: Belum Berkembang, Mulai Berkembang, Berkembang Sesuai Harapan, Berkembang Sangat Baik.</td></tr><tr><td>JWT (JSON Web Token)</td><td>Protokol otorisasi keamanan berbasis token yang menjaga sesi login pengguna tetap aman dan terenkripsi.</td></tr></tbody></table></div>
+        </main>
+    </div>
+
+    <script>
+        function filterTOC() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const links = document.querySelectorAll('.toc-link');
+            links.forEach(link => {
+                if (link.textContent.toLowerCase().includes(input)) {
+                    link.style.display = 'block';
+                } else {
+                    link.style.display = 'none';
+                }
+            });
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const target = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', target);
+            document.getElementById('themeBtn').textContent = target === 'dark' ? '☀️ Terang' : '🌙 Gelap';
+        }
+    </script>
+</body>
+</html>

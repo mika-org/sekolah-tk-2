@@ -453,9 +453,6 @@ export default function AdminDashboardPage() {
   const isAnyModalOpenRef = useRef(isAnyModalOpen);
   isAnyModalOpenRef.current = isAnyModalOpen;
 
-  const modalHistoryPushedRef = useRef(false);
-  const isClosingViaBackRef = useRef(false);
-
   const closeAllModals = useCallback(() => {
     let closed = false;
     if (previewModal.isOpen) {
@@ -480,6 +477,10 @@ export default function AdminDashboardPage() {
     }
     if (qrModal.isOpen) {
       setQrModal((prev) => ({ ...prev, isOpen: false }));
+      closed = true;
+    }
+    if (studentQrModal.isOpen) {
+      setStudentQrModal((prev) => ({ ...prev, isOpen: false, student: null, qrDataUrl: "" }));
       closed = true;
     }
     if (teacherProgressModal.isOpen) {
@@ -510,7 +511,18 @@ export default function AdminDashboardPage() {
       setEditingVideoModal(false);
       closed = true;
     }
-
+    if (editingStudent) {
+      setEditingStudent(null);
+      closed = true;
+    }
+    if (editingTeacher) {
+      setEditingTeacher(null);
+      closed = true;
+    }
+    if (editingClassRoom) {
+      setEditingClassRoom(null);
+      closed = true;
+    }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("close-child-modals"));
     }
@@ -523,6 +535,7 @@ export default function AdminDashboardPage() {
     addStudentToClassModal,
     selectedCredentialModal,
     qrModal.isOpen,
+    studentQrModal.isOpen,
     teacherProgressModal.isOpen,
     teacherCredentialModal.isOpen,
     progressiveHistoryModal.isOpen,
@@ -530,39 +543,22 @@ export default function AdminDashboardPage() {
     sppPaymentModal.isOpen,
     dailyGradeModal.isOpen,
     editingVideoModal,
+    editingStudent,
+    editingTeacher,
+    editingClassRoom,
+    editingProgram,
   ]);
 
-  // Sinkronisasi riwayat browser dengan modal terbuka
+  // Tutup modal menggunakan tombol Escape keyboard tanpa memanipulasi history browser
   useEffect(() => {
-    if (isAnyModalOpen) {
-      if (!modalHistoryPushedRef.current) {
-        modalHistoryPushedRef.current = true;
-        window.history.pushState({ isModal: true }, "", window.location.href);
-      }
-    } else {
-      if (modalHistoryPushedRef.current && !isClosingViaBackRef.current) {
-        // Modal ditutup via UI (klik tombol X, klik backdrop, dsb), bukan tombol Back
-        modalHistoryPushedRef.current = false;
-        if (typeof window !== "undefined" && window.history.state?.isModal) {
-          window.history.back();
-        }
-      }
-      isClosingViaBackRef.current = false;
-    }
-  }, [isAnyModalOpen]);
-
-  // Tangani event tombol Back (popstate) browser & perangkat
-  useEffect(() => {
-    const handlePopState = () => {
-      if (isAnyModalOpenRef.current || modalHistoryPushedRef.current) {
-        isClosingViaBackRef.current = true;
-        modalHistoryPushedRef.current = false;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
         closeAllModals();
       }
     };
 
-    window.addEventListener("popstate", handlePopState);
-    return () => window.removeEventListener("popstate", handlePopState);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closeAllModals]);
 
   // Helper & Memos untuk Hak Akses & Data Akun Orang Tua (ORTU / ORANG_TUA)
@@ -2443,6 +2439,7 @@ _Tata Usaha & Keuangan Sekolah_`;
           id: "kbm_kelas",
           title: "Kegiatan Belajar & Kelas",
           items: [
+            { id: "students", label: "Penilaian & Data Murid", icon: GraduationCap, iconColor: "text-amber-400", badge: studentsList.length },
             { id: "attendance", label: "Presensi Siswa", icon: CheckCircle, iconColor: "text-emerald-400", badge: attendanceList.length },
             { id: "schedules", label: "Jadwal Mengajar KBM", icon: Clock, iconColor: "text-cyan-400", badge: schedulesList.length },
             { id: "classes", label: "Master Kelas & Siswa", icon: Layers, iconColor: "text-emerald-400", badge: classesList.length },
@@ -3947,12 +3944,34 @@ _Tata Usaha & Keuangan Sekolah_`;
                                     />
                                   </div>
 
-                                  <button
-                                    onClick={() => handlePlotStudent(st.id, null, "REMOVE")}
-                                    className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-bold transition-all border border-red-500/20 shrink-0"
-                                  >
-                                    Keluarkan
-                                  </button>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setDailyGradeModal({
+                                          isOpen: true,
+                                          studentId: st.id,
+                                          studentName: st.name,
+                                          subject: "Moral & Agama",
+                                          score: 0,
+                                          date: new Date().toISOString().split("T")[0],
+                                          notes: "",
+                                        })
+                                      }
+                                      className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer"
+                                      title="Input Nilai Harian Siswa"
+                                    >
+                                      <Plus className="w-3.5 h-3.5" />
+                                      <span>Input Nilai</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePlotStudent(st.id, null, "REMOVE")}
+                                      className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-bold transition-all border border-red-500/20"
+                                    >
+                                      Keluarkan
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -5458,38 +5477,72 @@ _Tata Usaha & Keuangan Sekolah_`;
             </div>
           )}
 
-          {/* TAB: DATA SISWA */}
+          {/* TAB: DATA SISWA & PENILAIAN */}
           {activeTab === "students" && (
             <div className="space-y-6 w-full">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800/80 pb-4">
                 <div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Kelola Data Siswa / Murid</h2>
-                  <p className="text-xs text-slate-400">Daftar seluruh siswa terdaftar per cabang sekolah.</p>
+                  <h2 className="text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+                    <span>{admin?.role === "GURU" ? "Penilaian & Data Murid" : "Kelola Data Siswa / Murid"}</span>
+                    {admin?.role === "GURU" && (
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                        Portal Guru
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    {admin?.role === "GURU"
+                      ? "Beri nilai perkembangan aspek belajar, pantau capaian rapor siswa, dan kelola murid kelas."
+                      : "Daftar seluruh siswa terdaftar per cabang sekolah & kalkulasi transkrip nilai."}
+                  </p>
                 </div>
-                <button
-                  onClick={() =>
-                    setEditingStudent({
-                      name: "",
-                      nisn: `2122${Math.floor(1000 + Math.random() * 9000)}`,
-                      className: "Kelas TK A",
-                      gender: "L",
-                      avatarUrl: "https://i.pravatar.cc/150",
-                      birthPlaceDate: "Karawang, 01 Jan 2021",
-                      parentName: "",
-                      parentPhone: "",
-                      address: "",
-                      attendanceRate: 0.0,
-                      dailyGrade: 0.0,
-                      semesterGrade: 0.0,
-                      averageGrade: 0.0,
-                      schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
-                    })
-                  }
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Tambah Siswa</span>
-                </button>
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setDailyGradeModal({
+                        isOpen: true,
+                        studentId: studentsList[0]?.id || "",
+                        studentName: studentsList[0]?.name || "Siswa",
+                        subject: "Moral & Agama",
+                        score: 0,
+                        date: new Date().toISOString().split("T")[0],
+                        notes: "",
+                      })
+                    }
+                    className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/30 cursor-pointer transition-all"
+                    title="Buka form input nilai harian murid"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Input Nilai Murid</span>
+                  </button>
+                  {admin?.role !== "GURU" && (
+                    <button
+                      onClick={() =>
+                        setEditingStudent({
+                          name: "",
+                          nisn: `2122${Math.floor(1000 + Math.random() * 9000)}`,
+                          className: "Kelas TK A",
+                          gender: "L",
+                          avatarUrl: "https://i.pravatar.cc/150",
+                          birthPlaceDate: "Karawang, 01 Jan 2021",
+                          parentName: "",
+                          parentPhone: "",
+                          address: "",
+                          attendanceRate: 0.0,
+                          dailyGrade: 0.0,
+                          semesterGrade: 0.0,
+                          averageGrade: 0.0,
+                          schoolId: selectedSchoolId !== "ALL" ? selectedSchoolId : schoolsList[0]?.id,
+                        })
+                      }
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/30 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Tambah Siswa</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* MODAL EDIT DATA SISWA & ORANG TUA */}
@@ -6320,8 +6373,10 @@ _Tata Usaha & Keuangan Sekolah_`;
                         >
                           <MessageCircle className="w-4 h-4 text-emerald-400" />
                         </button>
-                        <button onClick={() => setEditingStudent(s)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Edit Data & Transkrip Siswa"><Edit className="w-4 h-4" /></button>
-                        <button onClick={() => handleDeleteStudent(s.id)} className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer" title="Hapus Siswa"><Trash2 className="w-4 h-4" /></button>
+                        <button type="button" onClick={() => setEditingStudent(s)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer" title="Edit Data & Transkrip Siswa"><Edit className="w-4 h-4" /></button>
+                        {admin?.role !== "GURU" && (
+                          <button type="button" onClick={() => handleDeleteStudent(s.id)} className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl cursor-pointer" title="Hapus Siswa"><Trash2 className="w-4 h-4" /></button>
+                        )}
                       </div>
                     </div>
                   </div>
